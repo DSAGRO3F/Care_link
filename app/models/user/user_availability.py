@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, time
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import String, Integer, Boolean, Text, ForeignKey, Date, Time, UniqueConstraint, CheckConstraint
+from sqlalchemy import Integer, Boolean, Text, ForeignKey, Date, Time, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base

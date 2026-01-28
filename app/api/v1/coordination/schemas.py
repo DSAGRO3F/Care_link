@@ -7,6 +7,7 @@ Contient les schémas pour :
 """
 from datetime import date, datetime, time
 from typing import Optional, List
+
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 

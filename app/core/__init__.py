@@ -1,4 +1,4 @@
-from app.core.tenant_context import (
+from app.core.session.tenant_context import (
     get_current_tenant_id,
     get_current_user_id,
     get_is_super_admin,

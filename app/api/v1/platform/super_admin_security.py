@@ -10,10 +10,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
+from app.core.security.jwt import verify_token
 from app.database.session_rls import get_db_no_rls as get_db
-from app.core.jwt import verify_token
 from app.models.platform.super_admin import SuperAdmin, SuperAdminRole
-
 
 # =============================================================================
 # SECURITY SCHEME

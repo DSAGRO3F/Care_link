@@ -10,9 +10,10 @@ Contient les schémas pour :
 """
 
 from datetime import datetime
-from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from enum import Enum
+from typing import Optional, List, Any, Dict
+
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 # =============================================================================

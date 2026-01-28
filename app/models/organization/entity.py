@@ -12,16 +12,16 @@ Une entité peut être :
 """
 
 from datetime import date
-from typing import TYPE_CHECKING, List, Optional
 from decimal import Decimal
+from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import String, ForeignKey, Text, Integer, Date, Numeric
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import String, ForeignKey, Text, Integer, Date, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin, StatusMixin
 from app.models.enums import EntityType, IntegrationType
+from app.models.mixins import TimestampMixin, StatusMixin
 
 if TYPE_CHECKING:
     from app.models.reference.country import Country

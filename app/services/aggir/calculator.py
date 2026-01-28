@@ -12,8 +12,8 @@ Date: Décembre 2024
 Version: 1.0.0 - Intégration CareLink
 """
 
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, Tuple, Optional, Any
 
 

@@ -11,17 +11,14 @@ Usage dans main.py:
 """
 from fastapi import APIRouter
 
-from .organization import router as organization_router
-
-
 from .auth import router as auth_router
-from .user import router as user_router
-from .patient import router as patient_router
-from .catalog import router as catalog_router
 from .careplan import router as careplan_router
+from .catalog import router as catalog_router
 from .coordination import router as coordination_router
+from .organization import router as organization_router
+from .patient import router as patient_router
 from .tenants import router as tenants_router
-
+from .user import router as user_router
 
 # =============================================================================
 # ROUTER PRINCIPAL

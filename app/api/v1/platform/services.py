@@ -9,27 +9,25 @@ Gestion au niveau plateforme (SuperAdmin) :
 - PlatformStatsService : Statistiques globales
 """
 import uuid
-from typing import Optional, List, Tuple
 from datetime import datetime, timezone, date, timedelta
+from typing import Optional, List, Tuple
 
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import Session, selectinload
-
-from app.models.tenants.tenant import Tenant, TenantStatus, TenantType
-from app.models.platform.super_admin import SuperAdmin, SuperAdminRole
-from app.models.platform.platform_audit_log import PlatformAuditLog
-from app.models.user.user_tenant_assignment import UserTenantAssignment
-from app.models.user.user import User
-from app.models.patient.patient import Patient
-from app.models.organization.entity import Entity
-
-from app.core.hashing import hash_password, verify_password
 
 from app.api.v1.platform.schemas import (
     TenantCreate, TenantUpdate, TenantFilters, SuperAdminCreate, SuperAdminUpdate, SuperAdminPasswordChange,
     AuditLogFilters,
     UserTenantAssignmentCreate, UserTenantAssignmentUpdate, UserTenantAssignmentFilters,
 )
+from app.core.security.hashing import hash_password, verify_password
+from app.models.organization.entity import Entity
+from app.models.patient.patient import Patient
+from app.models.platform.platform_audit_log import PlatformAuditLog
+from app.models.platform.super_admin import SuperAdmin, SuperAdminRole
+from app.models.tenants.tenant import Tenant, TenantStatus, TenantType
+from app.models.user.user import User
+from app.models.user.user_tenant_assignment import UserTenantAssignment
 
 
 # =============================================================================

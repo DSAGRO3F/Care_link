@@ -10,17 +10,27 @@ Gestion au niveau plateforme (SuperAdmin) :
 
 IMPORTANT: Toutes ces routes nécessitent une authentification SuperAdmin.
 """
-from typing import Optional, List
-from datetime import date, datetime
+import math
+from datetime import datetime
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db_no_rls as get_db
-from app.api.v1.platform.super_admin_security import (
-    get_current_super_admin,
-    require_super_admin_permission,
-    SuperAdminPermissions,
+from app.api.v1.platform.schemas import (
+    # Tenant
+    TenantCreate, TenantUpdate, TenantResponse, TenantFilters,
+    TenantStatusAPI, TenantTypeAPI, TenantStats,
+    # SuperAdmin
+    SuperAdminCreate, SuperAdminUpdate, SuperAdminResponse,
+    SuperAdminPasswordChange,
+    # AuditLog
+    AuditLogResponse, AuditLogFilters,
+    # Assignment
+    UserTenantAssignmentCreate, UserTenantAssignmentUpdate,
+    UserTenantAssignmentResponse, UserTenantAssignmentFilters, AssignmentTypeAPI,
+    # Stats
+    PlatformStats,
 )
 from app.api.v1.platform.services import (
     TenantService,
@@ -39,25 +49,13 @@ from app.api.v1.platform.services import (
     DuplicateAssignmentError,
     InvalidAssignmentError,
 )
-from app.api.v1.platform.schemas import (
-    # Tenant
-    TenantCreate, TenantUpdate, TenantResponse, TenantFilters,
-    TenantStatusAPI, TenantTypeAPI, TenantStats,
-    # SuperAdmin
-    SuperAdminCreate, SuperAdminUpdate, SuperAdminResponse,
-    SuperAdminPasswordChange,
-    # AuditLog
-    AuditLogResponse, AuditLogFilters,
-    # Assignment
-    UserTenantAssignmentCreate, UserTenantAssignmentUpdate,
-    UserTenantAssignmentResponse, UserTenantAssignmentFilters, AssignmentTypeAPI,
-    # Stats
-    PlatformStats,
+from app.api.v1.platform.super_admin_security import (
+    get_current_super_admin,
+    require_super_admin_permission,
+    SuperAdminPermissions,
 )
+from app.database.session_rls import get_db_no_rls as get_db
 from app.models.platform.super_admin import SuperAdmin
-
-import math
-
 
 # =============================================================================
 # ROUTER

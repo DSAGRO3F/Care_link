@@ -11,18 +11,17 @@ Usage:
         return db.query(Patient).all()
 """
 
-from typing import Generator, Optional
 from contextlib import contextmanager
+from typing import Generator, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.database.session import SessionLocal
-from app.core.tenant_context import (
+from app.core.session.tenant_context import (
     get_current_tenant_id,
-    get_current_user_id,
     get_is_super_admin,
 )
+from app.database.session import SessionLocal
 
 
 def configure_tenant_context(db: Session, tenant_id: Optional[int], is_super_admin: bool = False) -> None:

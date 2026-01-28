@@ -17,7 +17,6 @@ from app.models.enums import AccessType
 if TYPE_CHECKING:
     from app.models.patient.patient import Patient
     from app.models.user.user import User
-    from app.models.tenants.tenant import Tenant
 
 
 class PatientAccess(Base):

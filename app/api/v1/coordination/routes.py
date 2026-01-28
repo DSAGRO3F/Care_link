@@ -8,15 +8,11 @@ Endpoints pour :
 
 Version multi-tenant : tous les endpoints filtrent par tenant_id.
 """
-from typing import Optional
 from datetime import date, datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user
-from app.models.user.user import User
 
 from app.api.v1.coordination.schemas import (
     # CoordinationEntry
@@ -30,7 +26,6 @@ from app.api.v1.coordination.schemas import (
     # Planning
     DailyPlanning,
 )
-
 from app.api.v1.coordination.services import (
     CoordinationEntryService, ScheduledInterventionService,
     # Exceptions
@@ -38,9 +33,11 @@ from app.api.v1.coordination.services import (
     PatientNotFoundError, UserNotFoundError, CarePlanServiceNotFoundError,
     InterventionStatusError, EntryAlreadyDeletedError,
 )
-
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
+from app.core.auth.user_auth import get_current_user
+from app.database.session_rls import get_db
+from app.models.user.user import User
 
 # =============================================================================
 # ROUTERS

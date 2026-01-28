@@ -10,17 +10,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db_no_rls
-from app.models.tenants.tenant import Tenant
-from app.models.tenants.subscription import Subscription
-from app.models.enums import SubscriptionStatus
-from app.models.platform.super_admin import SuperAdmin
-
 from app.api.v1.platform.super_admin_security import (
     require_super_admin_permission,
     SuperAdminPermissions,
 )
-
+from app.database.session_rls import get_db_no_rls
+from app.models.enums import SubscriptionStatus
+from app.models.platform.super_admin import SuperAdmin
+from app.models.tenants.subscription import Subscription
+from app.models.tenants.tenant import Tenant
 from .schemas import (
     SubscriptionCreate,
     SubscriptionUpdate,

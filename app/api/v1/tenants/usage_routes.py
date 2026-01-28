@@ -7,26 +7,23 @@ Toutes les routes sont réservées aux SuperAdmins (équipe CareLink).
 """
 
 from typing import Optional
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import extract
-
-from app.database.session_rls import get_db_no_rls
-from app.models.tenants.tenant import Tenant
-from app.models.tenants.subscription import Subscription
-from app.models.tenants.subscription_usage import SubscriptionUsage
-from app.models.enums import SubscriptionStatus
-from app.models.patient.patient import Patient
-from app.models.user.user import User
-from app.models.platform.super_admin import SuperAdmin
+from sqlalchemy.orm import Session
 
 from app.api.v1.platform.super_admin_security import (
     require_super_admin_permission,
     SuperAdminPermissions,
 )
-
+from app.database.session_rls import get_db_no_rls
+from app.models.enums import SubscriptionStatus
+from app.models.patient.patient import Patient
+from app.models.platform.super_admin import SuperAdmin
+from app.models.tenants.subscription import Subscription
+from app.models.tenants.subscription_usage import SubscriptionUsage
+from app.models.tenants.tenant import Tenant
+from app.models.user.user import User
 from .schemas import (
     UsageResponse,
     CurrentUsageResponse,

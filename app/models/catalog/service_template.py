@@ -17,8 +17,8 @@ from sqlalchemy import String, Integer, Boolean, Text, ForeignKey, Enum as SQLEn
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin, StatusMixin
 from app.models.enums import ServiceCategory
+from app.models.mixins import TimestampMixin, StatusMixin
 
 if TYPE_CHECKING:
     from app.models.user.profession import Profession

@@ -16,15 +16,14 @@ Avantages vs JSON :
 - Permissions custom par tenant
 """
 
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List
 
 from sqlalchemy import String, Boolean, Integer, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin
 from app.models.enums import PermissionCategory
+from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.tenants.tenant import Tenant

@@ -13,27 +13,23 @@ Endpoints pour :
 MULTI-TENANT: Tous les endpoints injectent automatiquement le tenant_id
 depuis l'utilisateur authentifié.
 """
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user, require_role
-
-from app.models.user.user import User
-
+from app.api.v1.dependencies import PaginationParams
 from app.api.v1.patient.schemas import (
     # Patient
     PatientCreate, PatientUpdate, PatientResponse, PatientList,
-    PatientSummary, PatientFilters,
+    PatientFilters,
     # Access
     PatientAccessCreate, PatientAccessResponse, PatientAccessList,
     # Evaluation
     PatientEvaluationCreate, PatientEvaluationUpdate,
-    PatientEvaluationResponse, PatientEvaluationList, EvaluationValidate,
-    EvaluationSessionCreate, EvaluationSessionResponse, EvaluationSessionList,
+    PatientEvaluationResponse, PatientEvaluationList, EvaluationSessionCreate, EvaluationSessionResponse,
+    EvaluationSessionList,
     # Validation données d'évaluation versus JSON Schema
     ValidationErrorResponse,
     SyncPayload, SyncResponse,
@@ -47,25 +43,23 @@ from app.api.v1.patient.schemas import (
     PatientDeviceCreate, PatientDeviceUpdate,
     PatientDeviceResponse, PatientDeviceList,
     # Document
-    PatientDocumentCreate, PatientDocumentResponse, PatientDocumentList,
+    PatientDocumentResponse, PatientDocumentList,
 )
-
 from app.api.v1.patient.services import (
     PatientService, PatientAccessService, PatientEvaluationService,
-    EvaluationInProgressError, EvaluationExpiredError, EvaluationNotEditableError,
+    EvaluationExpiredError, EvaluationNotEditableError,
     PatientThresholdService, PatientVitalsService, PatientDeviceService,
     PatientDocumentService,
     # Exceptions
     PatientNotFoundError, EntityNotFoundError, UserNotFoundError,
     EvaluationNotFoundError, ThresholdNotFoundError, VitalsNotFoundError,
     DeviceNotFoundError, DocumentNotFoundError, AccessNotFoundError,
-    DuplicateThresholdError, DuplicateDeviceError, AccessDeniedError,
-    EvaluationAlreadyValidatedError, InvalidEvaluationDataError,
+    DuplicateThresholdError, DuplicateDeviceError, EvaluationAlreadyValidatedError, InvalidEvaluationDataError,
 )
-
-from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
-
+from app.core.auth.user_auth import get_current_user, require_role
+from app.database.session_rls import get_db
+from app.models.user.user import User
 
 # =============================================================================
 # ROUTERS

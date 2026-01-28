@@ -6,11 +6,11 @@ Supporte la validation complète et partielle (pendant la saisie).
 """
 
 import json
-from pathlib import Path
 from functools import lru_cache
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
-from jsonschema import Draft202012Validator, ValidationError
+from jsonschema import Draft202012Validator
 
 
 # =============================================================================

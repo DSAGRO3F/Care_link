@@ -5,25 +5,22 @@ Routes CRUD pour les Tenants.
 Toutes les routes sont réservées aux SuperAdmins (équipe CareLink).
 """
 
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db_no_rls
-from app.models.tenants.tenant import Tenant, TenantStatus
-from app.models.platform.platform_audit_log import PlatformAuditLog, AuditAction
-from app.models.platform.super_admin import SuperAdmin
 from app.api.v1.dependencies import PaginationParams
-
 from app.api.v1.platform.super_admin_security import (
-    get_current_super_admin,
     require_super_admin_permission,
     SuperAdminPermissions,
 )
-
+from app.database.session_rls import get_db_no_rls
+from app.models.platform.platform_audit_log import PlatformAuditLog, AuditAction
+from app.models.platform.super_admin import SuperAdmin
+from app.models.tenants.tenant import Tenant, TenantStatus
 from .schemas import (
     TenantCreate,
     TenantUpdate,

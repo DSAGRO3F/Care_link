@@ -14,13 +14,12 @@ from sqlalchemy import String, ForeignKey, Numeric, Text, Boolean, Index, Unique
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin
 from app.models.enums import VitalType, VitalStatus, VitalSource, DeviceType
+from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.patient.patient import Patient
     from app.models.user.user import User
-    from app.models.tenants.tenant import Tenant
 
 
 # =============================================================================

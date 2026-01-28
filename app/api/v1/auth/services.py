@@ -18,30 +18,25 @@ from datetime import datetime, timedelta, timezone
 from typing import Tuple, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
 
-from app.core.config import settings
-from app.core.jwt import create_access_token, create_refresh_token, verify_token
-from app.core.hashing import verify_password
-from app.core.psc import (
-    get_psc_client,
-    PSCTokenError,
-    PSCUserInfoError,
-    PSCAuthenticationError,
-)
-from app.core.redis_client import get_redis
-from app.models.user.user import User
-from app.models.user.profession import Profession
-from app.models.user.role import Role
 from app.api.v1.auth.schemas import (
     TokenResponse,
     AuthenticatedUser,
     LoginResponse,
     PSCSessionData,
-    PSCUserInfoParsed,
     AuthMethod,
     AccessType,
 )
+from app.core.auth.psc import (
+    get_psc_client,
+)
+from app.core.config import settings
+from app.core.security.hashing import verify_password
+from app.core.security.jwt import create_access_token, create_refresh_token
+from app.core.session.redis_client import get_redis
+from app.models.user.profession import Profession
+from app.models.user.role import Role
+from app.models.user.user import User
 
 
 # =============================================================================

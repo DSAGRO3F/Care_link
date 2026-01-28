@@ -16,16 +16,16 @@ Pour l'instant, les données sont stockées en clair.
 
 MULTI-TENANT: Toutes les opérations Patient sont filtrées par tenant_id.
 """
-from typing import Optional, List, Tuple, Dict, TYPE_CHECKING
 from datetime import datetime, timezone
+from typing import Optional, List, Tuple, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Ces imports ne sont utilisés QUE pour les type hints
     # Ils ne sont pas exécutés à runtime → pas d'import circulaire
     from app.models.patient.evaluation_session import EvaluationSession
 
-from sqlalchemy import select, func, or_, and_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session
 
 from app.models.patient.patient import Patient
 from app.models.patient.patient_access import PatientAccess

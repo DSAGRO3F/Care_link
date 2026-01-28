@@ -12,15 +12,14 @@ from typing import Optional, List, Tuple
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalog.service_template import ServiceTemplate
-from app.models.catalog.entity_service import EntityService
-from app.models.organization.entity import Entity
-from app.models.user.profession import Profession
-
 from app.api.v1.catalog.schemas import (
     ServiceTemplateCreate, ServiceTemplateUpdate, ServiceTemplateFilters,
     EntityServiceCreate, EntityServiceUpdate,
 )
+from app.models.catalog.entity_service import EntityService
+from app.models.catalog.service_template import ServiceTemplate
+from app.models.organization.entity import Entity
+from app.models.user.profession import Profession
 
 
 # =============================================================================

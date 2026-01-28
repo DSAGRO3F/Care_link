@@ -13,15 +13,14 @@ from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
+from app.models.enums import DocumentType, DocumentFormat
 from app.models.mixins import TimestampMixin
 from app.models.types import JSONBCompatible
-from app.models.enums import DocumentType, DocumentFormat
 
 if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.patient.patient import Patient
     from app.models.patient.patient_evaluation import PatientEvaluation
-    from app.models.tenants.tenant import Tenant
 
 
 class PatientDocument(TimestampMixin, Base):

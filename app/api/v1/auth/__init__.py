@@ -23,15 +23,6 @@ Usage dans router.py:
 """
 
 from app.api.v1.auth.routes import router
-from app.api.v1.auth.services import (
-    AuthService,
-    get_auth_service,
-    AuthenticationError,
-    InvalidCredentialsError,
-    InactiveUserError,
-    PSCSessionError,
-    PatientAccessError,
-)
 from app.api.v1.auth.schemas import (
     LoginRequest,
     LoginResponse,
@@ -41,6 +32,15 @@ from app.api.v1.auth.schemas import (
     PSCAuthorizationResponse,
     AccessType,
     AuthMethod,
+)
+from app.api.v1.auth.services import (
+    AuthService,
+    get_auth_service,
+    AuthenticationError,
+    InvalidCredentialsError,
+    InactiveUserError,
+    PSCSessionError,
+    PatientAccessError,
 )
 
 __all__ = [

@@ -7,24 +7,23 @@ Contient la logique CRUD pour :
 
 Version multi-tenant : toutes les requêtes filtrent par tenant_id.
 """
+from datetime import date
 from typing import Optional, List, Tuple
-from datetime import datetime, timezone, date
 
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import Session, selectinload
-
-from app.models.coordination.coordination_entry import CoordinationEntry
-from app.models.coordination.scheduled_intervention import ScheduledIntervention
-from app.models.patient.patient import Patient
-from app.models.user.user import User
-from app.models.careplan.care_plan_service import CarePlanService
-from app.models.enums import InterventionStatus
 
 from app.api.v1.coordination.schemas import (
     CoordinationEntryCreate, CoordinationEntryUpdate, CoordinationEntryFilters,
     ScheduledInterventionCreate, ScheduledInterventionUpdate, ScheduledInterventionFilters,
     InterventionStart, InterventionComplete, InterventionCancel, InterventionReschedule,
 )
+from app.models.careplan.care_plan_service import CarePlanService
+from app.models.coordination.coordination_entry import CoordinationEntry
+from app.models.coordination.scheduled_intervention import ScheduledIntervention
+from app.models.enums import InterventionStatus
+from app.models.patient.patient import Patient
+from app.models.user.user import User
 
 
 # =============================================================================

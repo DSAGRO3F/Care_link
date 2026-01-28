@@ -14,14 +14,11 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user, require_role
-
-from app.models.user import User
-from app.models.enums import EntityType, IntegrationType
-
-from ..dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
+from app.core.auth.user_auth import get_current_user, require_role
+from app.database.session_rls import get_db
+from app.models.enums import EntityType, IntegrationType
+from app.models.user import User
 from .schemas import (
     # Country
     CountryCreate,
@@ -38,6 +35,7 @@ from .schemas import (
     EntityFilters,
 )
 from .services import EntityService, CountryService
+from ..dependencies import PaginationParams
 
 # =============================================================================
 # ROUTER CONFIGURATION

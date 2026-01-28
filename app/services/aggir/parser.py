@@ -34,8 +34,8 @@ Le format JSON CareLink pour AGGIR est :
 }
 """
 
-from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime
+from typing import Dict, List, Tuple, Optional, Any
 
 from app.services.aggir.calculator import (
     Variable,

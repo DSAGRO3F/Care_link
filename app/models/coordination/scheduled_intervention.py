@@ -18,15 +18,14 @@ from sqlalchemy import Integer, Text, ForeignKey, Date, Time, Enum as SQLEnum, I
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin
 from app.models.enums import InterventionStatus
+from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.careplan.care_plan_service import CarePlanService
     from app.models.patient.patient import Patient
     from app.models.user.user import User
     from app.models.coordination.coordination_entry import CoordinationEntry
-    from app.models.tenants.tenant import Tenant
 
 
 class ScheduledIntervention(TimestampMixin, Base):

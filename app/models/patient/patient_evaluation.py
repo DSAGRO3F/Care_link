@@ -8,20 +8,19 @@ des patients au format JSON (validées par JSON Schema).
 from datetime import date, datetime, timezone, timedelta
 from typing import TYPE_CHECKING, Any, Dict, List
 
-from sqlalchemy import String, Integer, Date, ForeignKey, DateTime, Boolean
+from sqlalchemy import String, Integer, Date, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
+from app.models.enums import EvaluationSchemaType, EvaluationStatus
 from app.models.mixins import TimestampMixin, VersionedMixin
 from app.models.types import JSONBCompatible
-from app.models.enums import EvaluationSchemaType, EvaluationStatus
 
 if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.patient.patient import Patient
     from app.models.patient.evaluation_session import EvaluationSession
     from app.models.careplan.care_plan import CarePlan
-    from app.models.tenants.tenant import Tenant
 
 
 class PatientEvaluation(VersionedMixin, TimestampMixin, Base):

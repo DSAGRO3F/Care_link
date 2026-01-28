@@ -13,24 +13,18 @@ MULTI-TENANT: Les endpoints User et Role injectent automatiquement le tenant_id
 depuis l'utilisateur authentifié.
 """
 from typing import Optional, List
-from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user, require_role
-
-from app.models.user.user import User
-
+from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.schemas import (
     # Profession
     ProfessionCreate, ProfessionUpdate, ProfessionResponse, ProfessionList,
     # Role
     RoleCreate, RoleUpdate, RoleResponse, RoleList,
     # User
-    UserCreate, UserUpdate, UserResponse, UserList, UserSummary,
-    UserWithEntities, UserFilters,
+    UserCreate, UserUpdate, UserResponse, UserList, UserWithEntities, UserFilters,
     # UserEntity
     UserEntityCreate, UserEntityUpdate, UserEntityResponse,
     # UserRole
@@ -39,7 +33,6 @@ from app.api.v1.user.schemas import (
     UserAvailabilityCreate, UserAvailabilityUpdate,
     UserAvailabilityResponse, UserAvailabilityList,
 )
-
 from app.api.v1.user.services import (
     ProfessionService, RoleService, UserService, UserAvailabilityService,
     # Exceptions
@@ -50,9 +43,10 @@ from app.api.v1.user.services import (
     DuplicateRoleNameError, SystemRoleModificationError,
     UserAlreadyHasRoleError, UserEntityAlreadyExistsError,
 )
-
-from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
+from app.core.auth.user_auth import get_current_user, require_role
+from app.database.session_rls import get_db
+from app.models.user.user import User
 
 # =============================================================================
 # ROUTERS

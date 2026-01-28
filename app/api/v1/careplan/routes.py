@@ -13,10 +13,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user
-from app.models.user.user import User
-
 from app.api.v1.careplan.schemas import (
     # CarePlan
     CarePlanCreate, CarePlanUpdate, CarePlanResponse,
@@ -27,7 +23,6 @@ from app.api.v1.careplan.schemas import (
     CarePlanServiceResponse, CarePlanServiceList,
     ServiceAssignment,
 )
-
 from app.api.v1.careplan.services import (
     CarePlanCRUDService, CarePlanServiceCRUDService,
     # Exceptions
@@ -37,9 +32,11 @@ from app.api.v1.careplan.services import (
     CarePlanNotEditableError, CarePlanStatusError,
     AssignmentStatusError, DuplicateReferenceError,
 )
-
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
+from app.core.auth.user_auth import get_current_user
+from app.database.session_rls import get_db
+from app.models.user.user import User
 
 # =============================================================================
 # ROUTERS

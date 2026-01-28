@@ -2,11 +2,12 @@
 Configuration de la session SQLAlchemy - Connexion PostgreSQL
 Fournit l'engine, la factory de sessions, et la dependency FastAPI
 """
+import logging
+from typing import Optional
+
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
-from typing import Generator, Optional
-import logging
 
 from app.core.config import settings
 

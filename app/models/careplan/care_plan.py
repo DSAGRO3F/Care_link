@@ -22,8 +22,8 @@ from sqlalchemy import String, Integer, Text, ForeignKey, Date, DateTime, Numeri
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin, AuditMixin
 from app.models.enums import CarePlanStatus
+from app.models.mixins import TimestampMixin, AuditMixin
 
 if TYPE_CHECKING:
     from app.models.patient.patient import Patient
@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     from app.models.organization.entity import Entity
     from app.models.user.user import User
     from app.models.careplan.care_plan_service import CarePlanService
-    from app.models.tenants.tenant import Tenant
 
 
 class CarePlan(TimestampMixin, AuditMixin, Base):

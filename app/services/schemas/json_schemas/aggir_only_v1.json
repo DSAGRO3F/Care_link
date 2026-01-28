@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carelink.fr/schemas/aggir_only_v1.json",
+  "title": "Évaluation AGGIR simplifiée",
+  "description": "Schéma pour évaluation AGGIR seule - 10 variables discriminantes",
+  "type": "object",
+  "properties": {
+    "coherence": { "type": "string", "enum": ["A", "B", "C"] },
+    "orientation": { "type": "string", "enum": ["A", "B", "C"] },
+    "toilette": { "type": "string", "enum": ["A", "B", "C"] },
+    "habillage": { "type": "string", "enum": ["A", "B", "C"] },
+    "alimentation": { "type": "string", "enum": ["A", "B", "C"] },
+    "elimination": { "type": "string", "enum": ["A", "B", "C"] },
+    "transferts": { "type": "string", "enum": ["A", "B", "C"] },
+    "deplacement_interieur": { "type": "string", "enum": ["A", "B", "C"] },
+    "deplacement_exterieur": { "type": "string", "enum": ["A", "B", "C"] },
+    "communication": { "type": "string", "enum": ["A", "B", "C"] }
+  },
+  "required": [
+    "coherence", "orientation", "toilette", "habillage", "alimentation",
+    "elimination", "transferts", "deplacement_interieur", "deplacement_exterieur", "communication"
+  ],
+  "additionalProperties": false
+}

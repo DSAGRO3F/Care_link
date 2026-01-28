@@ -8,23 +8,21 @@ Contient la logique CRUD pour :
 Version multi-tenant : toutes les requêtes filtrent par tenant_id.
 """
 from typing import Optional, List, Tuple
-from datetime import datetime, timezone
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
-
-from app.models.careplan.care_plan import CarePlan
-from app.models.careplan.care_plan_service import CarePlanService
-from app.models.patient.patient import Patient
-from app.models.organization.entity import Entity
-from app.models.catalog.service_template import ServiceTemplate
-from app.models.user.user import User
-from app.models.enums import CarePlanStatus, AssignmentStatus
 
 from app.api.v1.careplan.schemas import (
     CarePlanCreate, CarePlanUpdate, CarePlanFilters,
     CarePlanServiceCreate, CarePlanServiceUpdate, ServiceAssignment,
 )
+from app.models.careplan.care_plan import CarePlan
+from app.models.careplan.care_plan_service import CarePlanService
+from app.models.catalog.service_template import ServiceTemplate
+from app.models.enums import CarePlanStatus
+from app.models.organization.entity import Entity
+from app.models.patient.patient import Patient
+from app.models.user.user import User
 
 
 # =============================================================================

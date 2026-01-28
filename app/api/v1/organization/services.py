@@ -7,14 +7,14 @@ Utilise les modèles SQLAlchemy existants.
 MULTI-TENANT: Toutes les opérations sont filtrées par tenant_id.
 """
 from typing import Optional, List, Tuple
+
+from fastapi import HTTPException, status
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session, selectinload
-from fastapi import HTTPException, status
 
 # Import des modèles existants
 from app.models.organization.entity import Entity
 from app.models.reference.country import Country
-
 from .schemas import (
     EntityCreate,
     EntityUpdate,

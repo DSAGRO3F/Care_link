@@ -12,11 +12,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user, require_role
-
-from app.models.user.user import User
-
 from app.api.v1.catalog.schemas import (
     # Service Template
     ServiceTemplateCreate, ServiceTemplateUpdate,
@@ -25,7 +20,6 @@ from app.api.v1.catalog.schemas import (
     EntityServiceCreate, EntityServiceUpdate,
     EntityServiceResponse, EntityServiceList,
 )
-
 from app.api.v1.catalog.services import (
     ServiceTemplateService, EntityServiceService,
     # Exceptions
@@ -33,9 +27,11 @@ from app.api.v1.catalog.services import (
     EntityNotFoundError, ProfessionNotFoundError,
     DuplicateServiceCodeError, DuplicateEntityServiceError,
 )
-
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
+from app.core.auth.user_auth import get_current_user, require_role
+from app.database.session_rls import get_db
+from app.models.user.user import User
 
 # =============================================================================
 # ROUTERS

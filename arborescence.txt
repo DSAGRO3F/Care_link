@@ -1,0 +1,168 @@
+.
+├── alembic
+│   ├── versions
+│   │   ├── 2025_01_12_add_rls_policies.py
+│   │   ├── 2025_01_13_normalize_permissions.py
+│   │   ├── 2026_01_05_1002_initial_schema_v4_1_with_multitenant.py
+│   │   ├── 2026_01_12_1005_add_multitenant_support.py
+│   │   └── alembic_migration.md
+│   ├── README
+│   ├── alembic_migration.md
+│   ├── env.py
+│   └── script.py.mako
+├── app
+│   ├── api
+│   │   ├── docs
+│   │   │   ├── API_DOCUMENTATION.md
+│   │   │   └── RLS.md
+│   │   ├── v1
+│   │   │   ├── auth
+│   │   │   ├── careplan
+│   │   │   ├── catalog
+│   │   │   ├── coordination
+│   │   │   ├── organization
+│   │   │   ├── patient
+│   │   │   ├── platform
+│   │   │   ├── tenants
+│   │   │   ├── user
+│   │   │   ├── __init__.py
+│   │   │   ├── dependencies.py
+│   │   │   └── router.py
+│   │   └── __init__.py
+│   ├── core
+│   │   ├── docs
+│   │   │   ├── doc_dependencies.md
+│   │   │   └── doc_pro_sante_connect.md
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── encryption.py
+│   │   ├── hashing.py
+│   │   ├── jwt.py
+│   │   ├── psc.py
+│   │   ├── redis_client.py
+│   │   ├── session_manager.py
+│   │   ├── tenant_context.py
+│   │   └── user_auth.py
+│   ├── dash_app
+│   │   ├── layouts
+│   │   ├── __init__.py
+│   │   ├── app.py
+│   │   └── callbacks.py
+│   ├── database
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── base_class.py
+│   │   ├── doc_db.md
+│   │   ├── init_db.py
+│   │   ├── session.py
+│   │   └── session_rls.py
+│   ├── models
+│   │   ├── careplan
+│   │   │   ├── __init__.py
+│   │   │   ├── care_plan.py
+│   │   │   └── care_plan_service.py
+│   │   ├── catalog
+│   │   │   ├── __init__.py
+│   │   │   ├── entity_service.py
+│   │   │   └── service_template.py
+│   │   ├── coordination
+│   │   │   ├── __init__.py
+│   │   │   ├── coordination_entry.py
+│   │   │   └── scheduled_intervention.py
+│   │   ├── docs
+│   │   │   └── carelink_schema_v4.1.dbml
+│   │   ├── organization
+│   │   │   ├── __init__.py
+│   │   │   └── entity.py
+│   │   ├── patient
+│   │   │   ├── __init__.py
+│   │   │   ├── patient.py
+│   │   │   ├── patient_access.py
+│   │   │   ├── patient_document.py
+│   │   │   ├── patient_evaluation.py
+│   │   │   └── patient_vitals.py
+│   │   ├── platform
+│   │   │   ├── __init__.py
+│   │   │   ├── platform_audit_log.py
+│   │   │   └── super_admin.py
+│   │   ├── reference
+│   │   │   ├── __init__.py
+│   │   │   └── country.py
+│   │   ├── tenants
+│   │   │   ├── __init__.py
+│   │   │   ├── subscription.py
+│   │   │   ├── subscription_usage.py
+│   │   │   └── tenant.py
+│   │   ├── user
+│   │   │   ├── __init__.py
+│   │   │   ├── permission.py
+│   │   │   ├── profession.py
+│   │   │   ├── role.py
+│   │   │   ├── role_permission.py
+│   │   │   ├── user.py
+│   │   │   ├── user_associations.py
+│   │   │   ├── user_availability.py
+│   │   │   └── user_tenant_assignment.py
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── enums.py
+│   │   ├── mixins.py
+│   │   └── types.py
+│   ├── schemas
+│   │   ├── json_schemas
+│   │   │   ├── __init__.py
+│   │   │   ├── evaluation_v1.json
+│   │   │   └── evaluation_v2.json
+│   │   └── __init__.py
+│   ├── __init__.py
+│   └── main.py
+├── assets
+│   ├── carelink_logo.jpg
+│   └── carelink_logo_hd.jpg
+├── docs
+│   ├── carelink_backend_specifications_v4.3.md
+│   └── carelink_specifications_v4.3_patch.md
+├── keys
+│   ├── jwt_private_key.pem
+│   └── jwt_public_key.pem
+├── scripts
+│   ├── __init__.py
+│   ├── generate_keys.py
+│   ├── init_database.py
+│   ├── seed_test_data.py
+│   └── verify_rls.sql
+├── tests
+│   ├── test_api
+│   │   ├── __init__.py
+│   │   ├── test_careplan.py
+│   │   ├── test_catalog.py
+│   │   ├── test_coordination.py
+│   │   ├── test_organization.py
+│   │   ├── test_patient.py
+│   │   ├── test_tenants.py
+│   │   └── test_user.py
+│   ├── test_database
+│   │   ├── __init__.py
+│   │   └── test_init_db.py
+│   ├── test_models
+│   │   ├── __init__.py
+│   │   ├── test_availability.py
+│   │   ├── test_base_models.py
+│   │   ├── test_careplan.py
+│   │   ├── test_catalog.py
+│   │   ├── test_coordination.py
+│   │   ├── test_patient.py
+│   │   ├── test_scheduled_intervention.py
+│   │   ├── test_tenant.py
+│   │   └── test_user.py
+│   ├── __init__.py
+│   ├── conftest.py
+│   └── test_rls.py
+├── __init__.py
+├── alembic.ini
+├── arborescence.txt
+├── pyproject.toml
+├── pytest.ini 
+└── requirements.txt
+
+42 directories, 124 files

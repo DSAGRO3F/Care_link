@@ -17,21 +17,20 @@ from __future__ import annotations
 from datetime import time, datetime, timezone
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import String, Integer, Text, ForeignKey, Time, DateTime, Enum as SQLEnum
 from sqlalchemy import JSON
+from sqlalchemy import String, Integer, Text, ForeignKey, Time, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin
 from app.models.enums import FrequencyType, ServicePriority, AssignmentStatus
+from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.careplan.care_plan import CarePlan
     from app.models.catalog.service_template import ServiceTemplate
     from app.models.user.user import User
     from app.models.coordination.scheduled_intervention import ScheduledIntervention
-    from app.models.tenants.tenant import Tenant
 
 
 class CarePlanService(TimestampMixin, Base):

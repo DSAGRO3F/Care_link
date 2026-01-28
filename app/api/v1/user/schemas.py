@@ -11,6 +11,7 @@ Contient les schémas pour :
 """
 from datetime import date, time, datetime
 from typing import Optional, List
+
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 
 
@@ -286,7 +287,7 @@ class UserAvailabilityResponse(UserAvailabilityBase):
         start = info.data.get("start_time")
         end = info.data.get("end_time")
         if start and end:
-            from datetime import datetime, timedelta
+            from datetime import datetime
             start_dt = datetime.combine(datetime.today(), start)
             end_dt = datetime.combine(datetime.today(), end)
             return int((end_dt - start_dt).total_seconds() / 60)

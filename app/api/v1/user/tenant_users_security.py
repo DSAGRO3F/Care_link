@@ -12,12 +12,11 @@ voir app/api/v1/platform/super_admin_security.py
 """
 
 from typing import Annotated, Optional
-from fastapi import Query, Depends, HTTPException, status
 
-from app.core.user_auth import get_current_user
-from app.database.session_rls import get_db
+from fastapi import Depends, HTTPException, status
+
+from app.core.auth.user_auth import get_current_user
 from app.models.user.user import User
-from sqlalchemy.orm import Session
 
 
 # =============================================================================

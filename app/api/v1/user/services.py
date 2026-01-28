@@ -11,29 +11,27 @@ MULTI-TENANT: Les opérations sur User et Role sont filtrées par tenant_id.
 
 v4.3: Architecture permissions normalisée (Permission + RolePermission)
 """
-from typing import Optional, List, Tuple
 from datetime import datetime, timezone
+from typing import Optional, List, Tuple
 
 from sqlalchemy import select, func, or_
-from sqlalchemy.orm import Session, selectinload, joinedload
-
-from app.models.user.user import User
-from app.models.user.role import Role
-from app.models.user.profession import Profession
-from app.models.user.user_associations import UserRole, UserEntity
-from app.models.user.user_availability import UserAvailability
-from app.models.user.permission import Permission  # AJOUT v4.3
-from app.models.user.role_permission import RolePermission  # AJOUT v4.3
-from app.models.enums import PermissionCategory  # AJOUT v4.3
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.user.schemas import (
     ProfessionCreate, ProfessionUpdate,
     RoleCreate, RoleUpdate,
     UserCreate, UserUpdate, UserFilters,
     UserEntityCreate, UserEntityUpdate,
-    UserRoleCreate,
     UserAvailabilityCreate, UserAvailabilityUpdate,
 )
+from app.models.enums import PermissionCategory  # AJOUT v4.3
+from app.models.user.permission import Permission  # AJOUT v4.3
+from app.models.user.profession import Profession
+from app.models.user.role import Role
+from app.models.user.role_permission import RolePermission  # AJOUT v4.3
+from app.models.user.user import User
+from app.models.user.user_associations import UserRole, UserEntity
+from app.models.user.user_availability import UserAvailability
 
 
 # =============================================================================
@@ -566,7 +564,7 @@ class UserService:
 
         # Hash du mot de passe si fourni
         if data.password:
-            from app.core.hashing import hash_password
+            from app.core.security.hashing import hash_password
             user.password_hash = hash_password(data.password)
 
         self.db.add(user)
@@ -601,7 +599,7 @@ class UserService:
 
         # Hash du mot de passe si fourni
         if data.password:
-            from app.core.hashing import hash_password
+            from app.core.security.hashing import hash_password
             user.password_hash = hash_password(data.password)
 
         self.db.commit()

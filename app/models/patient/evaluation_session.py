@@ -6,19 +6,17 @@ de saisie pour les évaluations multi-jours.
 """
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Integer, ForeignKey, DateTime, Text
+from sqlalchemy import String, ForeignKey, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
-from app.models.enums import EvaluationSessionStatus, SyncStatus
 
 if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.patient.patient_evaluation import PatientEvaluation
-    from app.models.tenants.tenant import Tenant
 
 
 class EvaluationSession(TimestampMixin, Base):

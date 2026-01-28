@@ -8,7 +8,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List
 
-from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator, HttpUrl
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, field_validator
 
 # Import des enums existants
 from app.models.enums import EntityType, IntegrationType

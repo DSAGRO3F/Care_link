@@ -14,7 +14,7 @@ Chaque entité peut personnaliser les paramètres d'un service :
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Integer, Boolean, Text, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,7 +25,6 @@ from app.models.mixins import TimestampMixin
 if TYPE_CHECKING:
     from app.models.organization.entity import Entity
     from app.models.catalog.service_template import ServiceTemplate
-    from app.models.tenants.tenant import Tenant
 
 
 class EntityService(TimestampMixin, Base):

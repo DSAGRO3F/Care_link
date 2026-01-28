@@ -8,7 +8,6 @@ Ce module définit :
 
 from datetime import date, datetime, timezone, time
 from typing import TYPE_CHECKING
-from decimal import Decimal
 
 from sqlalchemy import String, Boolean, ForeignKey, Date, UniqueConstraint, Integer, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,7 +19,6 @@ if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.user.role import Role
     from app.models.organization.entity import Entity
-    from app.models.tenants.tenant import Tenant
 
 
 class UserRole(Base):

@@ -7,9 +7,9 @@ Compatible avec les modèles existants :
 - app.models.platform.platform_audit_log.PlatformAuditLog
 - app.models.user.user_tenant_assignment.UserTenantAssignment
 """
-from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from enum import Enum
+from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field, EmailStr, field_validator
 

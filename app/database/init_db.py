@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 
 from app.database.base_class import Base
 from app.database.session import engine, db_session, check_database_connection
-
 # =============================================================================
 # IMPORTS DES MODÈLES (via le module centralisé)
 # =============================================================================
@@ -29,8 +28,8 @@ from app.models import (
     INITIAL_PROFESSIONS,
     UserRole,
     UserEntity,
-    Permission,       # AJOUT v4.3
-    RolePermission,   # AJOUT v4.3
+    Permission,  # AJOUT v4.3
+    RolePermission,  # AJOUT v4.3
     # Tenant (nouveau v4.1)
     Tenant,
     TenantStatus,

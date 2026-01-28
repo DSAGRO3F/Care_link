@@ -11,10 +11,11 @@ Conventions :
 
 from datetime import date, datetime
 from typing import Optional, Dict, Any, List
+
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
-from app.models.tenants.tenant import TenantType, TenantStatus
 from app.models.enums import SubscriptionPlan, SubscriptionStatus, BillingCycle
+from app.models.tenants.tenant import TenantType, TenantStatus
 
 
 # =============================================================================

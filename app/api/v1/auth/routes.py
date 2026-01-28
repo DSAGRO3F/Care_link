@@ -17,16 +17,11 @@ Flux local:
 """
 
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
-from app.core.jwt import verify_token
-from app.core.psc import get_psc_client
-from app.database.session_rls import get_db
-from app.core.user_auth import get_current_user
-from app.models.user.user import User
 from app.api.v1.auth.schemas import (
     LoginRequest,
     LoginResponse,
@@ -39,14 +34,18 @@ from app.api.v1.auth.schemas import (
     AuthMethod,
 )
 from app.api.v1.auth.services import (
-    AuthService,
     get_auth_service,
     InvalidCredentialsError,
     InactiveUserError,
     PSCSessionError,
 )
-from app.core.psc import PSCTokenError, PSCUserInfoError
-
+from app.core.auth.psc import PSCTokenError, PSCUserInfoError
+from app.core.auth.psc import get_psc_client
+from app.core.auth.user_auth import get_current_user
+from app.core.config import settings
+from app.core.security.jwt import verify_token
+from app.database.session_rls import get_db
+from app.models.user.user import User
 
 router = APIRouter(
     prefix="/auth",

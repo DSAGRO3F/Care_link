@@ -8,13 +8,14 @@ et la facturation des clients CareLink.
 
 from datetime import date
 from typing import TYPE_CHECKING, List, Optional
-# from enum import Enum as PyEnum
 
 from sqlalchemy import Enum, ForeignKey, Integer, String, Date, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
+
+# from enum import Enum as PyEnum
 
 # Imports conditionnels pour éviter les imports circulaires
 if TYPE_CHECKING:

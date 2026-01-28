@@ -12,12 +12,12 @@ Ce module contient les modèles liés aux patients :
 - PatientDocument : Documents générés (PPA, PPCS...)
 """
 
+from app.models.patient.evaluation_session import EvaluationSession  # NOUVEAU
 from app.models.patient.patient import Patient
 from app.models.patient.patient_access import PatientAccess
-from app.models.patient.patient_evaluation import PatientEvaluation
-from app.models.patient.evaluation_session import EvaluationSession  # NOUVEAU
-from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
 from app.models.patient.patient_document import PatientDocument
+from app.models.patient.patient_evaluation import PatientEvaluation
+from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
 
 __all__ = [
     "Patient",

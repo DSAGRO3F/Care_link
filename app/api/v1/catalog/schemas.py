@@ -8,6 +8,7 @@ Contient les schémas pour :
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
+
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 

@@ -10,16 +10,16 @@ IMPORTANT - SÉCURITÉ :
 - La clé de chiffrement est dans .env (ENCRYPTION_KEY)
 """
 
-from typing import TYPE_CHECKING, List, cast
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING, List
 
-from sqlalchemy import String, ForeignKey, Integer, Numeric, DateTime, Text
+from sqlalchemy import String, ForeignKey, Numeric, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin, AuditMixin, VersionedMixin
 from app.models.enums import PatientStatus
+from app.models.mixins import TimestampMixin, AuditMixin, VersionedMixin
 
 if TYPE_CHECKING:
     from app.models.user.user import User

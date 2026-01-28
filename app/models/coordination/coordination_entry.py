@@ -12,14 +12,13 @@ from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin
 from app.models.enums import CoordinationCategory
+from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.patient.patient import Patient
     from app.models.coordination.scheduled_intervention import ScheduledIntervention
-    from app.models.tenants.tenant import Tenant
 
 
 class CoordinationEntry(TimestampMixin, Base):

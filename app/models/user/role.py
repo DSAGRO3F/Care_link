@@ -21,8 +21,8 @@ from sqlalchemy import String, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.mixins import TimestampMixin
 from app.models.enums import RoleName
+from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.user.user import User

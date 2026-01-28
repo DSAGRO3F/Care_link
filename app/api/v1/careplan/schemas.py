@@ -7,7 +7,8 @@ Contient les schémas pour :
 """
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Optional, List, Any
+from typing import Optional, List
+
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 

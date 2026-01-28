@@ -13,6 +13,7 @@ Contient les schémas pour :
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
+
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 
 

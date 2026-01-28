@@ -16,11 +16,6 @@ Classes exportées:
     - SubscriptionUsage: Suivi de consommation mensuelle
 """
 
-from app.models.tenants.tenant import (
-    Tenant,
-    TenantStatus,
-    TenantType,
-)
 from app.models.tenants.subscription import (
     Subscription,
     SubscriptionPlan,
@@ -28,6 +23,11 @@ from app.models.tenants.subscription import (
     BillingCycle,
 )
 from app.models.tenants.subscription_usage import SubscriptionUsage
+from app.models.tenants.tenant import (
+    Tenant,
+    TenantStatus,
+    TenantType,
+)
 
 __all__ = [
     # Tenant

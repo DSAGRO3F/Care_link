@@ -22,6 +22,15 @@ Changelog:
     v4.1: Ajout tenants (Tenant, Subscription)
 """
 
+# === Modèles plans d'aide ===
+from app.models.careplan.care_plan import CarePlan
+from app.models.careplan.care_plan_service import CarePlanService
+from app.models.catalog.entity_service import EntityService
+# === Modèles catalogue ===
+from app.models.catalog.service_template import ServiceTemplate, INITIAL_SERVICE_TEMPLATES
+# === Modèles coordination ===
+from app.models.coordination.coordination_entry import CoordinationEntry
+from app.models.coordination.scheduled_intervention import ScheduledIntervention
 # === Enums ===
 from app.models.enums import (
     # Types d'entités et organisation
@@ -59,7 +68,6 @@ from app.models.enums import (
     AssignmentStatus,
     InterventionStatus,
 )
-
 # === Mixins ===
 from app.models.mixins import (
     TimestampMixin,
@@ -67,7 +75,24 @@ from app.models.mixins import (
     VersionedMixin,
     StatusMixin,
 )
-
+# === Modèles d'organisation ===
+from app.models.organization.entity import Entity
+from app.models.patient.evaluation_session import EvaluationSession
+# === Modèles patients ===
+from app.models.patient.patient import Patient
+from app.models.patient.patient_access import PatientAccess
+from app.models.patient.patient_document import PatientDocument
+from app.models.patient.patient_evaluation import PatientEvaluation
+from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
+# === Modèles Platform (v4.2) ===
+from app.models.platform import (
+    SuperAdmin,
+    SuperAdminRole,
+    PlatformAuditLog,
+    AuditAction,
+)
+# === Modèles de référence ===
+from app.models.reference.country import Country
 # === Modèles Tenant (v4.1) ===
 from app.models.tenants import (
     Tenant,
@@ -79,51 +104,15 @@ from app.models.tenants import (
     BillingCycle,
     SubscriptionUsage,
 )
-
-# === Modèles Platform (v4.2) ===
-from app.models.platform import (
-    SuperAdmin,
-    SuperAdminRole,
-    PlatformAuditLog,
-    AuditAction,
-)
-
-# === Modèles de référence ===
-from app.models.reference.country import Country
-
-# === Modèles d'organisation ===
-from app.models.organization.entity import Entity
-
+from app.models.user.permission import Permission, INITIAL_PERMISSIONS
+from app.models.user.profession import Profession, INITIAL_PROFESSIONS
+from app.models.user.role import Role, INITIAL_ROLES
+from app.models.user.role_permission import RolePermission, INITIAL_ROLE_PERMISSIONS
 # === Modèles utilisateurs et permissions (v4.3) ===
 from app.models.user.user import User
-from app.models.user.role import Role, INITIAL_ROLES
-from app.models.user.permission import Permission, INITIAL_PERMISSIONS
-from app.models.user.role_permission import RolePermission, INITIAL_ROLE_PERMISSIONS
-from app.models.user.profession import Profession, INITIAL_PROFESSIONS
 from app.models.user.user_associations import UserRole, UserEntity
 from app.models.user.user_availability import UserAvailability
 from app.models.user.user_tenant_assignment import UserTenantAssignment, AssignmentType  # Déplacé depuis platform/ v4.3
-
-# === Modèles patients ===
-from app.models.patient.patient import Patient
-from app.models.patient.patient_access import PatientAccess
-from app.models.patient.patient_evaluation import PatientEvaluation
-from app.models.patient.evaluation_session import EvaluationSession
-from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
-from app.models.patient.patient_document import PatientDocument
-
-# === Modèles catalogue ===
-from app.models.catalog.service_template import ServiceTemplate, INITIAL_SERVICE_TEMPLATES
-from app.models.catalog.entity_service import EntityService
-
-# === Modèles plans d'aide ===
-from app.models.careplan.care_plan import CarePlan
-from app.models.careplan.care_plan_service import CarePlanService
-
-# === Modèles coordination ===
-from app.models.coordination.coordination_entry import CoordinationEntry
-from app.models.coordination.scheduled_intervention import ScheduledIntervention
-
 
 # === Export explicite ===
 __all__ = [
