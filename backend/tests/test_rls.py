@@ -16,6 +16,15 @@ import uuid
 from contextlib import contextmanager
 
 import pytest
+
+# -----Note-----
+# tests RLS nécessitent une vraie base PostgreSQL configurée (le RLS ne fonctionne pas avec SQLite).
+# Solution possible: Marquer ces tests comme "integration": permet de skipper automatiquement si PostgreSQL n'est pas disponible
+pytestmark = pytest.mark.integration
+
+# Commande: pytest -v -m "not integration"
+# -------------
+
 from sqlalchemy import text
 
 from app.database.session import SessionLocal
