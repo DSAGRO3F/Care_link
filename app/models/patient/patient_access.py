@@ -17,6 +17,7 @@ from app.models.enums import AccessType
 if TYPE_CHECKING:
     from app.models.patient.patient import Patient
     from app.models.user.user import User
+    from app.models.tenants.tenant import Tenant
 
 
 class PatientAccess(Base):
@@ -61,6 +62,15 @@ class PatientAccess(Base):
         info={
             "description": "Clé primaire auto-incrémentée"
         }
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
     
     patient_id: Mapped[int] = mapped_column(
@@ -117,7 +127,7 @@ class PatientAccess(Base):
     )
     
     granted_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         doc="Date et heure d'attribution de l'accès",
         info={
@@ -186,7 +196,7 @@ class PatientAccess(Base):
         """Retourne True si l'accès est actif (non révoqué et non expiré)."""
         if self.revoked_at is not None:
             return False
-        if self.expires_at is not None and self.expires_at < datetime.utcnow():
+        if self.expires_at is not None and self.expires_at < datetime.now(timezone.utc):
             return False
         return True
     
@@ -195,7 +205,7 @@ class PatientAccess(Base):
         """Retourne True si l'accès a expiré."""
         if self.expires_at is None:
             return False
-        return self.expires_at < datetime.utcnow()
+        return self.expires_at < datetime.now(timezone.utc)
     
     @property
     def is_revoked(self) -> bool:

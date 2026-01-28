@@ -6,9 +6,9 @@ des professionnels de santé pour assurer la coordination et éviter les doublon
 """
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import String, Integer, Text, ForeignKey
+from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -18,6 +18,8 @@ from app.models.enums import CoordinationCategory
 if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.patient.patient import Patient
+    from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.tenants.tenant import Tenant
 
 
 class CoordinationEntry(TimestampMixin, Base):
@@ -52,6 +54,15 @@ class CoordinationEntry(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'entrée"
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
 
     # --- Références ---
@@ -112,6 +123,7 @@ class CoordinationEntry(TimestampMixin, Base):
     # --- Horodatage ---
 
     performed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         index=True,
         doc="Date/heure de réalisation de l'intervention"
@@ -126,6 +138,7 @@ class CoordinationEntry(TimestampMixin, Base):
     # --- Soft delete ---
 
     deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         doc="Date de suppression logique (NULL = actif)"
     )
@@ -142,6 +155,13 @@ class CoordinationEntry(TimestampMixin, Base):
         "User",
         foreign_keys="[CoordinationEntry.user_id]",
         doc="Professionnel ayant réalisé l'intervention"
+    )
+
+    scheduled_intervention: Mapped[Optional["ScheduledIntervention"]] = relationship(
+        "ScheduledIntervention",
+        back_populates="coordination_entry",
+        uselist=False,
+        doc="Intervention planifiée à l'origine de cette entrée"
     )
 
     # === Propriétés ===

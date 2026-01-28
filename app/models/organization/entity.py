@@ -15,7 +15,7 @@ from datetime import date
 from typing import TYPE_CHECKING, List, Optional
 from decimal import Decimal
 
-from sqlalchemy import String, ForeignKey, Text, Integer, Date
+from sqlalchemy import String, ForeignKey, Text, Integer, Date, Numeric
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,9 +25,13 @@ from app.models.enums import EntityType, IntegrationType
 
 if TYPE_CHECKING:
     from app.models.reference.country import Country
+    from app.models.tenants.tenant import Tenant
     from app.models.user.user import User
     from app.models.patient.patient import Patient
     from app.models.user.user_associations import UserEntity
+    from app.models.catalog.entity_service import EntityService
+    from app.models.careplan.care_plan import CarePlan
+    from app.models.user.user_availability import UserAvailability
 
 
 class Entity(TimestampMixin, StatusMixin, Base):
@@ -79,7 +83,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
     # =========================================================================
     # COLONNES D'IDENTIFICATION
     # =========================================================================
-    
+
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'entité",
@@ -107,7 +111,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "SSIAD P12"
         }
     )
-    
+
     # =========================================================================
     # TYPE ET RATTACHEMENT
     # =========================================================================
@@ -313,7 +317,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
     # =========================================================================
     # CLÉS ÉTRANGÈRES
     # =========================================================================
-    
+
     country_id: Mapped[int] = mapped_column(
         ForeignKey("countries.id", ondelete="RESTRICT"),
         nullable=False,
@@ -322,18 +326,28 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Référence vers le pays"
         }
     )
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+        doc="ID du tenant propriétaire",
+        info={
+            "description": "Référence vers le tenant (client) propriétaire de cette entité"
+        }
+    )
     
-    # NOTE: organization_id sera ajouté lors de la création de la table organizations
-    # organization_id: Mapped[Optional[int]] = mapped_column(
-    #     ForeignKey("organizations.id", ondelete="SET NULL"),
-    #     nullable=True,
-    #     doc="ID de l'organisation (GCSMS) de rattachement"
-    # )
-    
+
     # =========================================================================
     # RELATIONS
     # =========================================================================
-    
+
+    tenant: Mapped["Tenant"] = relationship(
+        "Tenant",
+        back_populates="entities",
+        doc="Tenant propriétaire de cette entité"
+    )
+
     country: Mapped["Country"] = relationship(
         "Country",
         back_populates="entities",
@@ -368,6 +382,28 @@ class Entity(TimestampMixin, StatusMixin, Base):
         back_populates="entity",
         doc="Patients suivis par cette entité"
     )
+
+    entity_services: Mapped[List["EntityService"]] = relationship(
+        "EntityService",
+        back_populates="entity",
+        cascade="all, delete-orphan",
+        doc="Services proposés par cette entité"
+    )
+
+    care_plans: Mapped[List["CarePlan"]] = relationship(
+        "CarePlan",
+        back_populates="entity",
+        doc="Plans d'aide coordonnés par cette entité"
+    )
+
+    user_availabilities: Mapped[List["UserAvailability"]] = relationship(
+        "UserAvailability",
+        back_populates="entity",
+        cascade="all, delete-orphan",
+        doc="Disponibilités des professionnels pour cette entité"
+    )
+
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="entities")
     
     # NOTE: Relations à ajouter plus tard
     # organization: Mapped[Optional["Organization"]] = relationship(...)

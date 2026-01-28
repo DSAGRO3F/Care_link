@@ -502,3 +502,302 @@ Activer une e-CPS
 
 C'est le même niveau de difficulté que de se faire passer pour un médecin dans un hôpital physique. PSC transpose cette sécurité dans le monde numérique.
 
+# Flux: exemple création utlisateur
+Prenons l'exemple concret de Marie Dupont, infirmière que l'on vient de recruter comme coordinatrice.
+Création de Marie Dupont (Infirmière + Coordinatrice)
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        COUCHE API                               │
+├─────────────────────────────────────────────────────────────────┤
+│  app/api/v1/user/                                               │
+│  ├── routes.py      ← Point d'entrée : POST /api/v1/users       │
+│  ├── schemas.py     ← Validation des données entrantes          │
+│  └── services.py    ← Logique métier (création user)            │
+│                                                                 │
+│  app/api/v1/auth/                                               │
+│  └── services.py    ← (Plus tard) Authentification PSC          │
+└─────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        COUCHE MODÈLES                           │
+├─────────────────────────────────────────────────────────────────┤
+│  app/models/user/                                               │
+│  ├── user.py        ← Table "users" (Marie)                     │
+│  ├── profession.py  ← Table "professions" (Infirmier)           │
+│  ├── role.py        ← Table "roles" (COORDINATEUR)              │
+│  └── user_associations.py ← Table "user_roles" (Marie ↔ Coord)  │
+└─────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        COUCHE DATABASE                          │
+├─────────────────────────────────────────────────────────────────┤
+│  app/database/                                                  │
+│  ├── session.py     ← Connexion PostgreSQL                      │
+│  └── base_class.py  ← Classe de base SQLAlchemy                 │
+└─────────────────────────────────────────────────────────────────┘
+
+# Explication imagée de chaque module: routes.py, schema.py et services.py
+## routes.py
+```
+app/api/v1/user/routes.py → 🚪 L'accueil / Le standard téléphonique
+```
+-> "Bonjour, je voudrais créer un compte pour Marie Dupont"
+
+C'est le point d'entrée. Comme une réceptionniste :
+
+Elle reçoit les demandes (requêtes HTTP)
+Elle vérifie que vous avez le droit de faire cette demande (authentification)
+Elle transmet au bon service (appelle services.py)
+Elle renvoie la réponse au demandeur
+
+@router.post("/users")  # "Si quelqu'un demande à créer un user..."
+async def create_user(user_data: UserCreate):  # "...prends ses infos..."
+    return user_service.create(user_data)  # "...et passe-les au service RH"
+
+
+---
+## schema.py
+```
+**`app/api/v1/user/schemas.py`** → 📋 **Le formulaire d'inscription**
+```
+┌─────────────────────────────────────┐
+│  FORMULAIRE NOUVEAU COLLABORATEUR   │
+├─────────────────────────────────────┤
+│  Nom*: [Dupont_________]            │
+│  Prénom*: [Marie__________]         │
+│  Email*: [marie.dupont@ssiad.fr]    │
+│  RPPS: [12345678901____]            │
+│  Profession*: [Infirmier ▼]         │
+│                                     │
+│  * Champs obligatoires              │
+└─────────────────────────────────────┘
+C'est le contrat de données. Comme un formulaire papier :
+
+Il définit quels champs sont obligatoires
+Il vérifie le format (email valide ? RPPS = 11 chiffres ?)
+Il rejette les formulaires mal remplis AVANT de déranger le service RH
+
+class UserCreate(BaseModel):
+    email: EmailStr           # ✅ Doit être un email valide
+    first_name: str           # ✅ Obligatoire
+    rpps: str | None = None   # ⚪ Optionnel
+    profession_id: int        # ✅ Obligatoire
+
+
+---
+
+## services.py
+```
+**app/api/v1/user/services.py`** → 👔 **Le service des Ressources Humaines**
+```
+"OK, j'ai le formulaire de Marie. Je vais :
+ 1. Vérifier qu'elle n'existe pas déjà
+ 2. Créer son dossier
+ 3. Lui attribuer son badge (rôle)
+ 4. L'inscrire dans l'annuaire"
+
+C'est la logique métier. Comme un gestionnaire RH :
+
+Il applique les règles (pas de doublon d'email, RPPS valide...)
+Il orchestre les opérations (créer user, assigner rôle...)
+Il interagit avec la base de données
+Il ne parle jamais directement au public (c'est routes.py qui fait ça)
+
+## Autres modules intervenant
+class UserService:
+    def create_user(self, data: UserCreate) -> User:
+        # Vérifier que l'email n'existe pas
+        if self.db.query(User).filter(User.email == data.email).first():
+            raise ValueError("Email déjà utilisé")
+        
+        # Créer l'utilisateur
+        user = User(**data.dict())
+        self.db.add(user)
+        self.db.commit()
+        return user
+```
+
+---
+
+### **`app/models/user/user.py`** → 🗂️ **Le dossier personnel de Marie**
+```
+┌─────────────────────────────────────┐
+│  DOSSIER EMPLOYÉ #42                │
+├─────────────────────────────────────┤
+│  Nom: Dupont                        │
+│  Prénom: Marie                      │
+│  Email: marie.dupont@ssiad.fr       │
+│  RPPS: 12345678901                  │
+│  Profession: → [voir classeur 60]   │
+│  Rôles: → [voir classeur COORD]     │
+│  Actif: ✅ Oui                      │
+└─────────────────────────────────────┘
+```
+
+C'est la **structure du dossier**. Comme un modèle de fiche employé :
+- Il **définit** quelles informations on stocke
+- Il **définit** les liens vers d'autres dossiers (profession, rôles)
+- Il **correspond** exactement à une table SQL
+
+---
+
+### **`app/models/user/profession.py`** → 📚 **Le référentiel des diplômes**
+```
+┌─────────────────────────────────────┐
+│  RÉFÉRENTIEL DES PROFESSIONS        │
+├─────────────────────────────────────┤
+│  Code 10: Médecin (RPPS: oui)       │
+│  Code 60: Infirmier (RPPS: oui) ◄── Marie
+│  Code 93: Aide-soignant (RPPS: non) │
+│  ...                                │
+└─────────────────────────────────────┘
+```
+
+C'est le **catalogue officiel** des diplômes d'État. Immuable.
+
+---
+
+### **`app/models/user/role.py`** → 🎫 **Les badges d'accès**
+```
+┌─────────────────────────────────────┐
+│  BADGE: COORDINATEUR                │
+├─────────────────────────────────────┤
+│  Accès:                             │
+│  ✅ Voir les patients               │
+│  ✅ Créer des patients              │
+│  ✅ Planifier les soins             │
+│  ✅ Accorder des accès              │
+│  ❌ Administration système          │
+└─────────────────────────────────────┘
+```
+
+C'est le **système de badges**. Un utilisateur peut avoir plusieurs badges.
+
+---
+
+### **`app/models/user/user_associations.py`** → 📎 **Le registre des attributions**
+```
+┌─────────────────────────────────────┐
+│  REGISTRE DES BADGES ATTRIBUÉS      │
+├─────────────────────────────────────┤
+│  Marie (42) ←→ COORDINATEUR         │
+│  Marie (42) ←→ INFIRMIERE           │
+│  Jean (43) ←→ ADMIN                 │
+│  ...                                │
+└─────────────────────────────────────┘
+```
+
+C'est la **table de liaison** qui connecte users et roles (many-to-many).
+
+---
+
+## 🔄 Le trio routes.py / services.py / schemas.py
+
+### Analogie : **Un restaurant** 🍽️
+```
+CLIENT                 SERVEUR              CUISINE              RECETTE
+(Navigateur)          (routes.py)         (services.py)        (schemas.py)
+    │                      │                    │                    │
+    │  "Je veux une        │                    │                    │
+    │   pizza margherita"  │                    │                    │
+    │─────────────────────►│                    │                    │
+    │                      │                    │                    │
+    │                      │  Vérifie la        │                    │
+    │                      │  commande avec ────┼───────────────────►│
+    │                      │  la carte          │                    │
+    │                      │◄───────────────────┼────────────────────│
+    │                      │  "OK, pizza        │                    │
+    │                      │   existe"          │                    │
+    │                      │                    │                    │
+    │                      │  "Chef, une        │                    │
+    │                      │   margherita !" ───┼───────────────────►│
+    │                      │                    │                    │
+    │                      │                    │  Prépare la pizza  │
+    │                      │                    │  (logique métier)  │
+    │                      │                    │                    │
+    │                      │◄───────────────────┼────────────────────│
+    │                      │  🍕 Pizza prête    │                    │
+    │                      │                    │                    │
+    │◄─────────────────────│                    │                    │
+    │  🍕 Votre pizza      │                    │                    │
+    │                      │                    │                    │
+
+
+## 🔄 Exemple complet : Rattacher une entité à un GCSMS
+
+Même pattern que pour création utilisateur :
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  POST /api/v1/organizations/gcsms/5/entities                    │
+│  Body: { "entity_id": 12 }                                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  routes.py                                                      │
+│  ─────────                                                      │
+│  "OK, l'admin veut rattacher l'entité 12 au GCSMS 5"            │
+│  → Vérifie que c'est bien un admin                              │
+│  → Passe au service                                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  schemas.py                                                     │
+│  ──────────                                                     │
+│  class EntityAttachRequest(BaseModel):                          │
+│      entity_id: int        # Obligatoire                        │
+│      start_date: date      # Optionnel, défaut = aujourd'hui    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  services.py                                                    │
+│  ───────────                                                    │
+│  def attach_entity_to_gcsms(gcsms_id, entity_id):               │
+│      1. Vérifier que le GCSMS existe                            │
+│      2. Vérifier que l'entité existe                            │
+│      3. Vérifier que l'entité n'est pas déjà rattachée          │
+│      4. Vérifier que l'entité est dans le même département      │
+│      5. Créer le rattachement                                   │
+│      6. Logger l'opération (audit)                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## ✅ En résumé
+
+Le trio fonctionne ainsi :
+```
+routes.py    →  "QUI peut faire QUOI et QUAND"  (API + permissions)
+schemas.py   →  "QUEL FORMAT pour les données"  (validation entrée/sortie)
+services.py  →  "COMMENT on le fait"            (logique + règles + base)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,49 @@
+# =============================================================================
+# CareLink - Dépendances directes (requirements.in)
+# =============================================================================
+# Généré à partir de l'analyse des imports réels du projet
+# Utiliser: pip-compile requirements.in -o requirements.txt
+# =============================================================================
+
+# === Framework Web ===
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0          # Serveur ASGI pour production
+
+# === Validation & Configuration ===
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+email-validator>=2.2.0             # Validation EmailStr dans Pydantic
+
+# === Base de données ===
+sqlalchemy>=2.0.36
+psycopg2-binary>=2.9.10            # Driver PostgreSQL
+alembic>=1.14.0                    # Migrations
+
+# === Authentification & Sécurité ===
+python-jose[cryptography]>=3.3.0   # JWT (inclut cryptography)
+bcrypt>=4.2.0                      # Hashing mots de passe
+passlib>=1.7.4                     # Utilitaires hashing
+
+# === Sessions & Cache ===
+redis>=5.2.0
+
+# === Client HTTP (Pro Santé Connect OAuth) ===
+httpx>=0.28.0
+
+# === Utilitaires FastAPI ===
+python-multipart>=0.0.17           # Upload fichiers / forms
+python-dotenv>=1.0.1               # Chargement .env
+
+
+# ========================
+# =====Utilisation========
+# ========================
+# Production
+pip install -r requirements.txt
+
+# Développement
+pip install -r requirements-dev.txt
+
+# Régénérer après modification de requirements.in
+pip install pip-tools
+pip-compile requirements.in -o requirements.txt

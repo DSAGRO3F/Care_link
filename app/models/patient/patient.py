@@ -12,8 +12,9 @@ IMPORTANT - SÉCURITÉ :
 
 from typing import TYPE_CHECKING, List, cast
 from decimal import Decimal
+from datetime import datetime
 
-from sqlalchemy import String, ForeignKey, Integer
+from sqlalchemy import String, ForeignKey, Integer, Numeric, DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -28,6 +29,9 @@ if TYPE_CHECKING:
     from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
     from app.models.patient.patient_document import PatientDocument
     from app.models.coordination.coordination_entry import CoordinationEntry
+    from app.models.careplan.care_plan import CarePlan
+    from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.tenants.tenant import Tenant
 
 
 class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
@@ -128,6 +132,16 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={"description": "Référence vers le médecin traitant"}
     )
 
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+        doc="ID du tenant propriétaire",
+        info={
+            "description": "Référence vers le tenant (client) propriétaire de cette entité"
+        }
+    )
+
     entity_id: Mapped[int] = mapped_column(
         ForeignKey("entities.id", ondelete="RESTRICT"),
         nullable=False,
@@ -145,6 +159,12 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         back_populates="patients_as_medecin",
         foreign_keys="[Patient.medecin_traitant_id]",
         doc="Médecin traitant référent du patient"
+    )
+
+    tenant: Mapped["Tenant"] = relationship(
+        "Tenant",
+        back_populates="patients",
+        doc="Tenant propriétaire de ce patient"
     )
 
     entity: Mapped["Entity"] = relationship(
@@ -166,6 +186,20 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         cascade="all, delete-orphan",
         order_by="desc(PatientEvaluation.evaluation_date)",
         doc="Évaluations du patient"
+    )
+
+    care_plans: Mapped[List["CarePlan"]] = relationship(
+        "CarePlan",
+        back_populates="patient",
+        cascade="all, delete-orphan",
+        doc="Plans d'aide du patient"
+    )
+
+    scheduled_interventions: Mapped[List["ScheduledIntervention"]] = relationship(
+        "ScheduledIntervention",
+        back_populates="patient",
+        cascade="all, delete-orphan",
+        doc="Interventions planifiées pour ce patient"
     )
 
     thresholds: Mapped[List["PatientThreshold"]] = relationship(

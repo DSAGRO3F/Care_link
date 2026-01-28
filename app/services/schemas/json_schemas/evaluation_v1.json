@@ -1,0 +1,850 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carelink.fr/schemas/evaluation_v1.json",
+  "title": "Évaluation Patient CareLink",
+  "description": "Schéma complet d'évaluation d'un patient en perte d'autonomie - Version 1.0",
+  "type": "object",
+  "required": ["usager", "aggir"],
+  "properties": {
+
+    "usager": {
+      "type": "object",
+      "description": "Informations du patient/usager",
+      "required": ["Informations d'état civil", "adresse"],
+      "properties": {
+
+        "Informations d'état civil": {
+          "type": "object",
+          "required": ["clientId", "personnePhysique"],
+          "properties": {
+
+            "clientId": {
+              "type": "string",
+              "description": "Identifiant unique du patient dans le système source"
+            },
+
+            "personnePhysique": {
+              "type": "object",
+              "required": ["nomFamille", "premierPrenomActeNaissance", "sexe", "dateNaissance"],
+              "properties": {
+                "civilite": {
+                  "type": "string",
+                  "enum": ["M", "MME"],
+                  "description": "M = Monsieur, MME = Madame"
+                },
+                "nomFamille": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "description": "Nom de famille à l'état civil"
+                },
+                "prenomsActeNaissance": {
+                  "type": "string",
+                  "description": "Tous les prénoms figurant sur l'acte de naissance"
+                },
+                "premierPrenomActeNaissance": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Premier prénom de l'acte de naissance"
+                },
+                "nomUtilise": {
+                  "type": "string",
+                  "description": "Nom d'usage (peut différer du nom de famille)"
+                },
+                "prenomUtilise": {
+                  "type": "string",
+                  "description": "Prénom usuel"
+                },
+                "sexe": {
+                  "type": "string",
+                  "enum": ["M", "F"],
+                  "description": "M = Masculin, F = Féminin"
+                },
+                "dateNaissance": {
+                  "type": "string",
+                  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}",
+                  "description": "Date de naissance au format YYYY-MM-DD (peut inclure l'heure)"
+                },
+                "communeNaissance": {
+                  "type": "object",
+                  "properties": {
+                    "codePostal": { "type": "string" },
+                    "libelleCommune": { "type": "string" },
+                    "inseeCommune": { "type": ["string", "null"] }
+                  }
+                },
+                "paysNaissance": {
+                  "type": "object",
+                  "properties": {
+                    "libellePays": { "type": "string" },
+                    "inseePays": { "type": ["string", "null"] }
+                  }
+                },
+                "situationFamiliale": {
+                  "type": ["string", "null"],
+                  "description": "Marié(e), Célibataire, Veuf(ve), Divorcé(e), Pacsé(e)..."
+                }
+              }
+            }
+          }
+        },
+
+        "adresse": {
+          "$ref": "#/$defs/adresse"
+        },
+
+        "contactInfosPersonnels": {
+          "type": "object",
+          "description": "Coordonnées personnelles du patient",
+          "properties": {
+            "domicile": {
+              "type": ["string", "null"],
+              "description": "Numéro de téléphone fixe"
+            },
+            "mobile": {
+              "type": ["string", "null"],
+              "pattern": "^[0-9]{10}$|^$",
+              "description": "Numéro de téléphone mobile (10 chiffres)"
+            },
+            "mail": {
+              "type": ["string", "null"],
+              "format": "email",
+              "description": "Adresse email personnelle"
+            }
+          }
+        }
+      }
+    },
+
+    "contacts": {
+      "type": "array",
+      "description": "Liste des contacts du patient (professionnels de santé, entourage, autres). Peut être vide si le patient est isolé.",
+      "items": {
+        "$ref": "#/$defs/contact"
+      }
+    },
+
+    "aggir": {
+      "type": "object",
+      "description": "Évaluation AGGIR (Autonomie Gérontologie Groupes Iso-Ressources)",
+      "required": ["GIR", "AggirVariable"],
+      "properties": {
+
+        "GIR": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "description": "Score GIR : 1 = très dépendant, 6 = autonome"
+        },
+
+        "dateModification": {
+          "type": "string",
+          "description": "Date de dernière modification de l'évaluation AGGIR"
+        },
+
+        "TempsAide24H": {
+          "type": "string",
+          "description": "Temps d'aide quotidien estimé (ex: '1h36min')"
+        },
+
+        "AggirVariable": {
+          "type": "array",
+          "description": "Liste des 17 variables AGGIR évaluées",
+          "items": {
+            "$ref": "#/$defs/aggirVariable"
+          }
+        }
+      }
+    },
+
+    "social": {
+      "type": "object",
+      "description": "Évaluation sociale (contexte, participation sociale, prise en charge)",
+      "properties": {
+        "blocs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blocSocial"
+          }
+        }
+      }
+    },
+
+    "materiels": {
+      "type": "array",
+      "description": "Liste des matériels et équipements (existants ou à prévoir)",
+      "items": {
+        "$ref": "#/$defs/materiel"
+      }
+    },
+
+    "sante": {
+      "type": "object",
+      "description": "Évaluations de santé multidimensionnelles",
+      "properties": {
+        "blocs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/blocSante"
+          }
+        }
+      }
+    },
+
+    "dispositifs": {
+      "type": "array",
+      "description": "Dispositifs médicaux (pace-maker, appareils auditifs, etc.)",
+      "items": {
+        "$ref": "#/$defs/dispositifMedical"
+      }
+    },
+
+    "poaSocial": {
+      "type": "object",
+      "description": "Plan d'Objectifs et d'Actions - Volet Social",
+      "properties": {
+        "problemes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/problemePOA"
+          }
+        }
+      }
+    },
+
+    "poaSante": {
+      "type": "object",
+      "description": "Plan d'Objectifs et d'Actions - Volet Santé",
+      "properties": {
+        "problemes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/problemePOA"
+          }
+        }
+      }
+    },
+
+    "planningInterventions": {
+      "type": "object",
+      "description": "Planning des interventions à domicile",
+      "properties": {
+        "interventions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/intervention"
+          }
+        }
+      }
+    }
+
+  },
+
+  "$defs": {
+
+    "adresse": {
+      "type": "object",
+      "description": "Adresse postale",
+      "properties": {
+        "ligne": {
+          "type": "string",
+          "description": "Numéro et nom de rue"
+        },
+        "commentaire": {
+          "type": "string",
+          "description": "Informations d'accès (digicode, étage, bâtiment...)"
+        },
+        "codePostal": {
+          "type": "string",
+          "pattern": "^[0-9]{5}$|^$",
+          "description": "Code postal français à 5 chiffres"
+        },
+        "libelleCommune": {
+          "type": "string",
+          "description": "Nom de la commune"
+        }
+      }
+    },
+
+    "contact": {
+      "type": "object",
+      "description": "Contact du patient (professionnel de santé, proche, autre)",
+      "required": ["typeContact", "personnePhysique"],
+      "properties": {
+
+        "typeContact": {
+          "type": "string",
+          "enum": ["Cercle d'aide et de soin", "Entourage", "Autre"],
+          "description": "Catégorie du contact"
+        },
+
+        "personnePhysique": {
+          "type": "object",
+          "required": ["nomUtilise"],
+          "properties": {
+            "civilite": {
+              "type": "string",
+              "enum": ["M", "MME"]
+            },
+            "nomUtilise": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Nom du contact"
+            },
+            "prenomUtilise": {
+              "type": "string",
+              "description": "Prénom du contact"
+            },
+            "dateNaissance": {
+              "type": "string",
+              "description": "Date de naissance (si connue)"
+            }
+          }
+        },
+
+        "adresse": {
+          "$ref": "#/$defs/adresse"
+        },
+
+        "contactInfosPersonnels": {
+          "type": "object",
+          "properties": {
+            "domicile": { "type": ["string", "null"] },
+            "mobile": { "type": ["string", "null"] },
+            "mailMSSANTE": {
+              "type": "string",
+              "description": "Adresse MSSanté (messagerie sécurisée de santé)"
+            },
+            "mailPro": {
+              "type": "string",
+              "description": "Email professionnel"
+            }
+          }
+        },
+
+        "titre": {
+          "type": "string",
+          "description": "Titre professionnel (DOCTEUR, INFIRMIER, etc.)"
+        },
+
+        "role": {
+          "type": "string",
+          "description": "Rôle auprès du patient (Médecin traitant, Infirmier, etc.)"
+        },
+
+        "numRpps": {
+          "type": "string",
+          "pattern": "^[0-9]{11}$|^$",
+          "description": "Numéro RPPS à 11 chiffres (professionnels de santé uniquement)"
+        },
+
+        "structure": {
+          "type": "string",
+          "description": "Nom de la structure d'exercice"
+        },
+
+        "typeStructure": {
+          "type": "string",
+          "description": "Type de structure (SSIAD, Réseaux, Cabinet libéral, etc.)"
+        },
+
+        "finessET": {
+          "type": "string",
+          "description": "Numéro FINESS de l'établissement"
+        },
+
+        "natureLien": {
+          "type": "string",
+          "description": "Nature du lien pour l'entourage : Conjoint, Enfant, Ami(e), Voisin(e)..."
+        },
+
+        "personneConfiance": {
+          "type": "boolean",
+          "description": "Est désigné(e) comme personne de confiance"
+        },
+
+        "dateDesignationPersonneConfiance": {
+          "type": "string",
+          "description": "Date de désignation comme personne de confiance"
+        },
+
+        "responsableLegal": {
+          "type": "boolean",
+          "description": "Est le responsable légal (tuteur, curateur)"
+        },
+
+        "dateDesignationResponsableLegal": {
+          "type": "string",
+          "description": "Date de désignation comme responsable légal"
+        }
+      }
+    },
+
+    "aggirAdverbe": {
+      "type": "object",
+      "description": "Adverbe AGGIR évaluant la qualité de réalisation",
+      "required": ["Question", "Reponse"],
+      "properties": {
+        "Question": {
+          "type": "string",
+          "enum": ["S", "T", "C", "H"],
+          "description": "S=Spontanément, T=Totalement, C=Correctement, H=Habituellement"
+        },
+        "Reponse": {
+          "type": "string",
+          "enum": ["oui", "non"]
+        }
+      }
+    },
+
+    "aggirSousVariable": {
+      "type": "object",
+      "description": "Sous-variable AGGIR (ex: Toilette → Haut/Bas)",
+      "required": ["Nom", "Resultat"],
+      "properties": {
+        "Nom": {
+          "type": "string",
+          "description": "Nom de la sous-variable"
+        },
+        "Resultat": {
+          "type": "string",
+          "enum": ["A", "B", "C"],
+          "description": "A=fait seul, B=fait partiellement, C=ne fait pas"
+        },
+        "Commentaires": {
+          "type": "string"
+        },
+        "AggirAdverbes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/aggirAdverbe" }
+        }
+      }
+    },
+
+    "aggirVariable": {
+      "type": "object",
+      "description": "Variable AGGIR principale",
+      "required": ["Nom", "Resultat"],
+      "properties": {
+        "Nom": {
+          "type": "string",
+          "enum": [
+            "Cohérence",
+            "Orientation",
+            "Toilette",
+            "Habillage",
+            "Alimentation",
+            "Élimination",
+            "Transferts",
+            "Déplacements intérieurs",
+            "Déplacements extérieurs",
+            "Communication",
+            "Gestion",
+            "Cuisine",
+            "Ménage",
+            "Transports",
+            "Achats",
+            "Suivi du traitement",
+            "Activités de temps libre",
+            "Alerter"
+          ],
+          "description": "Nom de la variable AGGIR (17 variables au total)"
+        },
+        "Resultat": {
+          "type": "string",
+          "enum": ["A", "B", "C"],
+          "description": "A=fait seul, B=fait partiellement, C=ne fait pas"
+        },
+        "Commentaires": {
+          "type": "string"
+        },
+        "AggirAdverbes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/aggirAdverbe" }
+        },
+        "AggirSousVariable": {
+          "type": "array",
+          "description": "Sous-variables (pour Toilette, Habillage, Alimentation, etc.)",
+          "items": { "$ref": "#/$defs/aggirSousVariable" }
+        }
+      }
+    },
+
+    "blocSocial": {
+      "type": "object",
+      "description": "Bloc d'évaluation sociale",
+      "required": ["nom"],
+      "properties": {
+        "nom": {
+          "type": "string",
+          "enum": ["Contexte", "Participation sociale", "PEC"],
+          "description": "Nom du bloc social"
+        },
+        "questionReponse": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/questionReponse" }
+        }
+      }
+    },
+
+    "questionReponse": {
+      "type": "object",
+      "description": "Couple question/réponse",
+      "required": ["question", "reponse"],
+      "properties": {
+        "question": { "type": "string" },
+        "reponse": { "type": "string" }
+      }
+    },
+
+    "materiel": {
+      "type": "object",
+      "description": "Matériel ou équipement",
+      "required": ["materiel", "statut"],
+      "properties": {
+        "materiel": {
+          "type": "string",
+          "description": "Nom du matériel (Lit médicalisé, Fauteuil roulant, etc.)"
+        },
+        "statut": {
+          "type": "string",
+          "enum": ["EXISTANT", "A PREVOIR", "COMMANDE", "LIVRE"],
+          "description": "Statut du matériel"
+        }
+      }
+    },
+
+    "testSante": {
+      "type": "object",
+      "description": "Résultat d'un test de santé standardisé",
+      "required": ["nom", "resultat"],
+      "properties": {
+        "nom": {
+          "type": "string",
+          "description": "Nom du test (GAI, Mini-GDS, ICOPE, MNA, Mini-cog, etc.)"
+        },
+        "resultat": {
+          "type": "string",
+          "description": "Résultat ou interprétation du test"
+        }
+      }
+    },
+
+    "comorbidite": {
+      "type": "object",
+      "description": "Comorbidité ou pathologie du patient",
+      "required": ["Affection", "Etat pathologique"],
+      "properties": {
+        "Affection": {
+          "type": "string",
+          "description": "Catégorie d'affection (Neurologiques, Cardio-vasculaires, etc.)"
+        },
+        "Etat pathologique": {
+          "type": "string",
+          "description": "Pathologie spécifique (AVC, Insuffisance cardiaque, etc.)"
+        },
+        "Etat": {
+          "type": "string",
+          "enum": ["Confirmé", "Suspicion", "Antécédent"],
+          "description": "État du diagnostic"
+        },
+        "Date de diagnostic": {
+          "type": "string",
+          "description": "Date du diagnostic (format YYYY-MM-DD)"
+        },
+        "Diagnostique": {
+          "type": "string",
+          "description": "Détails du diagnostic"
+        },
+        "Commentaires": {
+          "type": ["string", "null"],
+          "description": "Commentaires additionnels"
+        }
+      }
+    },
+
+    "seuilVital": {
+      "type": "object",
+      "description": "Seuil de surveillance d'une constante vitale",
+      "required": ["typeConstante", "max", "min", "unit"],
+      "properties": {
+        "typeConstante": {
+          "type": "string",
+          "enum": [
+            "Fréquence cardiaque",
+            "Tension artérielle systolique",
+            "Tension artérielle diastolique",
+            "Glycémie capillaire (hémoglucotest)",
+            "Hémoglucotest post-prandial",
+            "Poids",
+            "Saturation en Oxygène",
+            "Fréquence respiratoire",
+            "Température"
+          ],
+          "description": "Type de constante vitale"
+        },
+        "max": {
+          "type": "number",
+          "description": "Valeur maximale acceptable"
+        },
+        "min": {
+          "type": "number",
+          "description": "Valeur minimale acceptable"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unité de mesure"
+        },
+        "surveillance": {
+          "type": "string",
+          "description": "Fréquence de surveillance (1 fois par jour, etc.)"
+        }
+      }
+    },
+
+    "blocSante": {
+      "type": "object",
+      "description": "Bloc d'évaluation santé",
+      "required": ["nom"],
+      "properties": {
+        "nom": {
+          "type": "string",
+          "enum": [
+            "Anxiété",
+            "Cardio-respiratoire",
+            "Cognition",
+            "Dépression",
+            "Elimination",
+            "Général et ressenti",
+            "Préparations et prise médicamenteuse",
+            "Mobilité",
+            "Nutrition",
+            "Douleur",
+            "Polymédications",
+            "Sensoriel",
+            "Peau",
+            "Seuils",
+            "Comorbidités"
+          ],
+          "description": "Nom du bloc de santé"
+        },
+        "questionReponse": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/questionReponse" }
+        },
+        "test": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/testSante" }
+        },
+        "comorbidites": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/comorbidite" }
+        },
+        "seuil": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/seuilVital" }
+        }
+      }
+    },
+
+    "dispositifMedical": {
+      "type": "object",
+      "description": "Dispositif médical implanté ou utilisé",
+      "required": ["dispositif", "statut"],
+      "properties": {
+        "dispositif": {
+          "type": "string",
+          "description": "Nom du dispositif (Pace-maker, Appareils auditifs, etc.)"
+        },
+        "statut": {
+          "type": "string",
+          "enum": ["EXISTANT", "PREVOIR", "RETIRE"],
+          "description": "Statut du dispositif"
+        },
+        "datePose": {
+          "type": ["string", "null"],
+          "description": "Date de pose/installation"
+        },
+        "dateControle": {
+          "type": ["string", "null"],
+          "description": "Date du prochain contrôle"
+        },
+        "dateRetrait": {
+          "type": ["string", "null"],
+          "description": "Date de retrait prévue ou effective"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes et observations"
+        }
+      }
+    },
+
+    "actionPOA": {
+      "type": "object",
+      "description": "Action du Plan d'Objectifs et d'Actions",
+      "required": ["nomAction"],
+      "properties": {
+        "nomAction": {
+          "type": "string",
+          "description": "Intitulé de l'action"
+        },
+        "detailAction": {
+          "type": "string"
+        },
+        "personneChargeAction": {
+          "type": ["string", "array"],
+          "description": "Personne(s) en charge de l'action"
+        },
+        "dateDebutAction": {
+          "type": "string",
+          "description": "Date de début de l'action"
+        },
+        "dureeAction": {
+          "type": "string",
+          "description": "Durée prévue de l'action"
+        },
+        "recurrenceAction": {
+          "type": "string",
+          "description": "Récurrence de l'action"
+        },
+        "momentJournee": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Moments de la journée concernés"
+        }
+      }
+    },
+
+    "problemePOA": {
+      "type": "object",
+      "description": "Problème identifié dans le Plan d'Objectifs et d'Actions",
+      "required": ["nomBloc", "statut"],
+      "properties": {
+        "nomBloc": {
+          "type": "string",
+          "description": "Nom du bloc/domaine concerné"
+        },
+        "statut": {
+          "type": "string",
+          "enum": ["Actif", "Inactif", "Résolu"],
+          "description": "Statut du problème"
+        },
+        "problemePose": {
+          "type": "string",
+          "description": "Description du problème identifié"
+        },
+        "objectifs": {
+          "type": "string",
+          "description": "Objectifs à atteindre"
+        },
+        "preoccupationPatient": {
+          "type": "string",
+          "enum": ["Faible", "Assez faible", "Assez élevée", "Élevée", ""],
+          "description": "Niveau de préoccupation du patient"
+        },
+        "preoccupationProfessionel": {
+          "type": "string",
+          "enum": ["Faible", "Assez faible", "Assez élevée", "Élevée", ""],
+          "description": "Niveau de préoccupation du professionnel"
+        },
+        "planActions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/actionPOA" }
+        },
+        "critereEvaluation": {
+          "type": "string",
+          "description": "Critères d'évaluation de l'atteinte des objectifs"
+        },
+        "resultatActions": {
+          "type": "string",
+          "description": "Résultats des actions menées"
+        },
+        "message": {
+          "type": "string",
+          "description": "Message ou note complémentaire"
+        }
+      }
+    },
+
+    "intervention": {
+      "type": "object",
+      "description": "Intervention planifiée à domicile",
+      "required": ["typeAction"],
+      "properties": {
+        "typeAction": {
+          "type": "string",
+          "enum": ["Aide à domicile", "Soins infirmiers", "Kinésithérapie", "Autre"],
+          "description": "Type d'intervention"
+        },
+        "personneChargeAction": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Intervenants prévus"
+        },
+        "joursIntervention": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+          },
+          "description": "Jours d'intervention"
+        },
+        "secondJoursIntervention": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Jours d'intervention alternatifs"
+        },
+        "dateDebutAction": {
+          "type": "string",
+          "description": "Date de début des interventions"
+        },
+        "dureeAction": {
+          "type": "string",
+          "description": "Durée de la période d'intervention (3 mois, 6 mois, etc.)"
+        },
+        "dureePassage": {
+          "type": "string",
+          "description": "Durée de chaque passage (30mn, 60mn, etc.)"
+        },
+        "momentJournee": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Lever", "Matin", "Midi", "Après-midi", "Soir", "Coucher", "Nuit"]
+          },
+          "description": "Moments de la journée"
+        },
+        "secondMomentJournee": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Moments alternatifs"
+        },
+        "typeAide": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Types d'aide (Aide partielle, Stimulation, Tout faire)"
+        },
+        "actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Actions à réaliser lors de l'intervention"
+        },
+        "detailAction": {
+          "type": "string"
+        },
+        "critereEvaluation": {
+          "type": "string"
+        },
+        "resultatActions": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "description": "Instructions détaillées pour l'intervenant"
+        }
+      }
+    }
+
+  }
+}

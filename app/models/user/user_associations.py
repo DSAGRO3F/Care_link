@@ -6,11 +6,11 @@ Ce module définit :
 - UserEntity : Association User ↔ Entity
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, time
 from typing import TYPE_CHECKING
 from decimal import Decimal
 
-from sqlalchemy import String, Boolean, ForeignKey, Date, UniqueConstraint
+from sqlalchemy import String, Boolean, ForeignKey, Date, UniqueConstraint, Integer, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.user.role import Role
     from app.models.organization.entity import Entity
+    from app.models.tenants.tenant import Tenant
 
 
 class UserRole(Base):
@@ -49,6 +50,15 @@ class UserRole(Base):
         primary_key=True,
         doc="ID de l'utilisateur",
         info={"description": "Référence vers l'utilisateur"}
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
 
     role_id: Mapped[int] = mapped_column(
@@ -131,6 +141,15 @@ class UserEntity(Base):
         primary_key=True,
         doc="Identifiant unique de l'association",
         info={"description": "Clé primaire auto-incrémentée"}
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
 
     user_id: Mapped[int] = mapped_column(

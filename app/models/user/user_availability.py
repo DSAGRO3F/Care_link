@@ -13,15 +13,16 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import String, Integer, Boolean, Text, ForeignKey, Date, Time, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.organization.entity import Entity
+    from app.models.tenants.tenant import Tenant
 
 
-class UserAvailability(Base, TimestampMixin):
+class UserAvailability(TimestampMixin, Base):
     """
     Créneau de disponibilité d'un professionnel.
     
@@ -60,6 +61,15 @@ class UserAvailability(Base, TimestampMixin):
     
     # === Clé primaire ===
     id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # === Multi-tenant ===
+    tenant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
+    )
     
     # === Références ===
     user_id: Mapped[int] = mapped_column(
@@ -148,6 +158,11 @@ class UserAvailability(Base, TimestampMixin):
     entity: Mapped[Optional["Entity"]] = relationship(
         "Entity",
         back_populates="user_availabilities"
+    )
+    
+    tenant: Mapped["Tenant"] = relationship(
+        "Tenant",
+        doc="Tenant propriétaire de cette disponibilité"
     )
     
     # === Méthodes ===

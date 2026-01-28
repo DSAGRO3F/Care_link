@@ -6,21 +6,27 @@ de CareLink (professionnels de santé et administratifs).
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Set
 
 from sqlalchemy import String, Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
-from app.models.enums import Permission
 
 if TYPE_CHECKING:
     from app.models.user.profession import Profession
     from app.models.user.role import Role
+    from app.models.user.permission import Permission
     from app.models.organization.entity import Entity
     from app.models.patient.patient import Patient
     from app.models.user.user_associations import UserRole, UserEntity
+    from app.models.careplan.care_plan import CarePlan
+    from app.models.careplan.care_plan_service import CarePlanService
+    from app.models.user.user_availability import UserAvailability
+    from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.tenants.tenant import Tenant
+    from app.models.user.user_tenant_assignment import UserTenantAssignment
 
 
 class User(TimestampMixin, Base):
@@ -126,6 +132,16 @@ class User(TimestampMixin, Base):
 
     # === Clés étrangères ===
 
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+        doc="ID du tenant propriétaire",
+        info={
+            "description": "Référence vers le tenant (client) propriétaire de cette entité"
+        }
+    )
+
     profession_id: Mapped[int | None] = mapped_column(
         ForeignKey("professions.id", ondelete="SET NULL"),
         nullable=True,
@@ -134,6 +150,12 @@ class User(TimestampMixin, Base):
     )
 
     # === Relations ===
+
+    tenant: Mapped["Tenant"] = relationship(
+        "Tenant",
+        back_populates="users",
+        doc="Tenant propriétaire de cet utilisateur"
+    )
 
     profession: Mapped["Profession | None"] = relationship(
         "Profession",
@@ -163,6 +185,43 @@ class User(TimestampMixin, Base):
         back_populates="medecin_traitant",
         foreign_keys="[Patient.medecin_traitant_id]",
         doc="Patients dont cet utilisateur est le médecin traitant"
+    )
+
+    validated_care_plans: Mapped[List["CarePlan"]] = relationship(
+        "CarePlan",
+        foreign_keys="[CarePlan.validated_by_id]",
+        back_populates="validated_by",
+        doc="Plans d'aide validés par cet utilisateur"
+    )
+
+    assigned_services: Mapped[List["CarePlanService"]] = relationship(
+        "CarePlanService",
+        foreign_keys="[CarePlanService.assigned_user_id]",
+        back_populates="assigned_user",
+        doc="Services de plans d'aide affectés à cet utilisateur"
+    )
+
+    availabilities: Mapped[List["UserAvailability"]] = relationship(
+        "UserAvailability",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        doc="Disponibilités de cet utilisateur"
+    )
+
+    scheduled_interventions: Mapped[List["ScheduledIntervention"]] = relationship(
+        "ScheduledIntervention",
+        foreign_keys="[ScheduledIntervention.user_id]",
+        back_populates="user",
+        doc="Interventions planifiées pour cet utilisateur"
+    )
+
+    # Rattachements à d'autres tenants (cross-tenant)
+    tenant_assignments: Mapped[List["UserTenantAssignment"]] = relationship(
+        "UserTenantAssignment",
+        foreign_keys="[UserTenantAssignment.user_id]",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        doc="Rattachements à d'autres tenants (missions temporaires, remplacements)"
     )
 
     # === Propriétés ===
@@ -205,12 +264,70 @@ class User(TimestampMixin, Base):
         return active[0].entity if active else None
 
     @property
-    def all_permissions(self) -> set[str]:
-        """Ensemble de toutes les permissions de l'utilisateur."""
-        permissions = set()
+    def permissions(self) -> List["Permission"]:
+        """
+        Liste de toutes les permissions de l'utilisateur (via ses rôles).
+        
+        Returns:
+            Liste des objets Permission uniques
+        """
+        seen_ids: Set[int] = set()
+        permissions: List["Permission"] = []
+        
         for role in self.roles:
-            permissions.update(role.permissions)
+            for perm in role.permissions:
+                if perm.id not in seen_ids:
+                    seen_ids.add(perm.id)
+                    permissions.append(perm)
+        
         return permissions
+
+    @property
+    def all_permissions(self) -> Set[str]:
+        """
+        Ensemble de tous les codes de permissions de l'utilisateur.
+        
+        Utilise les relations normalisées (Role → RolePermission → Permission).
+        
+        Returns:
+            Set des codes de permissions (ex: {"PATIENT_VIEW", "USER_EDIT"})
+        """
+        permission_codes: Set[str] = set()
+        
+        for role in self.roles:
+            permission_codes.update(role.permission_codes)
+        
+        return permission_codes
+
+    @property
+    def all_tenant_ids(self) -> List[int]:
+        """
+        Liste tous les tenant_ids accessibles par cet utilisateur.
+
+        Inclut :
+        - Le tenant principal (users.tenant_id)
+        - Les tenants via user_tenant_assignments (si valides)
+
+        Returns:
+            Liste des tenant_ids accessibles
+        """
+        tenant_ids = [self.tenant_id]  # Tenant principal
+        for assignment in self.tenant_assignments:
+            if assignment.is_valid:
+                tenant_ids.append(assignment.tenant_id)
+        return tenant_ids
+
+    def has_access_to_tenant(self, target_tenant_id: int) -> bool:
+        """
+        Vérifie si l'utilisateur a accès à un tenant spécifique.
+
+        Args:
+            target_tenant_id: ID du tenant à vérifier
+
+        Returns:
+            True si l'utilisateur a accès
+        """
+        return target_tenant_id in self.all_tenant_ids
 
     # === Méthodes ===
 
@@ -220,15 +337,60 @@ class User(TimestampMixin, Base):
     def __str__(self) -> str:
         return self.full_name
 
-    def has_permission(self, permission: Permission | str) -> bool:
-        """Vérifie si l'utilisateur possède une permission."""
+    def has_permission(self, permission_code: str) -> bool:
+        """
+        Vérifie si l'utilisateur possède une permission spécifique.
+        
+        Args:
+            permission_code: Code de la permission à vérifier
+            
+        Returns:
+            True si l'utilisateur a la permission
+        """
         if self.is_admin:
             return True
 
-        if isinstance(permission, Permission):
-            permission = permission.value
+        # ADMIN_FULL donne toutes les permissions
+        if "ADMIN_FULL" in self.all_permissions:
+            return True
 
-        return permission in self.all_permissions
+        return permission_code in self.all_permissions
+
+    def has_any_permission(self, permission_codes: List[str]) -> bool:
+        """
+        Vérifie si l'utilisateur possède au moins une des permissions.
+        
+        Args:
+            permission_codes: Liste des codes de permissions à vérifier
+            
+        Returns:
+            True si l'utilisateur a au moins une des permissions
+        """
+        if self.is_admin:
+            return True
+            
+        if "ADMIN_FULL" in self.all_permissions:
+            return True
+
+        return any(code in self.all_permissions for code in permission_codes)
+
+    def has_all_permissions(self, permission_codes: List[str]) -> bool:
+        """
+        Vérifie si l'utilisateur possède toutes les permissions.
+        
+        Args:
+            permission_codes: Liste des codes de permissions à vérifier
+            
+        Returns:
+            True si l'utilisateur a toutes les permissions
+        """
+        if self.is_admin:
+            return True
+            
+        if "ADMIN_FULL" in self.all_permissions:
+            return True
+
+        return all(code in self.all_permissions for code in permission_codes)
 
     def has_role(self, role_name: str) -> bool:
         """Vérifie si l'utilisateur a un rôle spécifique."""

@@ -1,0 +1,32 @@
+[pytest]
+# Configuration pytest pour CareLink
+
+# Chemins des tests
+testpaths = tests
+
+# Pattern des fichiers de test
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+
+# Options par défaut
+addopts =
+    -v
+    --tb=short
+    --strict-markers
+
+# Markers personnalisés
+markers =
+    slow: marks tests as slow (deselect with '-m "not slow"')
+    integration: marks tests as integration tests
+    unit: marks tests as unit tests
+
+# Filtrer les warnings
+filterwarnings =
+    ignore::DeprecationWarning
+    ignore::PendingDeprecationWarning
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:sqlalchemy.*:",
+]

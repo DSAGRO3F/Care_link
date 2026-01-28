@@ -7,7 +7,7 @@ Ce module définit :
 - PatientDevice : Devices connectés
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import String, ForeignKey, Numeric, Text, Boolean, Index, UniqueConstraint
@@ -20,6 +20,7 @@ from app.models.enums import VitalType, VitalStatus, VitalSource, DeviceType
 if TYPE_CHECKING:
     from app.models.patient.patient import Patient
     from app.models.user.user import User
+    from app.models.tenants.tenant import Tenant
 
 
 # =============================================================================
@@ -65,6 +66,15 @@ class PatientThreshold(TimestampMixin, Base):
         primary_key=True,
         doc="Identifiant unique du seuil",
         info={"description": "Clé primaire auto-incrémentée"}
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
     
     patient_id: Mapped[int] = mapped_column(
@@ -137,15 +147,18 @@ class PatientThreshold(TimestampMixin, Base):
         Returns:
             VitalStatus (normal, low, high, critical)
         """
-        if self.min_value is not None and value < self.min_value:
+        from decimal import Decimal
+        value_dec = Decimal(str(value))
+        
+        if self.min_value is not None and value_dec < self.min_value:
             # Très en dessous = critical
-            if value < self.min_value * 0.9:
+            if value_dec < self.min_value * Decimal('0.9'):
                 return VitalStatus.CRITICAL
             return VitalStatus.LOW
         
-        if self.max_value is not None and value > self.max_value:
+        if self.max_value is not None and value_dec > self.max_value:
             # Très au dessus = critical
-            if value > self.max_value * 1.1:
+            if value_dec > self.max_value * Decimal('1.1'):
                 return VitalStatus.CRITICAL
             return VitalStatus.HIGH
         
@@ -200,6 +213,15 @@ class PatientVitals(TimestampMixin, Base):
         primary_key=True,
         doc="Identifiant unique de la mesure",
         info={"description": "Clé primaire auto-incrémentée"}
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
     
     patient_id: Mapped[int] = mapped_column(
@@ -368,6 +390,15 @@ class PatientDevice(TimestampMixin, Base):
         doc="Identifiant unique du device",
         info={"description": "Clé primaire auto-incrémentée"}
     )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
+    )
     
     patient_id: Mapped[int] = mapped_column(
         ForeignKey("patients.id", ondelete="CASCADE"),
@@ -445,4 +476,4 @@ class PatientDevice(TimestampMixin, Base):
     
     def update_sync_time(self) -> None:
         """Met à jour le timestamp de dernière synchronisation."""
-        self.last_sync_at = datetime.utcnow()
+        self.last_sync_at = datetime.now(timezone.utc)

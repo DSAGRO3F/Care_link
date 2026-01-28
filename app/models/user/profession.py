@@ -21,6 +21,7 @@ from app.models.enums import ProfessionCategory
 
 if TYPE_CHECKING:
     from app.models.user.user import User
+    from app.models.catalog.service_template import ServiceTemplate
 
 
 class Profession(TimestampMixin, Base):
@@ -112,6 +113,13 @@ class Profession(TimestampMixin, Base):
         back_populates="profession",
         doc="Utilisateurs ayant cette profession"
     )
+
+    # === relation service_templates dans profession.py ===
+    service_templates: Mapped[List["ServiceTemplate"]] = relationship(
+        "ServiceTemplate",
+        back_populates="required_profession",
+        doc="Services nécessitant cette profession"
+    )
     
     # === Méthodes ===
     
@@ -159,5 +167,4 @@ INITIAL_PROFESSIONS = [
     {"name": "Diététicien", "code": "97", "category": "PARAMEDICAL", "requires_rpps": True},
     {"name": "Psychologue", "code": "98", "category": "PARAMEDICAL", "requires_rpps": True},
     {"name": "Administratif", "code": None, "category": "ADMINISTRATIVE", "requires_rpps": False},
-    {"name": "Coordinateur", "code": None, "category": "ADMINISTRATIVE", "requires_rpps": False},
 ]

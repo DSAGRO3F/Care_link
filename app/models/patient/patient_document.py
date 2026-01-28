@@ -9,7 +9,7 @@ Le fichier binaire (PDF/DOCX) est stocké sur le filesystem/object storage.
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict
 
-from sqlalchemy import String, Integer, Text, ForeignKey
+from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from app.models.user.user import User
     from app.models.patient.patient import Patient
     from app.models.patient.patient_evaluation import PatientEvaluation
+    from app.models.tenants.tenant import Tenant
 
 
 class PatientDocument(TimestampMixin, Base):
@@ -57,6 +58,15 @@ class PatientDocument(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du document"
+    )
+
+    # === Multi-tenant ===
+
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Tenant propriétaire de cet enregistrement"
     )
 
     # --- Références ---
@@ -146,6 +156,7 @@ class PatientDocument(TimestampMixin, Base):
     # --- Métadonnées ---
 
     generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         doc="Date/heure de génération"
@@ -197,7 +208,7 @@ class PatientDocument(TimestampMixin, Base):
     @property
     def file_extension(self) -> str:
         """Retourne l'extension du fichier."""
-        return f".{self.file_format}"
+        return f".{self.file_format.lower()}"
 
     # === Méthodes ===
 

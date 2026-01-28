@@ -8,7 +8,7 @@ Ce module définit des mixins qui ajoutent des fonctionnalités communes
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 if TYPE_CHECKING:
@@ -29,12 +29,14 @@ class TimestampMixin:
     """
 
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),  # <-- TIMESTAMP WITH TIME ZONE
         default=datetime.now(timezone.utc),
         doc="Date et heure de création",
         info={"description": "Timestamp de création", "auto_generated": True}
     )
 
     updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),  # <-- TIMESTAMP WITH TIME ZONE
         default=None,
         onupdate=datetime.now(timezone.utc),
         doc="Date et heure de dernière modification",
