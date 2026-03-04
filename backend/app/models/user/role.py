@@ -2,7 +2,7 @@
 Modèle Role - Rôles fonctionnels.
 
 Ce module définit la table `roles` qui représente les rôles
-fonctionnels dans CareLink (Médecin traitant, Coordinateur, etc.).
+fonctionnels dans CareLink (Coordinateur, Référent, Évaluateur...).
 
 Architecture normalisée (v4.3) :
 - Les permissions sont stockées dans la table `permissions`
@@ -10,9 +10,15 @@ Architecture normalisée (v4.3) :
 - Plus de stockage JSON des permissions
 
 Important :
-- Un rôle est une fonction dans CareLink, il peut changer.
+- Un rôle est une responsabilité dans CareLink, il peut changer.
 - Une profession (dans la table `professions`) est un diplôme d'État.
 - Les permissions sont attachées aux rôles via la table de jonction.
+
+Changelog :
+    S3 : Refonte en 5 rôles fonctionnels purs (ADMIN, COORDINATEUR,
+         REFERENT, EVALUATEUR, INTERVENANT). Suppression des rôles-professions
+         (INFIRMIERE, AIDE_SOIGNANTE, etc.) — remplacés par le référentiel
+         professions (S2) + permissions par profession (S4).
 """
 
 from typing import TYPE_CHECKING, List
@@ -35,20 +41,20 @@ if TYPE_CHECKING:
 class Role(TimestampMixin, Base):
     """
     Représente un rôle fonctionnel dans CareLink.
-    
+
     Les rôles définissent ce qu'un utilisateur peut faire dans l'application.
     Un utilisateur peut avoir plusieurs rôles (many-to-many via user_roles).
     Les permissions sont associées via la table role_permissions.
-    
+
     Attributes:
         id: Identifiant unique
-        name: Nom du rôle (MEDECIN_TRAITANT, COORDINATEUR, etc.)
+        name: Nom du rôle (ADMIN, COORDINATEUR, REFERENT, etc.)
         description: Description du rôle
         is_system_role: Rôle système non modifiable
         tenant_id: NULL = rôle système, sinon = rôle custom du tenant
         users: Utilisateurs ayant ce rôle
         permissions: Permissions du rôle (via role_permissions)
-    
+
     Example:
         coordinateur = Role(
             name="COORDINATEUR",
@@ -57,20 +63,20 @@ class Role(TimestampMixin, Base):
         )
         # Les permissions sont ajoutées via RolePermission
     """
-    
+
     __tablename__ = "roles"
     __table_args__ = {
         "comment": "Table des rôles fonctionnels"
     }
-    
+
     # === Colonnes ===
-    
+
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du rôle",
         info={"description": "Clé primaire auto-incrémentée"}
     )
-    
+
     # Multi-tenant: NULL pour les rôles système, défini pour les rôles personnalisés
     tenant_id: Mapped[int | None] = mapped_column(
         Integer,
@@ -80,7 +86,7 @@ class Role(TimestampMixin, Base):
         doc="ID du tenant (NULL = rôle système partagé)",
         info={"description": "Clé étrangère vers le tenant propriétaire du rôle"}
     )
-    
+
     name: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -91,7 +97,7 @@ class Role(TimestampMixin, Base):
             "example": "COORDINATEUR"
         }
     )
-    
+
     description: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
@@ -101,7 +107,7 @@ class Role(TimestampMixin, Base):
             "example": "Coordinateur de parcours de soins"
         }
     )
-    
+
     is_system_role: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
@@ -112,115 +118,117 @@ class Role(TimestampMixin, Base):
             "default": False
         }
     )
-    
+
     # === Relations ===
-    
+
     tenant: Mapped["Tenant | None"] = relationship(
         "Tenant",
         back_populates="roles",
         doc="Tenant propriétaire du rôle (None = rôle système)"
     )
-    
+
     user_associations: Mapped[List["UserRole"]] = relationship(
         "UserRole",
         back_populates="role",
         cascade="all, delete-orphan",
         doc="Associations avec les utilisateurs (via table de jonction)"
     )
-    
+
     permission_associations: Mapped[List["RolePermission"]] = relationship(
         "RolePermission",
         back_populates="role",
         cascade="all, delete-orphan",
         doc="Associations avec les permissions (via table de jonction)"
     )
-    
+
     # === Propriétés ===
-    
+
     @property
     def users(self) -> List["User"]:
         """Liste des utilisateurs ayant ce rôle."""
         return [ua.user for ua in self.user_associations]
-    
+
     @property
     def permissions(self) -> List["Permission"]:
         """Liste des permissions de ce rôle."""
         return [pa.permission for pa in self.permission_associations]
-    
+
     @property
     def permission_codes(self) -> List[str]:
         """Liste des codes de permissions de ce rôle."""
         return [p.code for p in self.permissions]
-    
+
     @property
     def is_custom(self) -> bool:
         """Retourne True si c'est un rôle custom (non système)."""
         return self.tenant_id is not None and not self.is_system_role
-    
+
     # === Méthodes ===
-    
+
     def __repr__(self) -> str:
         return f"<Role(id={self.id}, name='{self.name}', system={self.is_system_role})>"
-    
+
     def __str__(self) -> str:
         return self.description or self.name
-    
+
     def has_permission(self, permission_code: str) -> bool:
         """
         Vérifie si le rôle possède une permission spécifique.
-        
+
         Args:
             permission_code: Code de la permission à vérifier
-            
+
         Returns:
             True si le rôle a la permission
         """
         # ADMIN_FULL donne toutes les permissions
         if "ADMIN_FULL" in self.permission_codes:
             return True
-        
+
         return permission_code in self.permission_codes
-    
+
     def has_any_permission(self, permission_codes: List[str]) -> bool:
         """
         Vérifie si le rôle possède au moins une des permissions.
-        
+
         Args:
             permission_codes: Liste des codes de permissions à vérifier
-            
+
         Returns:
             True si le rôle a au moins une des permissions
         """
         if "ADMIN_FULL" in self.permission_codes:
             return True
-        
+
         return any(code in self.permission_codes for code in permission_codes)
-    
+
     def has_all_permissions(self, permission_codes: List[str]) -> bool:
         """
         Vérifie si le rôle possède toutes les permissions.
-        
+
         Args:
             permission_codes: Liste des codes de permissions à vérifier
-            
+
         Returns:
             True si le rôle a toutes les permissions
         """
         if "ADMIN_FULL" in self.permission_codes:
             return True
-        
+
         return all(code in self.permission_codes for code in permission_codes)
 
 
 # =============================================================================
-# DONNÉES INITIALES - Rôles système
+# DONNÉES INITIALES - Rôles fonctionnels système (S3)
 # =============================================================================
-# Note: Les permissions sont maintenant dans INITIAL_ROLE_PERMISSIONS (role_permission.py)
+# 5 rôles fonctionnels purs — expriment une responsabilité, pas une profession.
+# Les permissions de base liées au diplôme seront portées par les professions (S4).
+# Note: Les permissions sont dans INITIAL_ROLE_PERMISSIONS (role_permission.py)
 
 INITIAL_ROLES = [
     {
         "name": "ADMIN",
-        "description": "Administrateur système",
+        "description": "Administrateur du tenant",
         "is_system_role": True
     },
     {
@@ -229,43 +237,18 @@ INITIAL_ROLES = [
         "is_system_role": True
     },
     {
-        "name": "MEDECIN_TRAITANT",
-        "description": "Médecin traitant référent",
+        "name": "REFERENT",
+        "description": "Référent patient désigné",
         "is_system_role": True
     },
     {
-        "name": "MEDECIN_SPECIALISTE",
-        "description": "Médecin spécialiste intervenant",
-        "is_system_role": True
-    },
-    {
-        "name": "INFIRMIERE",
-        "description": "Infirmier(ère)",
-        "is_system_role": True
-    },
-    {
-        "name": "AIDE_SOIGNANTE",
-        "description": "Aide-soignant(e)",
-        "is_system_role": True
-    },
-    {
-        "name": "KINESITHERAPEUTE",
-        "description": "Kinésithérapeute",
-        "is_system_role": True
-    },
-    {
-        "name": "AUXILIAIRE_VIE",
-        "description": "Auxiliaire de vie sociale",
-        "is_system_role": True
-    },
-    {
-        "name": "ASSISTANT_SOCIAL",
-        "description": "Assistant(e) social(e)",
+        "name": "EVALUATEUR",
+        "description": "Habilité aux évaluations AGGIR",
         "is_system_role": True
     },
     {
         "name": "INTERVENANT",
-        "description": "Intervenant ponctuel",
+        "description": "Intervenant ponctuel (lecture seule)",
         "is_system_role": True
-    }
+    },
 ]

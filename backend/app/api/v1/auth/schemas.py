@@ -39,9 +39,9 @@ class AuthMethod(str, Enum):
 
 class LoginRequest(BaseModel):
     """Requête de connexion avec email/mot de passe."""
+    tenant_code: str = Field(..., min_length=2, description="Code de la structure (ex: SSIAD-NORD)")
     email: EmailStr = Field(..., description="Email de connexion")
     password: str = Field(..., min_length=1, description="Mot de passe")
-
 
 class PasswordChangeRequest(BaseModel):
     """Requête de changement de mot de passe."""
@@ -194,6 +194,7 @@ class AuthenticatedUser(BaseModel):
     speciality: Optional[str] = Field(None, description="Spécialité")
     roles: List[str] = Field(default_factory=list, description="Rôles")
     is_admin: bool = Field(default=False, description="Est administrateur")
+    must_change_password: bool = Field(default=False, description="Doit changer son mot de passe")
     tenant_id: int = Field(..., description="ID du tenant")
 
     model_config = ConfigDict(from_attributes=True)

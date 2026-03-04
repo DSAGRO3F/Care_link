@@ -4,6 +4,7 @@ Sécurité multi-tenant pour les utilisateurs clients (professionnels de santé)
 
 Ce module gère :
 - Extraction du tenant_id depuis le contexte utilisateur
+- Configuration RLS PostgreSQL pour chaque requête
 - Vérification des accès cross-tenant
 - Contexte de sécurité TenantContext pour les routes métier
 
@@ -14,8 +15,11 @@ voir app/api/v1/platform/super_admin_security.py
 from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.core.auth.user_auth import get_current_user
+from app.database import get_db
 from app.models.user.user import User
 
 
@@ -24,10 +28,11 @@ from app.models.user.user import User
 # =============================================================================
 
 def get_current_tenant_id(
-    current_user: User = Depends(get_current_user)
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ) -> int:
     """
-    Extrait le tenant_id principal de l'utilisateur courant.
+    Extrait le tenant_id principal de l'utilisateur courant et configure RLS.
 
     Raises:
         HTTPException 403: Si l'utilisateur n'est pas rattaché à un tenant
@@ -37,11 +42,17 @@ def get_current_tenant_id(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Utilisateur non rattaché à un tenant"
         )
+
+    # Configure RLS PostgreSQL pour cette session
+    db.execute(text(f"SET app.current_tenant_id = '{current_user.tenant_id}'"))
+    db.execute(text("SET app.is_super_admin = 'false'"))
+
     return current_user.tenant_id
 
 
 def get_optional_tenant_id(
-    current_user: User = Depends(get_current_user)
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ) -> Optional[int]:
     """
     Extrait le tenant_id de l'utilisateur courant (optionnel).
@@ -49,26 +60,11 @@ def get_optional_tenant_id(
     Pour les super-admins qui peuvent voir tous les tenants.
     Retourne None si l'utilisateur n'a pas de tenant (super-admin).
     """
-    return current_user.tenant_id
+    if current_user.tenant_id:
+        # Configure RLS PostgreSQL pour cette session
+        db.execute(text(f"SET app.current_tenant_id = '{current_user.tenant_id}'"))
+        db.execute(text("SET app.is_super_admin = 'false'"))
 
-
-def get_active_tenant_id(
-    current_user: User = Depends(get_current_user)
-) -> int:
-    """
-    Récupère le tenant_id actif pour la requête.
-
-    Pour l'instant, retourne simplement le tenant_id de l'utilisateur.
-    Peut être étendu pour supporter le switch de tenant via header X-Tenant-Id.
-
-    Raises:
-        HTTPException 403: Si l'utilisateur n'est pas rattaché à un tenant
-    """
-    if not current_user.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Utilisateur non rattaché à un tenant"
-        )
     return current_user.tenant_id
 
 
@@ -91,12 +87,12 @@ class TenantContext:
     """
 
     def __init__(
-        self,
-        current_user: User = Depends(get_current_user),
-        active_tenant_id: int = Depends(get_active_tenant_id)
+            self,
+            current_user: User = Depends(get_current_user),
+            tenant_id: int = Depends(get_current_tenant_id)
     ):
         self.user = current_user
-        self.tenant_id = active_tenant_id
+        self.tenant_id = tenant_id
         self.user_id = current_user.id
 
     @property
@@ -142,6 +138,7 @@ def verify_write_permission():
         ):
             ...
     """
+
     def checker(ctx: TenantContext = Depends()):
         if not ctx.can_write():
             raise HTTPException(
@@ -157,6 +154,5 @@ def verify_write_permission():
 # =============================================================================
 
 CurrentTenantId = Annotated[int, Depends(get_current_tenant_id)]
-ActiveTenantId = Annotated[int, Depends(get_active_tenant_id)]
 OptionalTenantId = Annotated[Optional[int], Depends(get_optional_tenant_id)]
 TenantCtx = Annotated[TenantContext, Depends()]

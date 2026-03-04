@@ -4,11 +4,16 @@ Crée les tables, tenant par défaut, professions, rôles système, pays/entité
 """
 
 import logging
+from dotenv import load_dotenv
+load_dotenv()
+
+import os
 import sys
 from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.database.base_class import Base
 from app.database.session import engine, db_session, check_database_connection
@@ -30,6 +35,7 @@ from app.models import (
     UserEntity,
     Permission,  # AJOUT v4.3
     RolePermission,  # AJOUT v4.3
+    INITIAL_ROLE_PERMISSIONS,  # AJOUT S1 — fix seed permissions
     # Tenant (nouveau v4.1)
     Tenant,
     TenantStatus,
@@ -44,6 +50,8 @@ from app.models import (
     RoleName,
     PermissionCategory,  # AJOUT v4.3
 )
+
+from app.services.encryption import user_encryptor, get_user_search_blind
 
 # Configuration du logging
 logging.basicConfig(
@@ -107,12 +115,21 @@ def drop_all_tables() -> bool:
 
 def init_professions(db: Session) -> list[Profession]:
     """
-    Crée les professions de santé réglementées.
+    Crée les professions de santé réglementées (S2).
 
-    Les 17 professions prédéfinies (INITIAL_PROFESSIONS) :
-    - Médicales : Médecin, Pharmacien, Chirurgien-dentiste, Sage-femme
-    - Paramédicales : Infirmier, Kinésithérapeute, Aide-soignant, etc.
-    - Administratives : Administratif, Coordinateur
+    Les 27 professions prédéfinies (INITIAL_PROFESSIONS) :
+    - Médicales (6) : Médecin généraliste, gériatre, spécialiste,
+      Pharmacien, Chirurgien-dentiste, Sage-femme
+    - Paramédicales (12) : IDE, IPA, Aide-soignant, Kiné, Ergo,
+      Psychomotricien, Orthophoniste, Orthoptiste, Pédicure-podologue,
+      Diététicien, Auxiliaire de puériculture, Psychologue
+    - Sociales (6) : Assistant de service social, Éducateur spécialisé,
+      Conseiller en économie sociale, AVS, AES, Technicien intervention
+    - Administratives (3) : Secrétaire médical, Responsable administratif,
+      Agent d'accueil
+
+    Chaque profession porte un display_order (tri métier) et un status
+    ("active" par défaut).
 
     Args:
         db: Session SQLAlchemy
@@ -140,7 +157,9 @@ def init_professions(db: Session) -> list[Profession]:
                 name=prof_data["name"],
                 code=prof_data.get("code"),
                 category=prof_data.get("category"),
-                requires_rpps=prof_data.get("requires_rpps", True)
+                requires_rpps=prof_data.get("requires_rpps", True),
+                display_order=prof_data.get("display_order", 0),
+                status=prof_data.get("status", "active"),
             )
             db.add(profession)
             professions.append(profession)
@@ -159,17 +178,20 @@ def init_professions(db: Session) -> list[Profession]:
 
 def init_roles(db: Session) -> list[Role]:
     """
-    Crée ou met à jour les rôles système (v4.3 avec Permission/RolePermission).
+    Crée ou met à jour les rôles système (S3 — rôles fonctionnels purs).
 
-    Les 8 rôles prédéfinis (INITIAL_ROLES) :
-    - ADMIN : Tous les droits
-    - COORDINATEUR : Gestion équipe et accès
-    - MEDECIN_TRAITANT : Accès complet patients + validation
-    - MEDECIN_SPECIALISTE : Consultation
-    - INFIRMIERE : Soins + évaluations
-    - AIDE_SOIGNANTE : Consultation + mesures vitales
-    - KINESITHERAPEUTE : Consultation
-    - INTERVENANT : Lecture seule
+    Les 5 rôles fonctionnels (INITIAL_ROLES) :
+    - ADMIN : Administrateur du tenant (tous les droits)
+    - COORDINATEUR : Coordination parcours, gestion équipe et accès
+    - REFERENT : Référent patient désigné (suivi dédié)
+    - EVALUATEUR : Habilité aux évaluations AGGIR
+    - INTERVENANT : Accès ponctuel en lecture seule
+
+    Les permissions de base liées au diplôme (IDE, médecin, AS…) seront
+    portées par les professions (S4, profession_permissions).
+
+    Les permissions de chaque rôle sont définies dans INITIAL_ROLE_PERMISSIONS
+    (app/models/user/role_permission.py).
 
     Args:
         db: Session SQLAlchemy
@@ -194,13 +216,13 @@ def init_roles(db: Session) -> list[Role]:
             if perm_code.startswith("PATIENT"):
                 cat = PermissionCategory.PATIENT
             elif perm_code.startswith("EVALUATION"):
-                cat = PermissionCategory.PATIENT
+                cat = PermissionCategory.EVALUATION
             elif perm_code.startswith("VITALS"):
-                cat = PermissionCategory.PATIENT
+                cat = PermissionCategory.VITALS
             elif perm_code.startswith("USER"):
                 cat = PermissionCategory.USER
             elif perm_code.startswith("ENTITY"):
-                cat = PermissionCategory.ORGANIZATION
+                cat = PermissionCategory.ADMIN
             elif perm_code.startswith("CAREPLAN"):
                 cat = PermissionCategory.CAREPLAN
             elif perm_code.startswith("COORDINATION"):
@@ -208,7 +230,7 @@ def init_roles(db: Session) -> list[Role]:
             elif perm_code.startswith("ADMIN"):
                 cat = PermissionCategory.ADMIN
             else:
-                cat = PermissionCategory.SYSTEM
+                cat = PermissionCategory.ADMIN
 
             perm = Permission(
                 code=perm_code,
@@ -234,8 +256,8 @@ def init_roles(db: Session) -> list[Role]:
 
         if existing:
             # Rôle existe - mettre à jour les permissions via RolePermission
-            existing_perm_codes = {rp.permission.code for rp in existing.role_permissions}
-            new_perm_codes = set(role_data.get("permissions", []))
+            existing_perm_codes = {rp.permission.code for rp in existing.permission_associations}
+            new_perm_codes = set(INITIAL_ROLE_PERMISSIONS.get(role_data["name"], []))
 
             # Ajouter les permissions manquantes
             for perm_code in new_perm_codes - existing_perm_codes:
@@ -258,7 +280,7 @@ def init_roles(db: Session) -> list[Role]:
             db.flush()  # Pour obtenir l'ID
 
             # Créer les associations RolePermission
-            perm_codes = role_data.get("permissions", [])
+            perm_codes = INITIAL_ROLE_PERMISSIONS.get(role_data["name"], [])
             for perm_code in perm_codes:
                 perm = get_or_create_permission(perm_code)
                 role_perm = RolePermission(role_id=role.id, permission_id=perm.id)
@@ -505,8 +527,12 @@ def init_default_admin(
     """
     logger.info("👤 Initialisation du compte administrateur...")
 
-    # Vérifier si l'admin existe déjà
-    existing_admin = db.query(User).filter(User.email == email).first()
+    # Vérifier si l'admin existe déjà (recherche par blind index)
+    email_blind = get_user_search_blind(email, "email", tenant.id)
+    existing_admin = db.query(User).filter(
+        User.email_blind == email_blind,
+        User.tenant_id == tenant.id
+    ).first()
 
     if existing_admin:
         logger.info(f"   ℹ️ Admin {email} existe déjà")
@@ -529,16 +555,22 @@ def init_default_admin(
     if not admin_profession:
         logger.warning("   ⚠️ Profession 'Administratif' non trouvée, admin créé sans profession")
 
-    # Créer l'utilisateur admin
+    # Chiffrer email et rpps + générer blind indexes
+    encrypted_data = user_encryptor.encrypt_for_db(
+        {"email": email, "rpps": rpps},
+        tenant.id
+    )
+
+    # Créer l'utilisateur admin avec données chiffrées
     admin_user = User(
-        email=email,
         first_name="Admin",
         last_name="CareLink",
-        rpps=rpps,
         profession_id=admin_profession.id if admin_profession else None,
-        tenant_id=tenant.id,  # NOUVEAU: Rattachement au tenant
+        tenant_id=tenant.id,
         is_active=True,
-        is_admin=True
+        is_admin=True,
+        must_change_password=False,  # Admin initial n'a pas besoin de changer son MDP
+        **encrypted_data,  # email_encrypted, email_blind, rpps_encrypted, rpps_blind
     )
     db.add(admin_user)
     db.flush()  # Pour obtenir l'ID
@@ -637,9 +669,21 @@ def init_database(
         return False
     logger.info("")
 
+    # 3b. Vérifier les clés de chiffrement (requises pour créer l'admin)
+    if not os.environ.get("ENCRYPTION_KEY") or not os.environ.get("BLIND_INDEX_SECRET"):
+        logger.error("❌ ENCRYPTION_KEY et BLIND_INDEX_SECRET requis dans .env")
+        logger.error("   Générez-les avec : python generate_keys.py")
+        logger.error("   Sans ces clés, l'admin ne peut pas être créé avec email chiffré")
+        return False
+    logger.info("🔐 Clés de chiffrement OK\n")
+
     # 4-10. Initialisation des données avec une session
     try:
         with db_session() as db:
+            # Bypass RLS pour l'initialisation (FORCE ROW LEVEL SECURITY actif)
+            db.execute(text("SET app.is_super_admin = 'true'"))
+            logger.info("🔓 RLS bypass activé pour l'initialisation\n")
+
             # 4. Professions
             professions = init_professions(db)
             if not professions:

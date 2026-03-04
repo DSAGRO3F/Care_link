@@ -1,0 +1,1494 @@
+/**
+ * Styles globaux CareLink
+ * - Directives Tailwind CSS
+ * - Variables CSS personnalisées
+ * - Utilitaires spécifiques métier
+ */
+
+/* =============================================================================
+   TAILWIND DIRECTIVES
+   ============================================================================= */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES (Variables)
+   ============================================================================= */
+
+:root {
+  /* Couleurs sémantiques */
+  --color-primary: #3b82f6;
+  --color-secondary: #10b981;
+  --color-warning: #f97316;
+  --color-danger: #ef4444;
+  
+  /* Typographie */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  /* Espacements standards */
+  --spacing-card: 1.5rem;
+  --spacing-section: 2rem;
+  
+  /* Rayons de bordure */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  
+  /* Ombres */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+  
+  /* Z-index scale */
+  --z-dropdown: 100;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-tooltip: 400;
+}
+
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
+@layer base {
+  /* Reset et base typographique */
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    @apply bg-neutral-50 text-neutral-900;
+    min-height: 100vh;
+  }
+  
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-neutral-900;
+  }
+  
+  h1 { @apply text-2xl lg:text-3xl; }
+  h2 { @apply text-xl lg:text-2xl; }
+  h3 { @apply text-lg lg:text-xl; }
+  
+  /* Links */
+  a {
+    @apply text-primary-600 hover:text-primary-700 transition-colors;
+  }
+  
+  /* Focus visible pour l'accessibilité */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+}
+
+/* =============================================================================
+   COMPONENT STYLES
+   ============================================================================= */
+
+@layer components {
+  /* Card générique */
+  .card {
+    @apply bg-white rounded-lg shadow-card p-4 lg:p-6;
+  }
+  
+  .card-hover {
+    @apply card transition-shadow hover:shadow-card-hover;
+  }
+  
+  /* Boutons personnalisés */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-all;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-white text-neutral-700 border border-neutral-300;
+    @apply hover:bg-neutral-50 focus:ring-primary-500;
+  }
+  
+  .btn-danger {
+    @apply btn bg-danger-600 text-white hover:bg-danger-700 focus:ring-danger-500;
+  }
+  
+  .btn-icon {
+    @apply btn p-2 rounded-full;
+  }
+  
+  /* Badge de statut */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply badge bg-secondary-100 text-secondary-800;
+  }
+  
+  .badge-warning {
+    @apply badge bg-warning-100 text-warning-800;
+  }
+  
+  .badge-danger {
+    @apply badge bg-danger-100 text-danger-800;
+  }
+  
+  .badge-info {
+    @apply badge bg-primary-100 text-primary-800;
+  }
+  
+  .badge-neutral {
+    @apply badge bg-neutral-100 text-neutral-800;
+  }
+  
+  /* GIR Badge spécifique */
+  .gir-badge {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold;
+  }
+  
+  .gir-1, .gir-2 { @apply bg-danger-100 text-danger-700; }
+  .gir-3, .gir-4 { @apply bg-warning-100 text-warning-700; }
+  .gir-5, .gir-6 { @apply bg-secondary-100 text-secondary-700; }
+  
+  /* Input groups */
+  .input-group {
+    @apply space-y-1;
+  }
+  
+  .input-label {
+    @apply block text-sm font-medium text-neutral-700;
+  }
+  
+  .input-error {
+    @apply text-sm text-danger-600 mt-1;
+  }
+  
+  /* Page header */
+  .page-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6;
+  }
+  
+  .page-title {
+    @apply text-2xl font-bold text-neutral-900;
+  }
+  
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center;
+  }
+  
+  .empty-state-icon {
+    @apply w-16 h-16 text-neutral-300 mb-4;
+  }
+  
+  .empty-state-title {
+    @apply text-lg font-medium text-neutral-900 mb-2;
+  }
+  
+  .empty-state-description {
+    @apply text-neutral-500 max-w-sm;
+  }
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+   ============================================================================= */
+
+@layer utilities {
+  /* Scrollbar personnalisée */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.neutral.300') transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: theme('colors.neutral.300');
+    border-radius: 3px;
+  }
+  
+  /* Animation skeleton loading */
+  .skeleton {
+    @apply animate-pulse bg-neutral-200 rounded;
+  }
+  
+  /* Truncate multi-lignes */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* Safe area pour iOS */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* =============================================================================
+   PRIMEVUE OVERRIDES
+   ============================================================================= */
+
+/* Ajustements PrimeVue pour cohérence avec Tailwind */
+.p-button {
+  @apply font-medium;
+}
+
+.p-inputtext {
+  @apply rounded-lg text-sm;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.25rem;  /* 20px — verrou hauteur identique au Dropdown */
+}
+
+.p-inputtext:enabled:focus {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1);
+  outline: none;
+}
+
+.p-inputtext::placeholder {
+  @apply text-slate-400;
+}
+
+/* Textarea — même style que InputText (PrimeVue applique aussi .p-inputtext) */
+textarea.p-inputtext {
+  line-height: 1.5;  /* Override le 1.25rem pour le multi-ligne */
+  resize: vertical;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  @apply bg-neutral-50 font-semibold text-neutral-700;
+}
+
+.p-toast {
+  @apply font-sans;
+}
+
+/* =============================================================================
+   TOAST OVERRIDES — Style CareLink (centralisé, audit 25/02/2026)
+   Remplace les styles PrimeVue par défaut pour un rendu opaque avec border-left.
+   ⚠️ Ne PAS dupliquer dans les composants — ce fichier est la source unique.
+   ============================================================================= */
+
+.p-toast {
+  z-index: 99999 !important;
+  opacity: 1 !important;
+}
+
+.p-toast .p-toast-message {
+  backdrop-filter: none !important;
+  border-radius: 0.75rem !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  margin-bottom: 0.75rem !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+.p-toast .p-toast-message .p-toast-message-content {
+  padding: 1rem 1.25rem !important;
+  gap: 0.75rem !important;
+  align-items: flex-start !important;
+}
+
+.p-toast .p-toast-message .p-toast-summary {
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.p-toast .p-toast-message .p-toast-detail {
+  font-size: 0.8125rem !important;
+  line-height: 1.5 !important;
+  opacity: 0.9 !important;
+}
+
+/* Erreur — fond rouge opaque */
+.p-toast .p-toast-message.p-toast-message-error {
+  background: #fef2f2 !important;
+  border-left: 4px solid #ef4444 !important;
+  color: #991b1b !important;
+}
+.p-toast .p-toast-message.p-toast-message-error .p-toast-summary { color: #b91c1c !important; }
+.p-toast .p-toast-message.p-toast-message-error .p-toast-detail { color: #7f1d1d !important; }
+.p-toast .p-toast-message.p-toast-message-error .p-toast-icon-close { color: #dc2626 !important; }
+
+/* Succès — fond vert opaque */
+.p-toast .p-toast-message.p-toast-message-success {
+  background: #f0fdf4 !important;
+  border-left: 4px solid #22c55e !important;
+  color: #166534 !important;
+}
+.p-toast .p-toast-message.p-toast-message-success .p-toast-summary { color: #15803d !important; }
+.p-toast .p-toast-message.p-toast-message-success .p-toast-detail { color: #14532d !important; }
+.p-toast .p-toast-message.p-toast-message-success .p-toast-icon-close { color: #16a34a !important; }
+
+/* Info — fond bleu opaque */
+.p-toast .p-toast-message.p-toast-message-info {
+  background: #eff6ff !important;
+  border-left: 4px solid #3b82f6 !important;
+  color: #1e40af !important;
+}
+.p-toast .p-toast-message.p-toast-message-info .p-toast-summary { color: #1d4ed8 !important; }
+.p-toast .p-toast-message.p-toast-message-info .p-toast-detail { color: #1e3a8a !important; }
+.p-toast .p-toast-message.p-toast-message-info .p-toast-icon-close { color: #2563eb !important; }
+
+/* Warning — fond ambre opaque */
+.p-toast .p-toast-message.p-toast-message-warn {
+  background: #fffbeb !important;
+  border-left: 4px solid #f59e0b !important;
+  color: #92400e !important;
+}
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-summary { color: #b45309 !important; }
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-detail { color: #78350f !important; }
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-icon-close { color: #d97706 !important; }
+
+/* Bouton fermer */
+.p-toast .p-toast-icon-close {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  border-radius: 0.375rem !important;
+  transition: background-color 0.15s ease !important;
+}
+.p-toast .p-toast-icon-close:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* =============================================================================
+   MODAL TRANSITIONS — Réutilisables pour toutes les modales CareLink
+   Usage : <Transition name="modal-fade">
+   ============================================================================= */
+
+.modal-fade-enter-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-active > div:last-child {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+.modal-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.modal-fade-leave-active > div:last-child {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.modal-fade-enter-from {
+  opacity: 0;
+}
+.modal-fade-enter-from > div:last-child {
+  opacity: 0;
+  transform: scale(0.95) translateY(8px);
+}
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-leave-to > div:last-child {
+  opacity: 0;
+  transform: scale(0.95) translateY(8px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SLIDE PANEL — Transition panneau latéral droit
+   Source unique — NE PAS redéclarer dans les composants
+   ═══════════════════════════════════════════════════════════════ */
+.slide-panel-enter-active {
+  transition: opacity 0.25s ease;
+}
+.slide-panel-enter-active > div:last-child {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-panel-leave-active {
+  transition: opacity 0.2s ease;
+}
+.slide-panel-leave-active > div:last-child {
+  transition: transform 0.2s ease;
+}
+.slide-panel-enter-from {
+  opacity: 0;
+}
+.slide-panel-enter-from > div:last-child {
+  transform: translateX(100%);
+}
+.slide-panel-leave-to {
+  opacity: 0;
+}
+.slide-panel-leave-to > div:last-child {
+  transform: translateX(100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTEXT MENU — Pattern partagé (.carelink-context-menu)
+   Source unique — NE PAS redéclarer dans les composants
+   ═══════════════════════════════════════════════════════════════ */
+.carelink-context-menu.p-menu {
+  min-width: 200px;
+  border-radius: 0.75rem;
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 0.375rem;
+  overflow: hidden;
+  background: white;
+}
+
+.carelink-context-menu .p-menuitem-link {
+  padding: 0.625rem 0.875rem !important;
+  border-radius: 0.5rem !important;
+  gap: 0.625rem !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.carelink-context-menu .p-menuitem-link:hover {
+  background-color: #f4f4f5 !important;
+}
+
+.carelink-context-menu .p-menuitem-link .p-menuitem-icon {
+  color: #71717a !important;
+  font-size: 0.875rem;
+}
+
+.carelink-context-menu .p-menuitem-link:hover .p-menuitem-icon {
+  color: #7c3aed !important;
+}
+
+.carelink-context-menu .p-menuitem-link .p-menuitem-text {
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: #3f3f46 !important;
+}
+
+.carelink-context-menu .p-menuitem-link:hover .p-menuitem-text {
+  color: #18181b !important;
+}
+
+.carelink-context-menu .p-menu-separator {
+  margin: 0.25rem 0.5rem !important;
+  border-color: #f4f4f5 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ENTITY TYPE PANEL — Dropdown PrimeVue pour types d'entité
+   Source unique — NE PAS redéclarer dans les composants
+   ═══════════════════════════════════════════════════════════════ */
+.entity-type-panel {
+  z-index: 9999 !important;
+  background: white !important;
+  border: 1px solid #e4e4e7 !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  overflow: hidden;
+}
+
+.entity-type-panel .p-select-list-container {
+  max-height: 280px !important;
+}
+
+.entity-type-panel .p-select-option {
+  padding: 0.625rem 1rem !important;
+  font-size: 0.875rem !important;
+  color: #3f3f46 !important;
+  border-bottom: 1px solid #f4f4f5 !important;
+  transition: background-color 0.15s ease;
+}
+
+.entity-type-panel .p-select-option:last-child {
+  border-bottom: none !important;
+}
+
+.entity-type-panel .p-select-option:not(.p-select-option-selected):not(.p-disabled).p-focus {
+  background-color: #f5f3ff !important;
+  color: #5b21b6 !important;
+}
+
+.entity-type-panel .p-select-option.p-select-option-selected {
+  background-color: #ede9fe !important;
+  color: #6d28d9 !important;
+  font-weight: 600 !important;
+}
+
+.entity-type-panel .p-select-empty-message {
+  padding: 0.75rem 1rem !important;
+  font-size: 0.75rem !important;
+  color: #a1a1aa !important;
+}
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    @apply bg-white text-black;
+  }
+
+  .card {
+    @apply shadow-none border border-neutral-200;
+  }
+}
+
+/* ── Select CareLink — Style « Soft médical » ────────────────────────────
+ * Source unique pour les panels Select portés sur <body>.
+ * Ne JAMAIS redéclarer dans un composant.
+ * Palette verte soins · coins doux · point coloré sur sélection
+ * Centralisé : audit V4A, correction M2 (26/02/2026)
+ * Mise à jour : harmonisation style B (28/02/2026)
+ * Migration PrimeVue 4 — Dropdown→Select (04/03/2026)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.p-select-overlay {
+  z-index: 9999 !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+  overflow: hidden;
+  padding: 6px !important;
+}
+
+.p-select-overlay .p-select-list-container {
+  max-height: 280px !important;
+}
+
+.p-select-overlay .p-select-option {
+  padding: 0.625rem 0.875rem !important;
+  font-size: 0.875rem !important;
+  color: #374151 !important;
+  border-radius: 0.5rem !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  margin-bottom: 1px !important;
+  border: none !important;
+  position: relative !important;
+  padding-left: 1.75rem !important;
+}
+
+.p-select-overlay .p-select-option:not(.p-select-option-selected):not(.p-disabled).p-focus {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+}
+
+.p-select-overlay .p-select-option.p-select-option-selected {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  font-weight: 600 !important;
+}
+
+/* Point coloré indicateur de sélection */
+.p-select-overlay .p-select-option.p-select-option-selected::before {
+  content: '';
+  position: absolute;
+  left: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10b981;
+}
+
+.p-select-overlay .p-select-empty-message {
+  padding: 0.75rem 1rem !important;
+  font-size: 0.75rem !important;
+  color: #9ca3af !important;
+}
+
+/* ── Select trigger — alignement sur InputText ───────────────────────
+ * Harmonise le Select PrimeVue avec les InputText :
+ * même padding, même font-size, même border-radius, chevron intégré.
+ *
+ * Approche : contrôler le padding du label (pas la hauteur du conteneur)
+ * pour que le layout interne PrimeVue (label + trigger flex) s'adapte.
+ * Mis à jour : 03/03/2026
+ * Migration PrimeVue 4 — Dropdown→Select (04/03/2026)
+ * Note v4 : .p-focus → .p-focused
+ * ────────────────────────────────────────────────────────────────────── */
+
+.p-select {
+  @apply bg-white transition-colors duration-200;
+  display: flex;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0;  /* Reset PrimeVue default — seul le label gère le padding */
+}
+
+.p-select:not(.p-disabled):hover {
+  border-color: #cbd5e1;
+}
+
+.p-select:not(.p-disabled).p-focused {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1);
+}
+
+.p-select .p-select-label {
+  @apply text-sm text-slate-700;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.25rem;  /* Identique à .p-inputtext */
+  flex: 1;
+  min-width: 0;
+  border: none;        /* Neutralise le border hérité de .p-inputtext (piège v3/v4) */
+  border-radius: 0;
+}
+
+.p-select .p-select-label.p-placeholder {
+  @apply text-slate-400;
+}
+
+.p-select .p-select-dropdown {
+  @apply flex items-center justify-center flex-shrink-0;
+  width: 2.25rem;
+  color: #94a3b8;
+}
+
+.p-select .p-select-dropdown-icon {
+  font-size: 0.65rem;
+}
+
+.p-select .p-select-clear-icon {
+  color: #94a3b8;
+  font-size: 0.6rem;
+  right: 2.25rem;
+}
+
+/* ── Transition slide-panel ────────────────────────────────────────────────
+ * Panels latéraux (édition profil, ajout entité/rôle).
+ * Centralisé : audit V4A, correction Y5 (26/02/2026)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.slide-panel-enter-active { transition: opacity 0.25s ease; }
+.slide-panel-enter-active > div:last-child { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-panel-leave-active { transition: opacity 0.2s ease; }
+.slide-panel-leave-active > div:last-child { transition: transform 0.2s ease; }
+.slide-panel-enter-from { opacity: 0; }
+.slide-panel-enter-from > div:last-child { transform: translateX(100%); }
+.slide-panel-leave-to { opacity: 0; }
+.slide-panel-leave-to > div:last-child { transform: translateX(100%); }
+
+/* ── DataTable Admin ───────────────────────────────────────────────────────
+ * Thème commun aux tables admin (UsersPage, PatientsPage).
+ * Ne JAMAIS redéclarer dans un composant.
+ * Centralisé : audit V4B, correction Y1 (26/02/2026)
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.admin-table .p-datatable-thead > tr > th {
+  @apply bg-slate-50/80 text-slate-500 border-slate-200 font-semibold text-xs uppercase tracking-wider;
+}
+
+.admin-table .p-datatable-tbody > tr {
+  @apply cursor-pointer;
+}
+
+.admin-table .p-datatable-tbody > tr > td {
+  @apply border-slate-100 py-4;
+}
+
+.admin-table .p-datatable-tbody > tr:hover {
+  @apply bg-blue-50/40;
+}
+
+.admin-table .p-paginator {
+  @apply border-slate-200;
+}
+
+.admin-table .p-paginator .p-paginator-element.p-highlight {
+  @apply bg-blue-600 text-white;
+}
+
+/* ==========================================================================
+   ACTION MENU — Menu contextuel admin (trois points)
+   Utilisé par : UsersPage, PatientsPage, futures listes admin
+   Pattern : Teleport to="body" + backdrop + positionnement fixed
+   ========================================================================== */
+
+.action-menu-backdrop {
+  @apply fixed inset-0;
+  z-index: 99;
+}
+
+.action-menu {
+  @apply fixed w-48 bg-white rounded-xl border border-slate-200 overflow-hidden;
+  z-index: 100;
+  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.1),
+              0 2px 8px -2px rgba(15, 23, 42, 0.06);
+}
+
+.action-menu__group {
+  @apply py-1.5;
+}
+
+.action-menu__separator {
+  @apply border-t border-slate-100;
+}
+
+.action-menu__item {
+  @apply flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 transition-colors;
+}
+
+.action-menu__item:hover {
+  @apply bg-slate-50;
+}
+
+.action-menu__item i {
+  @apply text-slate-400;
+}
+
+.action-menu__item--danger {
+  @apply text-red-600;
+}
+
+.action-menu__item--danger:hover {
+  @apply bg-red-50;
+}
+
+.action-menu__item--danger i {
+  @apply text-red-400;
+}
+
+.action-menu__item--success {
+  @apply text-emerald-600;
+}
+
+.action-menu__item--success:hover {
+  @apply bg-emerald-50;
+}
+
+.action-menu__item--success i {
+  @apply text-emerald-400;
+}
+
+/* Transitions */
+.action-menu-enter-active {
+  @apply transition ease-out duration-150;
+}
+
+.action-menu-enter-from {
+  @apply opacity-0 scale-95 -translate-y-1;
+}
+
+.action-menu-enter-to {
+  @apply opacity-100 scale-100 translate-y-0;
+}
+
+.action-menu-leave-active {
+  @apply transition ease-in duration-100;
+}
+
+.action-menu-leave-from {
+  @apply opacity-100 scale-100;
+}
+
+.action-menu-leave-to {
+  @apply opacity-0 scale-95;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EVALUATION WIZARD — Carnet à intercalaires (saisie d'évaluation)
+   Source unique pour l'identité visuelle du wizard.
+   Ne JAMAIS redéclarer ces styles dans les composants.
+   Ajouté : 01/03/2026 — Phase 1 (architecture de saisie)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Layout principal ──────────────────────────────────────────────────── */
+
+.wizard-layout {
+  @apply flex gap-5 items-start;
+  min-height: calc(100vh - 10rem);
+}
+
+/* ── Barre contexte patient ────────────────────────────────────────────── */
+
+.wizard-patient-bar {
+  @apply flex items-center gap-4 bg-white rounded-2xl px-5 py-3.5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.wizard-patient-avatar {
+  @apply w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+}
+
+.wizard-patient-info {
+  @apply flex-1 min-w-0;
+}
+
+.wizard-patient-name {
+  @apply text-sm font-semibold text-slate-800 truncate;
+}
+
+.wizard-patient-meta {
+  @apply text-xs text-slate-500;
+}
+
+.wizard-patient-session {
+  @apply flex items-center gap-1.5 text-xs text-slate-400;
+}
+
+.wizard-draft-badge {
+  @apply inline-flex items-center font-semibold text-amber-700 bg-amber-50 rounded-lg;
+  font-size: 0.6875rem;
+  padding: 1px 8px;
+}
+
+/* ── Sidebar navigateur ────────────────────────────────────────────────── */
+
+.wizard-nav {
+  @apply bg-white flex-shrink-0 overflow-hidden;
+  width: 310px;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.wizard-nav-header {
+  @apply flex items-center gap-3.5 border-b border-slate-100;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.wizard-nav-progress-label {
+  @apply text-xs font-semibold text-slate-800;
+}
+
+.wizard-nav-progress-detail {
+  @apply text-xs text-slate-500 mt-0.5;
+}
+
+.wizard-nav-list {
+  @apply flex flex-col gap-1.5;
+  padding: 0.75rem;
+}
+
+/* ── Progress ring (SVG entourant) ─────────────────────────────────────── */
+
+.wizard-progress-ring {
+  @apply relative flex-shrink-0;
+  width: 52px;
+  height: 52px;
+}
+
+.wizard-progress-ring svg {
+  transform: rotate(-90deg);
+}
+
+.wizard-progress-ring__track {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 4;
+}
+
+.wizard-progress-ring__fill {
+  fill: none;
+  stroke: url(#wizardProgressGradient);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wizard-progress-ring__text {
+  @apply absolute inset-0 flex items-center justify-center text-xs font-bold;
+  color: #0d9488;
+}
+
+/* ── Section item (intercalaire) ───────────────────────────────────────── */
+
+.wizard-section-item {
+  @apply flex items-center gap-3 w-full text-left relative overflow-hidden;
+  padding: 0.6875rem 0.875rem;
+  border-radius: 1rem;
+  border: 2px solid transparent;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.wizard-section-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.wizard-section-item--active {
+  border-color: #0d9488;
+  background: #f0fdfa;
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.10), 0 1px 3px rgba(13, 148, 136, 0.06);
+}
+
+.wizard-section-label {
+  @apply text-sm text-slate-600 leading-tight;
+  font-weight: 520;
+  transition: all 0.2s ease;
+}
+
+.wizard-section-item--active .wizard-section-label {
+  @apply text-slate-900;
+  font-weight: 650;
+}
+
+.wizard-section-subtitle {
+  @apply text-xs text-slate-400 mt-0.5 leading-tight;
+}
+
+.wizard-section-chevron {
+  @apply absolute text-teal-500 opacity-50;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* ── Icône de section (pastille colorée) ───────────────────────────────── */
+
+.wizard-section-icon {
+  @apply flex items-center justify-center flex-shrink-0;
+  width: 2.625rem;
+  height: 2.625rem;
+  border-radius: 0.8125rem;
+  border-width: 1.5px;
+  border-style: solid;
+  transition: all 0.22s ease;
+}
+
+.wizard-section-item--active .wizard-section-icon {
+  transform: scale(1.05);
+}
+
+/* Variantes de couleur — chaque section a sa teinte */
+.wizard-icon--blue       { background: #eff6ff; border-color: #bfdbfe; color: #3b82f6; }
+.wizard-icon--violet     { background: #faf5ff; border-color: #ddd6fe; color: #8b5cf6; }
+.wizard-icon--teal       { background: #f0fdfa; border-color: #99f6e4; color: #0d9488; }
+.wizard-icon--amber      { background: #fffbeb; border-color: #fde68a; color: #d97706; }
+.wizard-icon--pink       { background: #fdf2f8; border-color: #fbcfe8; color: #db2777; }
+.wizard-icon--emerald    { background: #ecfdf5; border-color: #a7f3d0; color: #059669; }
+.wizard-icon--slate      { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
+.wizard-icon--orange     { background: #fff7ed; border-color: #fed7aa; color: #ea580c; }
+.wizard-icon--red        { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+.wizard-icon--indigo     { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
+
+/* ── Indicateurs de statut ─────────────────────────────────────────────── */
+
+.wizard-status {
+  @apply flex flex-col items-end gap-1 flex-shrink-0;
+}
+
+.wizard-status__icon {
+  transition: all 0.2s ease;
+}
+
+.wizard-status--empty .wizard-status__icon    { color: #94a3b8; opacity: 0.6; }
+.wizard-status--partial .wizard-status__icon  { color: #d97706; opacity: 0.8; }
+.wizard-status--complete .wizard-status__icon { color: #059669; opacity: 1; }
+
+.wizard-status__fields {
+  @apply text-slate-400;
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Zone de contenu (formulaire) ──────────────────────────────────────── */
+
+.wizard-content {
+  @apply flex-1 bg-white overflow-hidden;
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.wizard-content-header {
+  @apply flex items-center gap-4 border-b border-slate-100;
+  padding: 1.375rem 1.75rem 1.125rem;
+}
+
+.wizard-content-header__icon {
+  @apply flex items-center justify-center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.875rem;
+  border-width: 1.5px;
+  border-style: solid;
+}
+
+.wizard-content-header__title {
+  @apply text-lg font-bold text-slate-800;
+  margin: 0;
+}
+
+.wizard-content-header__subtitle {
+  @apply text-sm text-slate-500;
+}
+
+.wizard-content-header__status {
+  @apply flex items-center gap-1.5 rounded-xl;
+  padding: 0.3125rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.wizard-content-header__status--empty {
+  background: rgba(203, 213, 225, 0.15);
+  border: 1px solid rgba(203, 213, 225, 0.3);
+  color: #94a3b8;
+}
+
+.wizard-content-header__status--partial {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  color: #d97706;
+}
+
+.wizard-content-header__status--complete {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+.wizard-content-body {
+  @apply overflow-y-auto;
+  padding: 1.75rem;
+  max-height: calc(100vh - 18rem);
+}
+
+/* ── Placeholder formulaire (pré-Phase 3) ──────────────────────────────── */
+
+.wizard-form-placeholder {
+  @apply flex flex-col items-center justify-center py-16 text-center;
+}
+
+.wizard-form-placeholder__icon {
+  @apply mb-4;
+  color: #cbd5e1;
+}
+
+.wizard-form-placeholder__title {
+  @apply text-base font-semibold text-slate-400 mb-1;
+}
+
+.wizard-form-placeholder__hint {
+  @apply text-sm text-slate-300;
+}
+
+/* ── Barre d'actions ───────────────────────────────────────────────────── */
+
+.wizard-action-bar {
+  @apply flex items-center gap-3 border-t border-slate-100;
+  padding: 1rem 1.75rem;
+  background: #fafcfb;
+  border-radius: 0 0 1.25rem 1.25rem;
+}
+
+.wizard-btn-draft {
+  @apply inline-flex items-center gap-2 font-medium text-slate-600 cursor-pointer;
+  padding: 0.625rem 1.375rem;
+  border-radius: 0.75rem;
+  background: #f1f5f9;
+  border: 1.5px solid #e2e8f0;
+  font-size: 0.8125rem;
+  transition: all 0.2s ease;
+}
+
+.wizard-btn-draft:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+.wizard-btn-submit {
+  @apply inline-flex items-center gap-2 font-semibold text-white cursor-pointer;
+  padding: 0.625rem 1.625rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  border: none;
+  font-size: 0.8125rem;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28), 0 1px 3px rgba(13, 148, 136, 0.12);
+  transition: all 0.2s ease;
+}
+
+.wizard-btn-submit:hover {
+  box-shadow: 0 6px 20px rgba(13, 148, 136, 0.35), 0 2px 4px rgba(13, 148, 136, 0.15);
+  transform: translateY(-1px);
+}
+
+.wizard-btn-submit:disabled {
+  @apply opacity-50 cursor-not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.wizard-btn-quit {
+  @apply inline-flex items-center gap-2 text-slate-400 cursor-pointer;
+  padding: 0.625rem 1rem;
+  border-radius: 0.75rem;
+  background: transparent;
+  border: none;
+  font-size: 0.8125rem;
+  transition: all 0.2s ease;
+}
+
+.wizard-btn-quit:hover {
+  @apply text-slate-600;
+  background: #f8fafc;
+}
+
+/* ── Transition section (switch de contenu) ────────────────────────────── */
+
+.wizard-section-fade-enter-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.wizard-section-fade-leave-active {
+  transition: opacity 0.12s ease;
+}
+
+.wizard-section-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.wizard-section-fade-leave-to {
+  opacity: 0;
+}
+
+/* ── Responsive tablette ───────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .wizard-nav {
+    width: 260px;
+  }
+
+  .wizard-section-subtitle {
+    display: none;
+  }
+
+  .wizard-content-body {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .wizard-layout {
+    @apply flex-col;
+  }
+
+  .wizard-nav {
+    @apply w-full;
+  }
+
+  .wizard-nav-list {
+    @apply flex-row flex-wrap;
+    gap: 0.5rem;
+  }
+
+  .wizard-section-item {
+    @apply flex-col text-center;
+    padding: 0.5rem;
+    min-width: 4.5rem;
+    flex: 0 0 auto;
+  }
+
+  .wizard-section-label {
+    font-size: 0.625rem;
+  }
+
+  .wizard-status,
+  .wizard-section-chevron {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   WIZARD FORMS — Styles partagés par tous les formulaires de saisie
+   Chemin : src/assets/styles/main.css (à ajouter après les styles .wizard-*)
+
+   Utilisé par : forms/UsagerForm.vue, forms/AggirForm.vue, forms/ContactsForm.vue,
+                 forms/SocialForm.vue, forms/SanteForm.vue, etc. (10 formulaires)
+   ========================================================================== */
+
+/* ── Fieldsets ────────────────────────────────────────────────────────── */
+
+.form-fieldset {
+  @apply border border-slate-200 rounded-xl p-5 pb-6 bg-white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.form-legend {
+  @apply flex items-center gap-2.5 px-1 text-xs font-bold text-slate-500
+         uppercase tracking-widest;
+}
+
+/* ── Icônes légende (pattern UserDetailPage — conteneur arrondi + fond subtil) ── */
+
+.form-legend-icon {
+  @apply w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0;
+  transition: background-color 0.2s ease;
+}
+
+.form-legend-icon--blue    { @apply bg-blue-50 text-blue-500; }
+.form-legend-icon--amber   { @apply bg-amber-50 text-amber-500; }
+.form-legend-icon--emerald { @apply bg-emerald-50 text-emerald-500; }
+.form-legend-icon--violet  { @apply bg-violet-50 text-violet-500; }
+.form-legend-icon--teal    { @apply bg-teal-50 text-teal-500; }
+.form-legend-icon--pink    { @apply bg-pink-50 text-pink-500; }
+.form-legend-icon--red     { @apply bg-red-50 text-red-500; }
+.form-legend-icon--slate   { @apply bg-slate-100 text-slate-500; }
+
+/* ── Grilles ─────────────────────────────────────────────────────────── */
+
+.form-grid-2 {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-0 items-start mt-5;
+}
+
+.form-grid-3 {
+  @apply grid grid-cols-1 md:grid-cols-3 gap-x-5 gap-y-0 items-start mt-5;
+}
+
+/* Premier grid juste après la légende — espacement réduit */
+.form-fieldset > .form-grid-2:first-of-type,
+.form-fieldset > .form-grid-3:first-of-type {
+  @apply mt-3;
+}
+
+/* ── Groupes de champs ───────────────────────────────────────────────── */
+
+.form-group {
+  @apply flex flex-col gap-1.5 mt-5;
+}
+
+/* Première rangée après la légende — espacement réduit.
+   UNIQUEMENT pour les form-group hors grille (standalone). */
+.form-fieldset > .form-group:first-of-type {
+  @apply mt-3;
+}
+
+/* Dans les grilles : mt-0 sur les form-group — le grid gère l'espacement.
+   Garantit un alignement IDENTIQUE gauche/droite. */
+.form-grid-2 > .form-group,
+.form-grid-3 > .form-group {
+  @apply mt-0;
+}
+
+.form-label {
+  @apply text-sm font-medium text-slate-600;
+}
+
+.form-label--required::after {
+  content: ' *';
+  @apply text-red-400;
+}
+
+.form-error {
+  @apply text-xs text-red-500 mt-0.5;
+}
+
+/* ── Bandeau informatif pré-remplissage ──────────────────────────────── */
+
+.form-prefill-banner {
+  @apply flex items-center gap-2.5 px-4 py-3 bg-blue-50 border border-blue-100
+         rounded-xl text-sm text-blue-700;
+}
+
+/* ── Date de naissance — 3 champs séparés + badge âge ────────────────
+ * Composant réutilisable pour dates de naissance en contexte gériatrique.
+ * Évite la navigation mensuelle du Calendar PrimeVue (pénible pour 1920-1960).
+ * Utilisé par : forms/UsagerForm.vue, réutilisable par tout formulaire CareLink.
+ * Ajouté : 03/03/2026
+ * ────────────────────────────────────────────────────────────────────── */
+
+.birth-date-input {
+  @apply flex items-center gap-1.5;
+}
+
+.birth-date-input__field {
+  @apply text-center rounded-lg bg-white
+         text-sm text-slate-700 font-medium
+         outline-none transition-all duration-200;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid #e2e8f0;
+  line-height: 1.25rem;  /* Identique à .p-inputtext et .p-select-label */
+  font-variant-numeric: tabular-nums;
+}
+
+.birth-date-input__field:focus {
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1);
+}
+
+.birth-date-input__field::placeholder {
+  @apply text-slate-300 font-normal;
+}
+
+.birth-date-input__field--short {
+  width: 52px;
+}
+
+.birth-date-input__field--year {
+  width: 72px;
+}
+
+.birth-date-input__field--invalid {
+  border-color: #fca5a5;
+}
+
+.birth-date-input__field--invalid:focus {
+  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.1);
+}
+
+.birth-date-input__sep {
+  @apply text-slate-300 text-lg font-light select-none;
+  line-height: 1;
+}
+
+.birth-date-input__age {
+  @apply ml-2 px-2.5 py-1 rounded-full
+         text-xs font-semibold whitespace-nowrap;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATEPICKER PRIMEVUE 4 — Fix superposition + style « Soft médical »
+   ⚠️  TODO vague C/D : PrimeVue 4 renomme Calendar→DatePicker et change
+       la structure interne des cellules (td > span → .p-day-cell > .p-day).
+       Ces styles fonctionnent partiellement en v4 (panel, header, nav).
+       Les sélecteurs de jours (.p-datepicker table td > span, .p-highlight)
+       devront être migrés quand DatePicker est utilisé activement.
+   Ajouté : 01/03/2026 | Noté migration : 04/03/2026
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.p-datepicker {
+  z-index: 9999 !important;
+  border-radius: 0.875rem !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+  overflow: hidden;
+  padding: 0.5rem !important;
+}
+
+.p-datepicker .p-datepicker-header {
+  border-bottom: 1px solid #f1f5f9 !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.p-datepicker table td > span {
+  border-radius: 0.5rem !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.p-datepicker table td > span:hover {
+  background-color: #ecfdf5 !important;
+  color: #065f46 !important;
+}
+
+.p-datepicker table td > span.p-highlight {
+  background-color: #0d9488 !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
+.p-datepicker .p-datepicker-today > span:not(.p-highlight) {
+  border: 1.5px solid #0d9488 !important;
+  color: #0d9488 !important;
+  font-weight: 600 !important;
+}
+
+.p-datepicker .p-datepicker-prev,
+.p-datepicker .p-datepicker-next {
+  border-radius: 0.5rem !important;
+  transition: background-color 0.15s ease;
+}
+
+.p-datepicker .p-datepicker-prev:hover,
+.p-datepicker .p-datepicker-next:hover {
+  background-color: #f0fdfa !important;
+  color: #0d9488 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INFO BUBBLE — Tooltip CSS pur (sans dépendance PrimeVue)
+   Usage : <span class="info-bubble-trigger"><Icon/><span class="info-bubble">Texte</span></span>
+   Ajouté : 01/03/2026
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.info-bubble-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: #cbd5e1;
+  cursor: help;
+  transition: color 0.2s ease;
+}
+
+.info-bubble-trigger:hover {
+  color: #64748b;
+}
+
+.info-bubble {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 260px;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  font-size: 0.75rem;
+  line-height: 1.625;
+  color: #475569;
+  font-weight: 400;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.info-bubble::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 4px;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-left: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
+  transform: rotate(45deg);
+}
+
+.info-bubble-trigger:hover .info-bubble {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}

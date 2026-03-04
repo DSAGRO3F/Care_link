@@ -13,6 +13,7 @@ from datetime import date, time, datetime
 from typing import Optional, List
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+from app.models.enums import ProfessionCategory
 
 
 # =============================================================================
@@ -30,7 +31,7 @@ class ProfessionBase(BaseModel):
     @classmethod
     def validate_category(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
-            valid = ["MEDICAL", "PARAMEDICAL", "ADMINISTRATIVE"]
+            valid = [e.value for e in ProfessionCategory]
             if v.upper() not in valid:
                 raise ValueError(f"Catégorie invalide. Valeurs acceptées: {valid}")
             return v.upper()
@@ -53,6 +54,8 @@ class ProfessionUpdate(BaseModel):
 class ProfessionResponse(ProfessionBase):
     """Schéma de réponse pour une profession."""
     id: int
+    display_order: int = 0          # AJOUT S2
+    status: str = "active"          # AJOUT S2
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -370,6 +373,7 @@ class UserSummary(BaseModel):
     full_name: str
     rpps: Optional[str] = None
     is_active: bool
+    must_change_password: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -380,6 +384,7 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
+    must_change_password: bool = False
     # Propriétés calculées
     full_name: str
     display_name: str
@@ -387,6 +392,9 @@ class UserResponse(UserBase):
     profession: Optional[ProfessionResponse] = None
     roles: List[RoleResponse] = []
     role_names: List[str] = []
+    # S4 — Permissions effectives (profession ∪ rôles)
+    # Alimenté par le service AVANT expunge (approche B)
+    effective_permissions: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
 

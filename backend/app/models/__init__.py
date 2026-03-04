@@ -16,6 +16,7 @@ Structure des sous-dossiers :
     catalog/        - Catalogue de services (ServiceTemplate, EntityService)
 
 Changelog:
+    v4.11: Ajout profession_permissions (S4 — permissions par profession)
     v4.3: Normalisation des permissions (Permission, RolePermission)
     v4.3: Déplacement UserTenantAssignment de platform/ vers user/
     v4.2: Ajout platform (SuperAdmin, PlatformAuditLog)
@@ -106,6 +107,10 @@ from app.models.tenants import (
 )
 from app.models.user.permission import Permission, INITIAL_PERMISSIONS
 from app.models.user.profession import Profession, INITIAL_PROFESSIONS
+from app.models.user.profession_permissions import (  # S4
+    PROFESSION_DEFAULT_PERMISSIONS,
+    get_profession_permissions,
+)
 from app.models.user.role import Role, INITIAL_ROLES
 from app.models.user.role_permission import RolePermission, INITIAL_ROLE_PERMISSIONS
 # === Modèles utilisateurs et permissions (v4.3) ===
@@ -192,6 +197,8 @@ __all__ = [
     "INITIAL_ROLE_PERMISSIONS",
     "Profession",
     "INITIAL_PROFESSIONS",
+    "PROFESSION_DEFAULT_PERMISSIONS",  # S4
+    "get_profession_permissions",      # S4
     "UserRole",
     "UserEntity",
     "UserAvailability",

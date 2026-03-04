@@ -1,6 +1,11 @@
 """
 Schémas Pydantic pour le module Platform.
 
+Gestion des entités côté SuperAdmin.
+Réutilise les schémas Organization existants et ajoute
+les validations spécifiques au contexte SuperAdmin.
+
+
 Compatible avec les modèles existants :
 - app.models.tenants.tenant.Tenant
 - app.models.platform.super_admin.SuperAdmin
@@ -11,7 +16,17 @@ from datetime import datetime, date
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
+from app.models.enums import EntityType
+from app.api.v1.organization.schemas import (
+    EntityBase,
+    EntityResponse,
+    EntitySummary,
+    EntityWithChildren,
+    EntityList,
+    EntityFilters,
+    EntityUpdate,
+)
 
 
 # =============================================================================
@@ -229,6 +244,11 @@ class TenantStats(BaseModel):
 # SUPER ADMIN SCHEMAS
 # =============================================================================
 
+class SuperAdminLoginRequest(BaseModel):
+    """Requête de connexion super admin."""
+    email: EmailStr
+    password: str
+
 class SuperAdminCreate(BaseModel):
     """Création d'un super admin."""
     email: EmailStr
@@ -428,3 +448,131 @@ class PlatformStats(BaseModel):
     # Super admins
     total_super_admins: int = 0
     active_super_admins: int = 0
+
+
+# =============================================================================
+# CONSTANTES ENTITY
+# =============================================================================
+
+# Types réservés aux racines de tenant (SuperAdmin uniquement)
+ROOT_ENTITY_TYPES = {EntityType.GCSMS, EntityType.GTSMS}
+
+
+# =============================================================================
+# PLATFORM ENTITY SCHEMAS
+# =============================================================================
+
+class PlatformEntityCreate(EntityBase):
+    """
+    Création d'entité côté SuperAdmin.
+
+    Hérite de EntityBase (mêmes champs et validateurs que EntityCreate)
+    et ajoute un model_validator pour la cohérence racine/enfant :
+
+    - Type racine (GCSMS/GTSMS) → parent_entity_id DOIT être None,
+      integration_type DOIT être None
+    - Type enfant → parent_entity_id peut être None
+      (le service auto-rattachera à la racine du tenant)
+
+    La validation "1 seule racine par tenant" est dans le service
+    (nécessite accès DB).
+    """
+
+    @model_validator(mode="after")
+    def validate_type_parent_coherence(self) -> "PlatformEntityCreate":
+        """Valide la cohérence type ↔ parent ↔ integration_type."""
+        if self.entity_type in ROOT_ENTITY_TYPES:
+            if self.parent_entity_id is not None:
+                raise ValueError(
+                    f"Une entité de type {self.entity_type.value} est une racine "
+                    f"et ne peut pas avoir de parent_entity_id"
+                )
+            if self.integration_type is not None:
+                raise ValueError(
+                    f"Une entité racine ({self.entity_type.value}) ne peut pas "
+                    f"avoir de type d'intégration"
+                )
+
+        return self
+
+
+# =============================================================================
+# TENANT ADMIN USER SCHEMAS
+# =============================================================================
+
+class TenantAdminUserCreate(BaseModel):
+    """
+    Création d'un admin client par le SuperAdmin.
+
+    Schéma allégé par rapport à UserCreate :
+    - Pas de rpps ni profession_id (l'admin est un gestionnaire, pas un soignant)
+    - Pas de role_ids (ADMIN_FULL est assigné automatiquement)
+    - entity_id optionnel (rattaché à l'entité racine si non fourni)
+    """
+    first_name: str = Field(
+        ..., min_length=1, max_length=100,
+        description="Prénom de l'administrateur"
+    )
+    last_name: str = Field(
+        ..., min_length=1, max_length=100,
+        description="Nom de l'administrateur"
+    )
+    email: EmailStr = Field(
+        ...,
+        description="Email de connexion (sera chiffré AES-256-GCM)"
+    )
+    phone: Optional[str] = Field(
+        None, max_length=20,
+        description="Téléphone (optionnel)"
+    )
+    password: str = Field(
+        ..., min_length=12,
+        description="Mot de passe initial"
+    )
+    entity_id: Optional[int] = Field(
+        None,
+        description="Entité de rattachement. Si null → rattaché à l'entité racine"
+    )
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        """Valide la complexité du mot de passe."""
+        if len(v) < 12:
+            raise ValueError("Le mot de passe doit contenir au moins 12 caractères")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins une majuscule")
+        if not any(c.islower() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins une minuscule")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins un chiffre")
+        return v
+
+    @property
+    def start_date_value(self):
+        """Date de début par défaut pour le rattachement entité."""
+        from datetime import date
+        return date.today()
+
+
+class TenantAdminUserResponse(BaseModel):
+    """Réponse après création d'un admin client."""
+    id: int
+    tenant_id: int
+    first_name: str
+    last_name: str
+    email: str
+    phone: Optional[str] = None
+    is_admin: bool
+    is_active: bool
+    entity_id: Optional[int] = None
+    entity_name: Optional[str] = None
+    role: str
+    must_change_password: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"

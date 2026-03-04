@@ -138,77 +138,43 @@ class RolePermission(Base):
 
 
 # =============================================================================
-# ASSOCIATIONS INITIALES - Rôles système ↔ Permissions
+# ASSOCIATIONS INITIALES - Rôles fonctionnels ↔ Permissions (S3)
 # =============================================================================
-# Ces associations sont créées lors du seeding pour les rôles système.
+# 5 rôles fonctionnels purs. Les permissions de base liées au diplôme
+# seront portées par les professions (S4, via profession_permissions).
 # Format: role_name -> liste des codes de permissions
 
 INITIAL_ROLE_PERMISSIONS = {
     "ADMIN": [
         "ADMIN_FULL"  # Donne accès à tout
     ],
-    
+
     "COORDINATEUR": [
         "PATIENT_VIEW", "PATIENT_CREATE", "PATIENT_EDIT",
         "EVALUATION_VIEW", "EVALUATION_CREATE",
         "COORDINATION_VIEW", "COORDINATION_CREATE", "COORDINATION_EDIT",
-        "CAREPLAN_VIEW", "CAREPLAN_CREATE", "CAREPLAN_EDIT",
+        "CAREPLAN_VIEW", "CAREPLAN_CREATE", "CAREPLAN_EDIT", "CAREPLAN_VALIDATE",
         "USER_VIEW",
         "ACCESS_GRANT", "ACCESS_REVOKE",
-        "ROLE_VIEW", "ROLE_ASSIGN"
+        "ROLE_VIEW", "ROLE_ASSIGN",
     ],
-    
-    "MEDECIN_TRAITANT": [
-        "PATIENT_VIEW", "PATIENT_EDIT",
-        "EVALUATION_VIEW", "EVALUATION_CREATE", "EVALUATION_VALIDATE",
-        "VITALS_VIEW", "VITALS_CREATE",
-        "COORDINATION_VIEW", "COORDINATION_CREATE",
-        "CAREPLAN_VIEW", "CAREPLAN_VALIDATE"
-    ],
-    
-    "MEDECIN_SPECIALISTE": [
-        "PATIENT_VIEW",
-        "EVALUATION_VIEW",
-        "VITALS_VIEW",
-        "COORDINATION_VIEW"
-    ],
-    
-    "INFIRMIERE": [
+
+    "REFERENT": [
         "PATIENT_VIEW", "PATIENT_EDIT",
         "EVALUATION_VIEW", "EVALUATION_CREATE",
-        "VITALS_VIEW", "VITALS_CREATE",
         "COORDINATION_VIEW", "COORDINATION_CREATE", "COORDINATION_EDIT",
-        "CAREPLAN_VIEW"
+        "CAREPLAN_VIEW",
     ],
-    
-    "AIDE_SOIGNANTE": [
+
+    "EVALUATEUR": [
         "PATIENT_VIEW",
-        "EVALUATION_VIEW",
-        "VITALS_VIEW", "VITALS_CREATE",
-        "COORDINATION_VIEW", "COORDINATION_CREATE"
-    ],
-    
-    "KINESITHERAPEUTE": [
-        "PATIENT_VIEW",
-        "EVALUATION_VIEW",
+        "EVALUATION_VIEW", "EVALUATION_CREATE", "EVALUATION_VALIDATE",
         "VITALS_VIEW",
-        "COORDINATION_VIEW", "COORDINATION_CREATE"
     ],
-    
-    "AUXILIAIRE_VIE": [
-        "PATIENT_VIEW",
-        "COORDINATION_VIEW", "COORDINATION_CREATE"
-    ],
-    
-    "ASSISTANT_SOCIAL": [
-        "PATIENT_VIEW",
-        "EVALUATION_VIEW",
-        "COORDINATION_VIEW", "COORDINATION_CREATE"
-    ],
-    
+
     "INTERVENANT": [
         "PATIENT_VIEW",
         "VITALS_VIEW",
-        "COORDINATION_VIEW"
-    ]
+        "COORDINATION_VIEW",
+    ],
 }

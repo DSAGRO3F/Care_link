@@ -54,8 +54,8 @@ class UserAvailability(TimestampMixin, Base):
     
     __tablename__ = "user_availabilities"
     __table_args__ = (
-        CheckConstraint("day_of_week >= 1 AND day_of_week <= 7", name="ck_day_of_week"),
-        CheckConstraint("start_time < end_time", name="ck_time_range"),
+        CheckConstraint("day_of_week >= 1 AND day_of_week <= 7", name="ck_user_avail_day_of_week"),
+        CheckConstraint("start_time < end_time", name="ck_user_avail_time_range"),
         {"comment": "Disponibilités récurrentes des professionnels"}
     )
     

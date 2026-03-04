@@ -33,6 +33,14 @@ from app.models.user.user import User
 from app.models.user.user_associations import UserRole, UserEntity
 from app.models.user.user_availability import UserAvailability
 
+from app.services.encryption import (
+    user_encryptor,
+    encrypt_user_data,
+    decrypt_user_data,
+    get_user_search_blind,
+)
+
+
 
 # =============================================================================
 # EXCEPTIONS
@@ -133,7 +141,7 @@ class ProfessionService:
         total = db.execute(count_query).scalar() or 0
 
         # Pagination
-        query = query.order_by(Profession.name)
+        query = query.order_by(Profession.display_order, Profession.name)
         query = query.offset((page - 1) * size).limit(size)
 
         items = db.execute(query).scalars().all()
@@ -142,7 +150,7 @@ class ProfessionService:
     @staticmethod
     def get_by_id(db: Session, profession_id: int) -> Profession:
         """Récupère une profession par son ID."""
-        profession = db.get(Profession, profession_id)
+        profession: Optional[Profession] = db.get(Profession, profession_id)
         if not profession:
             raise ProfessionNotFoundError(f"Profession {profession_id} non trouvée")
         return profession
@@ -324,12 +332,16 @@ class RoleService:
         perm = self.db.query(Permission).filter(Permission.code == code).first()
         if not perm:
             # Déterminer la catégorie selon le préfixe
-            if code.startswith("PATIENT") or code.startswith("EVALUATION") or code.startswith("VITALS"):
+            if code.startswith("PATIENT"):
                 cat = PermissionCategory.PATIENT
+            elif code.startswith("EVALUATION"):
+                cat = PermissionCategory.EVALUATION
+            elif code.startswith("VITALS"):
+                cat = PermissionCategory.VITALS
             elif code.startswith("USER"):
                 cat = PermissionCategory.USER
             elif code.startswith("ENTITY"):
-                cat = PermissionCategory.ORGANIZATION
+                cat = PermissionCategory.ADMIN
             elif code.startswith("CAREPLAN"):
                 cat = PermissionCategory.CAREPLAN
             elif code.startswith("COORDINATION"):
@@ -337,7 +349,7 @@ class RoleService:
             elif code.startswith("ADMIN"):
                 cat = PermissionCategory.ADMIN
             else:
-                cat = PermissionCategory.SYSTEM
+                cat = PermissionCategory.ADMIN
 
             perm = Permission(
                 code=code,
@@ -437,6 +449,43 @@ class UserService:
         """Retourne une requête de base filtrée par tenant."""
         return select(User).where(User.tenant_id == self.tenant_id)
 
+    def _get_raw(self, user_id: int, load_relations: bool = False) -> User:
+        """
+        Récupère un user chiffré, attaché à la session.
+        Usage interne uniquement : mutations (update, delete, add_role, etc.)
+        Ne PAS utiliser pour retourner à l'API → utiliser get_by_id() à la place.
+        """
+        query = self._base_query().where(User.id == user_id)
+        if load_relations:
+            query = query.options(
+                selectinload(User.profession),
+                selectinload(User.role_associations).selectinload(UserRole.role),
+                selectinload(User.entity_associations).selectinload(UserEntity.entity),
+            )
+        user = self.db.execute(query).scalar_one_or_none()
+        if not user:
+            raise UserNotFoundError(f"Utilisateur {user_id} non trouvé")
+
+        return user
+
+    def _decrypt_and_detach(self, user: User) -> User:
+        """
+        Détache le user de la session SQLAlchemy, puis déchiffre email/rpps.
+        L'objet retourné est READ-ONLY (ne plus faire de commit dessus).
+
+        Pattern expunge+decrypt : empêche SQLAlchemy d'écraser le chiffré
+        par le clair lors d'un autoflush.
+        """
+        self.db.expunge(user)
+        decrypted = user_encryptor.decrypt_model(user)
+        if decrypted.get("email"):
+            user.email = decrypted["email"]
+        if decrypted.get("rpps"):
+            user.rpps = decrypted["rpps"]
+        return user
+
+    # ----------Lister les utilisateurs--------------
+
     def get_all(
             self,
             page: int = 1,
@@ -478,12 +527,13 @@ class UserService:
 
             if filters.search:
                 search_term = f"%{filters.search}%"
+                # MODIFIÉ: Recherche textuelle uniquement sur nom/prénom (non chiffrés)
+                # Email et RPPS sont chiffrés, on ne peut plus faire de recherche partielle
+                # Email et RPPS -> supprimés de recherche sql
                 query = query.where(
                     or_(
                         User.first_name.ilike(search_term),
                         User.last_name.ilike(search_term),
-                        User.email.ilike(search_term),
-                        User.rpps.ilike(search_term),
                     )
                 )
 
@@ -502,13 +552,18 @@ class UserService:
         query = query.offset((page - 1) * size).limit(size)
 
         items = self.db.execute(query).scalars().unique().all()
-        return list(items), total
+
+        # Expunge+decrypt chaque user pour le retour API
+        decrypted_items = [self._decrypt_and_detach(user) for user in items]
+        return decrypted_items, total
+
+    # ----------Récupérer un utilisateur--------------
 
     def get_by_id(self, user_id: int, load_relations: bool = True) -> User:
         """
         Récupère un utilisateur par son ID.
-
         MULTI-TENANT: Vérifie que l'utilisateur appartient au tenant courant.
+        CHIFFREMENT: email et rpps sont déchiffrés avant retour.
         """
         if load_relations:
             query = self._base_query().options(
@@ -523,43 +578,82 @@ class UserService:
 
         if not user:
             raise UserNotFoundError(f"Utilisateur {user_id} non trouvé")
-        return user
+
+        # S4 : Calculer les permissions effectives AVANT expunge
+        # (les relations profession/roles sont encore accessibles en session)
+        user._cached_effective_permissions = sorted(user.effective_permission_codes)
+
+        # Expunge+decrypt pour retour API sécurisé
+        return self._decrypt_and_detach(user)
+
+    # ----------Récupérer un utilisateur--------------
 
     def get_by_email(self, email: str) -> Optional[User]:
-        """Récupère un utilisateur par son email (dans le tenant)."""
-        query = self._base_query().where(User.email == email)
-        return self.db.execute(query).scalar_one_or_none()
+        """
+        Récupère un utilisateur par son email (dans le tenant).
+        CHIFFREMENT: Utilise le blind index pour la recherche.
+        """
+        # Recherche par blind index
+        email_blind = get_user_search_blind(email, "email", self.tenant_id)
+        query = self._base_query().where(User.email_blind == email_blind)
+        user = self.db.execute(query).scalar_one_or_none()
+
+        if user:
+            return self._decrypt_and_detach(user)
+        return None
+
+    # ----------Récupérer un utilisateur--------------
 
     def get_by_rpps(self, rpps: str) -> Optional[User]:
-        """Récupère un utilisateur par son RPPS (dans le tenant)."""
-        query = self._base_query().where(User.rpps == rpps)
-        return self.db.execute(query).scalar_one_or_none()
+        """
+        Récupère un utilisateur par son RPPS (dans le tenant).
+        CHIFFREMENT: Utilise le blind index pour la recherche.
+        """
+        # NOUVEAU: Recherche par blind index
+        rpps_blind = get_user_search_blind(rpps, "rpps", self.tenant_id)
+        query = self._base_query().where(User.rpps_blind == rpps_blind)
+        user = self.db.execute(query).scalar_one_or_none()
+
+        if user:
+            return self._decrypt_and_detach(user)
+        return None
+
+    # ----------Créer un utilisateur--------------
 
     def create(self, data: UserCreate) -> User:
         """
         Crée un nouvel utilisateur.
-
         MULTI-TENANT: Injecte automatiquement le tenant_id.
+        CHIFFREMENT: email et rpps sont chiffrés avant stockage.
         """
-        # Vérifier unicité email (dans le tenant)
+        # Vérifier unicité email (dans le tenant) - utilise blind index
         if self.get_by_email(data.email):
             raise DuplicateEmailError(f"Email '{data.email}' déjà utilisé")
 
-        # Vérifier unicité RPPS (dans le tenant)
+        # Vérifier unicité RPPS (dans le tenant) - utilise blind index
         if data.rpps and self.get_by_rpps(data.rpps):
             raise DuplicateRPPSError(f"RPPS '{data.rpps}' déjà utilisé")
 
         # Vérifier profession existe
         if data.profession_id:
-            profession = self.db.get(Profession, data.profession_id)
+            profession: Optional[Profession] = self.db.get(Profession, data.profession_id)
             if not profession:
                 raise ProfessionNotFoundError(f"Profession {data.profession_id} non trouvée")
 
-        # Créer l'utilisateur avec tenant_id auto-injecté
+        # Préparer les données (exclure password)
         user_data = data.model_dump(exclude={"password"})
+
+        # NOUVEAU: Chiffrer email et rpps + générer blind indexes
+        encrypted_data = user_encryptor.encrypt_for_db(
+            {"email": user_data.pop("email"), "rpps": user_data.pop("rpps", None)},
+            self.tenant_id
+        )
+
+        # Créer l'utilisateur avec données chiffrées
         user = User(
-            tenant_id=self.tenant_id,  # AUTO-INJECTION DU TENANT
-            **user_data
+            tenant_id=self.tenant_id,
+            **user_data,  # first_name, last_name, profession_id, etc.
+            **encrypted_data,  # email (chiffré), email_blind, rpps (chiffré), rpps_blind
         )
 
         # Hash du mot de passe si fourni
@@ -569,31 +663,67 @@ class UserService:
 
         self.db.add(user)
         self.db.commit()
-        self.db.refresh(user)
-        return user
+
+        # Recharger avec les relations nécessaires à la sérialisation
+        user = self.db.execute(
+            select(User)
+            .options(
+                selectinload(User.profession),
+                selectinload(User.role_associations).selectinload(UserRole.role),
+            )
+            .where(User.id == user.id)
+        ).scalar_one()
+
+        # S4 : Calculer les permissions effectives AVANT expunge
+        user._cached_effective_permissions = sorted(user.effective_permission_codes)
+
+        # Expunge+decrypt pour le retour API
+        return self._decrypt_and_detach(user)
+
+    # ----------Mise à jour utilisateur--------------
 
     def update(self, user_id: int, data: UserUpdate) -> User:
-        """Met à jour un utilisateur."""
-        user = self.get_by_id(user_id, load_relations=False)
+        """
+        Met à jour un utilisateur.
+        CHIFFREMENT: Si email ou rpps modifiés, re-chiffrer avec nouveaux blind indexes.
+        """
+        # 1. Récupérer le user brut (chiffré, session-attached) — PAS de decrypt
+        user = self._get_raw(user_id, load_relations=False)
 
         update_data = data.model_dump(exclude_unset=True, exclude={"password"})
 
-        # Vérifier unicité email
-        if "email" in update_data and update_data["email"] != user.email:
-            if self.get_by_email(update_data["email"]):
+        # 2. Vérifier unicité email via blind index (comparaison par ID, pas par clair)
+        if "email" in update_data:
+            existing = self.get_by_email(update_data["email"])
+            if existing and existing.id != user_id:
                 raise DuplicateEmailError(f"Email '{update_data['email']}' déjà utilisé")
 
-        # Vérifier unicité RPPS
-        if "rpps" in update_data and update_data["rpps"] != user.rpps:
-            if update_data["rpps"] and self.get_by_rpps(update_data["rpps"]):
-                raise DuplicateRPPSError(f"RPPS '{update_data['rpps']}' déjà utilisé")
+        # 3. Vérifier unicité RPPS via blind index (comparaison par ID)
+        if "rpps" in update_data:
+            if update_data["rpps"]:
+                existing = self.get_by_rpps(update_data["rpps"])
+                if existing and existing.id != user_id:
+                    raise DuplicateRPPSError(f"RPPS '{update_data['rpps']}' déjà utilisé")
 
-        # Vérifier profession existe
+        # 4. Vérifier profession existe
         if "profession_id" in update_data and update_data["profession_id"]:
-            profession = self.db.get(Profession, update_data["profession_id"])
+            profession: Optional[Profession] = self.db.get(Profession, update_data["profession_id"])
             if not profession:
                 raise ProfessionNotFoundError(f"Profession {update_data['profession_id']} non trouvée")
 
+        # 5. Chiffrer email/rpps si présents dans update_data
+        if "email" in update_data or "rpps" in update_data:
+            fields_to_encrypt = {}
+            if "email" in update_data:
+                fields_to_encrypt["email"] = update_data.pop("email")
+            if "rpps" in update_data:
+                fields_to_encrypt["rpps"] = update_data.pop("rpps")
+
+            # Chiffrer + générer blind indexes
+            encrypted_fields = user_encryptor.prepare_update(fields_to_encrypt, self.tenant_id)
+            update_data.update(encrypted_fields)
+
+        # 6. Appliquer les modifications (tout reste chiffré en session)
         for field, value in update_data.items():
             setattr(user, field, value)
 
@@ -603,20 +733,37 @@ class UserService:
             user.password_hash = hash_password(data.password)
 
         self.db.commit()
-        self.db.refresh(user)
-        return user
+
+        # S4 : Recharger avec relations pour calculer effective_permissions
+        # (remplace le simple refresh qui ne chargeait pas les relations)
+        user = self.db.execute(
+            select(User)
+            .options(
+                selectinload(User.profession),
+                selectinload(User.role_associations).selectinload(UserRole.role),
+            )
+            .where(User.id == user.id)
+        ).scalar_one()
+
+        # S4 : Calculer les permissions effectives AVANT expunge
+        user._cached_effective_permissions = sorted(user.effective_permission_codes)
+
+        # 7. Détacher PUIS déchiffrer pour le retour API
+        return self._decrypt_and_detach(user)
+
+    # ----------Supprimer un utilisateur--------------
 
     def delete(self, user_id: int) -> None:
         """Désactive un utilisateur (soft delete)."""
-        user = self.get_by_id(user_id, load_relations=False)
+        user = self._get_raw(user_id)
         user.is_active = False
         self.db.commit()
 
-    # --- Gestion des rôles ---
+    # ----------Ajouter un rôle--------------
 
     def add_role(self, user_id: int, role_id: int, assigned_by: Optional[int] = None) -> UserRole:
         """Attribue un rôle à un utilisateur."""
-        user = self.get_by_id(user_id, load_relations=False)
+        self._get_raw(user_id)  # Vérifie existence + tenant
 
         # Le RoleService vérifie que le rôle appartient au tenant
         role_service = RoleService(self.db, self.tenant_id)
@@ -645,6 +792,8 @@ class UserService:
         self.db.refresh(user_role)
         return user_role
 
+    # ----------Enlever un rôle--------------
+
     def remove_role(self, user_id: int, role_id: int) -> None:
         """Retire un rôle à un utilisateur."""
         user_role = self.db.execute(
@@ -660,13 +809,13 @@ class UserService:
         self.db.delete(user_role)
         self.db.commit()
 
-    # --- Gestion des entités ---
+    # ----------Ajout entité--------------
 
     def add_entity(self, user_id: int, data: UserEntityCreate) -> UserEntity:
         """Rattache un utilisateur à une entité."""
         from app.models.organization.entity import Entity
 
-        user = self.get_by_id(user_id, load_relations=False)
+        self._get_raw(user_id)  # Vérifie existence + tenant
 
         # Vérifier entité existe ET appartient au tenant
         entity = self.db.execute(
@@ -719,6 +868,8 @@ class UserService:
         self.db.refresh(user_entity)
         return user_entity
 
+    # ----------Mise à jour entité--------------
+
     def update_entity(self, user_id: int, entity_id: int, data: UserEntityUpdate) -> UserEntity:
         """Met à jour le rattachement à une entité."""
         user_entity = self.db.execute(
@@ -750,6 +901,8 @@ class UserService:
         self.db.commit()
         self.db.refresh(user_entity)
         return user_entity
+
+    # ----------Enlever entité--------------
 
     def remove_entity(self, user_id: int, entity_id: int) -> None:
         """Détache un utilisateur d'une entité."""
@@ -833,7 +986,7 @@ class UserAvailabilityService:
         # Vérifier que l'utilisateur appartient au tenant
         self._verify_user_access(user_id)
 
-        availability = self.db.get(UserAvailability, availability_id)
+        availability: Optional[UserAvailability] = self.db.get(UserAvailability, availability_id)
         if not availability or availability.user_id != user_id:
             raise AvailabilityNotFoundError(f"Disponibilité {availability_id} non trouvée")
         return availability

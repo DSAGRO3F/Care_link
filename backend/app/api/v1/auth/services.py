@@ -12,12 +12,18 @@ Ce module orchestre le processus d'authentification complet :
 Fusion de :
 - app/auth/service.py (logique métier existante)
 - Nouvelles fonctionnalités (PKCE, sessions Redis, switch BAS/PROD)
+
+Changement v4.8 : Harmonisation encryption
+- Pattern expunge+decrypt utilise decrypt_model() du BaseEncryptor
+- Recherche PSC par RPPS via blind index (corrige le bug clair vs chiffré)
+- Création User PSC avec encrypt_for_db() + noms de colonnes _encrypted
 """
 
 from datetime import datetime, timedelta, timezone
 from typing import Tuple, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.api.v1.auth.schemas import (
     TokenResponse,
@@ -31,12 +37,16 @@ from app.core.auth.psc import (
     get_psc_client,
 )
 from app.core.config import settings
-from app.core.security.hashing import verify_password
+from app.core.security.hashing import verify_password, hash_password
 from app.core.security.jwt import create_access_token, create_refresh_token
 from app.core.session.redis_client import get_redis
 from app.models.user.profession import Profession
 from app.models.user.role import Role
 from app.models.user.user import User
+
+from app.models.tenants.tenant import Tenant
+from app.models.enums import TenantStatus
+from app.services.encryption import user_encryptor, get_user_search_blind
 
 
 # =============================================================================
@@ -110,47 +120,152 @@ class AuthService:
     # AUTHENTIFICATION LOCALE (EMAIL/MOT DE PASSE)
     # =========================================================================
 
-    def authenticate_local(self, email: str, password: str) -> User:
+    # ============================================================================
+    # PATCH pour app/api/v1/auth/services.py
+    # ============================================================================
+    #
+    # Problème : Le RLS bloque la recherche d'utilisateur lors du login
+    # car tenant_id n'est pas encore connu.
+    #
+    # Solution : Bypasser temporairement le RLS pour authenticate_local
+    # ============================================================================
+
+
+    def authenticate_local(self, email: str, password: str, tenant_code: str) -> User:
         """
         Authentifie un utilisateur avec email/mot de passe.
 
         IMPORTANT: Cette méthode est réservée aux utilisateurs dont la profession
         ne nécessite pas de RPPS. Les professionnels de santé (requires_rpps=True)
         doivent utiliser Pro Santé Connect.
+
+        Note: Le RLS est temporairement bypassé pour chercher l'utilisateur par email,
+        car on ne connaît pas encore le tenant_id à ce stade.
         """
-        # Rechercher l'utilisateur
-        user = self.db.query(User).filter(User.email == email).first()
+        # Bypass RLS pour chercher l'utilisateur par email
+        # (on ne connaît pas encore le tenant_id)
+        self.db.execute(text("SET app.is_super_admin = 'true'"))
+        try:
+            # Résoudre le tenant par son code
+            tenant = self.db.query(Tenant).filter(
+                Tenant.code == tenant_code.upper()
+            ).first()
+            if not tenant:
+                raise InvalidCredentialsError("Code structure, email ou mot de passe incorrect")
+            if tenant.status != TenantStatus.ACTIVE:
+                raise InactiveUserError("Cette structure est actuellement désactivée")
 
-        if not user:
-            raise InvalidCredentialsError("Email ou mot de passe incorrect")
+            # Rechercher l'utilisateur via blind index (email chiffré)
+            tenant_id_value: int = tenant.id  # type: ignore[assignment]
+            email_blind = get_user_search_blind(email, "email", tenant_id_value)
 
-        # ATTENTION ! : Vérifier que la profession ne nécessite pas PSC
-        if user.profession and user.profession.requires_rpps:
-            raise InvalidCredentialsError(
-                "Les professionnels de santé doivent utiliser Pro Santé Connect. "
-                "Veuillez vous connecter avec votre e-CPS."
-            )
+            user: User | None = self.db.query(User).filter(
+                User.email_blind == email_blind,
+                User.tenant_id == tenant.id,
+            ).first()
 
-        # Vérifier que l'utilisateur a un mot de passe (pas un compte PSC uniquement)
-        if not user.password_hash:
-            raise InvalidCredentialsError(
-                "Ce compte utilise Pro Santé Connect. "
-                "Veuillez vous connecter avec votre e-CPS."
-            )
+            if not user:
+                raise InvalidCredentialsError("Email ou mot de passe incorrect")
 
-        # Vérifier le mot de passe
-        if not verify_password(password, user.password_hash):
-            raise InvalidCredentialsError("Email ou mot de passe incorrect")
+            # Vérifier si le compte est verrouillé
+            if user.is_locked:
+                raise InvalidCredentialsError(
+                    "Compte temporairement verrouillé suite à des tentatives échouées. "
+                    "Réessayez dans quelques minutes."
+                )
 
-        # Vérifier que le compte est actif
-        if not user.is_active:
-            raise InactiveUserError("Ce compte a été désactivé")
+            # ATTENTION ! : Vérifier que la profession ne nécessite pas PSC
+            if user.profession and user.profession.requires_rpps:
+                raise InvalidCredentialsError(
+                    "Les professionnels de santé doivent utiliser Pro Santé Connect. "
+                    "Veuillez vous connecter avec votre e-CPS."
+                )
 
-        # Mettre à jour la date de dernière connexion
-        user.last_login = datetime.now(timezone.utc)
+            # Vérifier que l'utilisateur a un mot de passe (pas un compte PSC uniquement)
+            if not user.password_hash:
+                raise InvalidCredentialsError(
+                    "Ce compte utilise Pro Santé Connect. "
+                    "Veuillez vous connecter avec votre e-CPS."
+                )
+
+            # À ce stade, password_hash est garanti non-None
+            password_hash = str(user.password_hash)
+
+            # Vérifier le mot de passe
+            if not verify_password(password, password_hash):
+                user.record_login_failure()
+                self.db.commit()
+                raise InvalidCredentialsError("Email ou mot de passe incorrect")
+
+            # Vérifier que le compte est actif
+            if not user.is_active:
+                raise InactiveUserError("Ce compte a été désactivé")
+
+            # Succès : réinitialiser les compteurs
+            user.record_login_success()
+
+            # Configurer le contexte RLS avec le bon tenant pour les opérations suivantes
+            self.db.execute(text(f"SET app.current_tenant_id = '{user.tenant_id}'"))
+            self.db.execute(text("SET app.is_super_admin = 'false'"))
+
+            self.db.commit()
+            self.db.refresh(user)
+
+            # Forcer le chargement des relations avant détachement
+            _ = user.role_associations
+            for ra in user.role_associations:
+                _ = ra.role  # 🔄 S5 fix — charger le Role imbriqué (évite DetachedInstanceError)
+            _ = user.profession
+
+            # v4.8 : Pattern expunge+decrypt via decrypt_model
+            self.db.expunge(user)  # Détacher → plus de tracking
+            self._decrypt_user_in_place(user)
+
+            assert isinstance(user, User)
+            return user
+
+        except (InvalidCredentialsError, InactiveUserError):
+            # Remettre RLS en mode normal avant de propager l'exception
+            self.db.execute(text("SET app.is_super_admin = 'false'"))
+            raise
+        except Exception as e:
+            # Remettre RLS en mode normal en cas d'erreur inattendue
+            self.db.execute(text("SET app.is_super_admin = 'false'"))
+            raise
+
+    def change_password(self, user: User, current_password: str, new_password: str) -> User:
+        """
+        Change le mot de passe d'un utilisateur.
+        """
+        # Re-fetch le user dans CETTE session (current_user vient d'une autre session)
+        db_user = self.db.get(User, user.id)
+        if not db_user:
+            raise InvalidCredentialsError("Utilisateur non trouvé")
+
+        if not db_user.password_hash:
+            raise InvalidCredentialsError("Ce compte n'a pas de mot de passe local")
+
+        if not verify_password(current_password, str(db_user.password_hash)):
+            raise InvalidCredentialsError("Mot de passe actuel incorrect")
+
+        # Mettre à jour
+        db_user.password_hash = hash_password(new_password)
+        db_user.must_change_password = False
+
         self.db.commit()
+        self.db.refresh(db_user)
 
-        return user
+        # Charger les relations avant détachement
+        _ = db_user.role_associations
+        for ra in db_user.role_associations:
+            _ = ra.role  # 🔄 S5 fix — charger le Role imbriqué
+        _ = db_user.profession
+
+        # v4.8 : Pattern expunge+decrypt via decrypt_model
+        self.db.expunge(db_user)
+        self._decrypt_user_in_place(db_user)
+
+        return db_user
 
     # =========================================================================
     # AUTHENTIFICATION PRO SANTÉ CONNECT
@@ -277,7 +392,7 @@ class AuthService:
         Crée ou met à jour un utilisateur depuis les données PSC.
 
         La logique :
-        1. Chercher par RPPS (identifiant unique)
+        1. Chercher par RPPS (blind index)
         2. Si trouvé : mettre à jour les infos et last_login
         3. Si non trouvé : créer un nouvel utilisateur avec rôle par défaut
 
@@ -292,8 +407,12 @@ class AuthService:
         if not rpps:
             raise ValueError("RPPS manquant dans les données PSC")
 
-        # Chercher l'utilisateur par RPPS
-        user = self.db.query(User).filter(User.rpps == rpps).first()
+        # v4.8 : Chercher l'utilisateur par RPPS via blind index
+        # Note: tenant_id=None car recherche cross-tenant lors d'une connexion PSC
+        # TODO: Évaluer si la recherche cross-tenant par RPPS nécessite
+        #       un blind index global (sans tenant) ou une itération sur les tenants
+        rpps_blind = user_encryptor.get_blind_index(rpps, "rpps", tenant_id=None)
+        user = self.db.query(User).filter(User.rpps_blind == rpps_blind).first()
 
         # Extraire les infos
         first_name = psc_info.get("given_name", "")
@@ -306,8 +425,15 @@ class AuthService:
             # === Mise à jour d'un utilisateur existant ===
             user.first_name = first_name or user.first_name
             user.last_name = last_name or user.last_name
+
+            # v4.8 : Re-chiffrer l'email si mis à jour
             if email:
-                user.email = email
+                encrypted_email = user_encryptor.encrypt_for_db(
+                    {"email": email}, tenant_id=user.tenant_id
+                )
+                user.email_encrypted = encrypted_email["email_encrypted"]
+                user.email_blind = encrypted_email["email_blind"]
+
             user.last_login = datetime.now(timezone.utc)
 
             self.db.commit()
@@ -327,17 +453,27 @@ class AuthService:
             if not email:
                 email = f"{rpps}@psc.carelink.local"
 
-            # Créer l'utilisateur
+            # v4.8 : Chiffrer email et rpps via encrypt_for_db
+            # TODO: Déterminer dynamiquement le tenant_id pour les nouveaux users PSC
+            target_tenant_id = 1  # TODO: Déterminer dynamiquement
+            encrypted_data = user_encryptor.encrypt_for_db(
+                {"email": email, "rpps": rpps},
+                tenant_id=target_tenant_id
+            )
+
+            # Créer l'utilisateur avec les colonnes _encrypted
             user = User(
-                email=email,
+                email_encrypted=encrypted_data["email_encrypted"],
+                email_blind=encrypted_data["email_blind"],
+                rpps_encrypted=encrypted_data.get("rpps_encrypted"),
+                rpps_blind=encrypted_data.get("rpps_blind"),
                 first_name=first_name or "Prénom",
                 last_name=last_name or "Nom",
-                rpps=rpps,
                 profession_id=profession.id if profession else None,
                 password_hash=None,  # Pas de mot de passe, auth PSC uniquement
                 is_active=True,
                 is_admin=False,
-                tenant_id=1,  # TODO: Déterminer dynamiquement
+                tenant_id=target_tenant_id,
                 last_login=datetime.now(timezone.utc),
             )
 
@@ -358,12 +494,9 @@ class AuthService:
         """
         Retourne le rôle par défaut à attribuer selon la profession.
 
-        Mapping profession → rôle par défaut :
-        - Médecin → MEDECIN_TRAITANT
-        - Infirmier(ère) → INFIRMIERE
-        - Aide-soignant(e) → AIDE_SOIGNANTE
-        - Coordinateur → COORDINATEUR
-        - Autres → None (admin attribuera manuellement)
+        🔄 S5 fix : Depuis S3, les 7 rôles-professions (MEDECIN_TRAITANT, INFIRMIERE, etc.)
+        ont été supprimés. Le rôle par défaut est INTERVENANT (accès lecture seule).
+        L'admin du tenant ajustera les responsabilités ensuite.
 
         Args:
             profession: Profession extraite de PSC
@@ -371,29 +504,10 @@ class AuthService:
         Returns:
             Objet Role ou None
         """
-        profession_lower = profession.lower() if profession else ""
-
-        # Mapping profession → nom de rôle
-        role_mapping = {
-            "médecin": "MEDECIN_TRAITANT",
-            "medecin": "MEDECIN_TRAITANT",
-            "infirmier": "INFIRMIERE",
-            "infirmière": "INFIRMIERE",
-            "infirmiere": "INFIRMIERE",
-            "aide-soignant": "AIDE_SOIGNANTE",
-            "aide-soignante": "AIDE_SOIGNANTE",
-            "aide soignant": "AIDE_SOIGNANTE",
-            "aide soignante": "AIDE_SOIGNANTE",
-            "coordinateur": "COORDINATEUR",
-            "coordinatrice": "COORDINATEUR",
-        }
-
-        role_name = role_mapping.get(profession_lower)
-
-        if role_name:
-            return self.db.query(Role).filter(Role.name == role_name).first()
-
-        return None
+        # Post-S3 : tous les nouveaux utilisateurs PSC reçoivent INTERVENANT
+        # comme rôle fonctionnel de base. L'admin client assignera
+        # COORDINATEUR, REFERENT ou EVALUATEUR selon les besoins.
+        return self.db.query(Role).filter(Role.name == "INTERVENANT").first()
 
     # =========================================================================
     # GÉNÉRATION DE TOKENS JWT
@@ -402,6 +516,10 @@ class AuthService:
     def create_tokens_for_user(self, user: User) -> TokenResponse:
         """
         Génère les tokens JWT pour un utilisateur authentifié.
+
+        Note: user.email et user.rpps retournent les valeurs via les
+        properties de rétro-compatibilité (email_encrypted / rpps_encrypted).
+        Après expunge+decrypt, elles contiennent les valeurs en clair.
 
         Args:
             user: Utilisateur authentifié
@@ -413,6 +531,8 @@ class AuthService:
         role_names = [role.name for role in user.roles] if user.roles else []
 
         # Claims pour l'access token
+        # user.email et user.rpps sont les properties rétro-compat
+        # qui pointent vers email_encrypted / rpps_encrypted (en clair post-decrypt)
         access_token_data = {
             "sub": str(user.id),
             "email": user.email,
@@ -598,12 +718,34 @@ class AuthService:
     # HELPERS
     # =========================================================================
 
+    def _decrypt_user_in_place(self, user: User) -> None:
+        """
+        Déchiffre les champs sensibles d'un User détaché (post-expunge).
+
+        Utilise BaseEncryptor.decrypt_model() pour obtenir les valeurs claires,
+        puis les écrit via les properties de rétro-compatibilité.
+
+        ATTENTION: Appeler uniquement APRÈS db.expunge(user).
+
+        Args:
+            user: User détaché de la session SQLAlchemy
+        """
+        try:
+            decrypted = user_encryptor.decrypt_model(user)
+            # Les properties email/rpps écrivent dans email_encrypted/rpps_encrypted
+            if "email" in decrypted and decrypted["email"] is not None:
+                user.email = decrypted["email"]
+            if "rpps" in decrypted and decrypted["rpps"] is not None:
+                user.rpps = decrypted["rpps"]
+        except Exception:
+            pass  # Si le déchiffrement échoue, on garde les valeurs brutes
+
     def build_authenticated_user(self, user: User) -> AuthenticatedUser:
         """
         Construit un objet AuthenticatedUser depuis un User.
 
         Args:
-            user: Utilisateur SQLAlchemy
+            user: Utilisateur SQLAlchemy (post-decrypt si détaché)
 
         Returns:
             AuthenticatedUser (schéma Pydantic)
@@ -616,6 +758,7 @@ class AuthService:
         if user.profession:
             profession_name = user.profession.name
 
+        # user.email et user.rpps utilisent les properties rétro-compat
         return AuthenticatedUser(
             id=user.id,
             email=user.email,
@@ -627,6 +770,7 @@ class AuthService:
             speciality=getattr(user, 'speciality', None),
             roles=role_names,
             is_admin=user.is_admin,
+            must_change_password=user.must_change_password,
             tenant_id=user.tenant_id,
         )
 

@@ -3,16 +3,23 @@ Modèle User - Utilisateurs/Professionnels de santé.
 
 Ce module définit la table `users` qui représente les utilisateurs
 de CareLink (professionnels de santé et administratifs).
+
+Changement v4.8 : Harmonisation encryption
+- Colonne `email` → `email_encrypted` (alignement convention BaseEncryptor)
+- Colonne `rpps` → `rpps_encrypted` (alignement convention BaseEncryptor)
+- Properties `email` / `rpps` ajoutées pour rétro-compatibilité transitoire
 """
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING, List, Set
 
-from sqlalchemy import String, Boolean, ForeignKey
+from sqlalchemy import String, Boolean, ForeignKey, Index, text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
+
+from app.models.user.profession_permissions import get_profession_permissions  # S4
 
 if TYPE_CHECKING:
     from app.models.user.profession import Profession
@@ -36,23 +43,37 @@ class User(TimestampMixin, Base):
     Les utilisateurs sont identifiés de manière unique par leur email
     et optionnellement par leur numéro RPPS (professionnels de santé).
 
+    Convention de nommage (v4.8) :
+    - Colonnes chiffrées : {field}_encrypted (ex: email_encrypted)
+    - Colonnes blind index : {field}_blind (ex: email_blind)
+    - Properties d'accès : {field} (ex: .email) — rétro-compatibilité
+
     Attributes:
         id: Identifiant unique
-        email: Email de connexion (unique)
+        email_encrypted: Email chiffré (AES-256-GCM)
+        email_blind: Blind index email (HMAC-SHA256)
         first_name: Prénom
         last_name: Nom de famille
-        rpps: Numéro RPPS (11 chiffres, optionnel)
+        rpps_encrypted: Numéro RPPS chiffré (AES-256-GCM)
+        rpps_blind: Blind index RPPS (HMAC-SHA256)
         profession: Profession réglementée
         roles: Rôles fonctionnels (many-to-many)
         entities: Entités de rattachement (many-to-many)
         is_admin: Est administrateur système
         is_active: Compte actif
+        must_change_password: Force le changement de mot de passe
     """
 
     __tablename__ = "users"
-    __table_args__ = {
-        "comment": "Table des utilisateurs (professionnels de santé et administratifs)"
-    }
+    __table_args__ = (
+        # Unicité sur les blind indexes (par tenant)
+        Index("ix_users_email_blind_tenant", "email_blind", "tenant_id", unique=True),
+        Index("ix_users_rpps_blind_tenant", "rpps_blind", "tenant_id",
+              unique=True, postgresql_where=text("rpps_blind IS NOT NULL")),
+        {
+            "comment": "Table des utilisateurs (professionnels de santé et administratifs)"
+        }
+    )
 
     # === Colonnes ===
 
@@ -62,19 +83,56 @@ class User(TimestampMixin, Base):
         info={"description": "Clé primaire auto-incrémentée"}
     )
 
-    email: Mapped[str] = mapped_column(
-        String(255),
-        unique=True,
+    # --- Champs chiffrés (convention v4.8 : {field}_encrypted) ---
+
+    email_encrypted: Mapped[str] = mapped_column(
+        String(512),
         nullable=False,
-        index=True,
-        doc="Adresse email unique de connexion",
+        doc="Adresse email chiffrée (AES-256-GCM)",
         info={
-            "description": "Email professionnel",
+            "description": "Email professionnel (chiffré)",
             "format": "email",
             "pii": True,
+            "encrypted": True,
             "example": "marie.dupont@ssiad.fr"
         }
     )
+
+    email_blind: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=False,
+        index=True,
+        doc="Blind index de l'email pour recherche",
+        info={
+            "description": "HMAC-SHA256 de l'email normalisé pour recherche sans déchiffrement",
+            "internal": True
+        }
+    )
+
+    rpps_encrypted: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        doc="Numéro RPPS chiffré (AES-256-GCM)",
+        info={
+            "description": "RPPS (chiffré)",
+            "pattern": "^[0-9]{11}$",
+            "encrypted": True,
+            "example": "12345678901"
+        }
+    )
+
+    rpps_blind: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
+        doc="Blind index du RPPS pour recherche",
+        info={
+            "description": "HMAC-SHA256 du RPPS pour recherche sans déchiffrement",
+            "internal": True
+        }
+    )
+
+    # --- Champs en clair ---
 
     first_name: Mapped[str] = mapped_column(
         String(100),
@@ -88,19 +146,6 @@ class User(TimestampMixin, Base):
         nullable=False,
         doc="Nom de famille de l'utilisateur",
         info={"description": "Nom de famille", "pii": True, "example": "Dupont"}
-    )
-
-    rpps: Mapped[str | None] = mapped_column(
-        String(11),
-        unique=True,
-        nullable=True,
-        index=True,
-        doc="Numéro RPPS du professionnel de santé",
-        info={
-            "description": "Répertoire Partagé des Professionnels de Santé (11 chiffres)",
-            "pattern": "^[0-9]{11}$",
-            "example": "12345678901"
-        }
     )
 
     password_hash: Mapped[str | None] = mapped_column(
@@ -124,10 +169,34 @@ class User(TimestampMixin, Base):
         info={"description": "False = compte désactivé, connexion impossible", "default": True}
     )
 
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default=text("false"),
+        doc="Force le changement de mot de passe à la prochaine connexion",
+        info={
+            "description": "True = redirection vers changement de mot de passe au login",
+            "default": False,
+        }
+    )
+
     last_login: Mapped[datetime | None] = mapped_column(
         nullable=True,
         doc="Date et heure de dernière connexion",
         info={"description": "Timestamp de la dernière authentification réussie"}
+    )
+
+    # === Sécurité anti-brute-force ===
+    failed_login_attempts: Mapped[int] = mapped_column(
+        default=0,
+        server_default=text("0"),
+        nullable=False,
+        doc="Nombre de tentatives de connexion échouées"
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="Date jusqu'à laquelle le compte est verrouillé"
     )
 
     # === Clés étrangères ===
@@ -224,7 +293,43 @@ class User(TimestampMixin, Base):
         doc="Rattachements à d'autres tenants (missions temporaires, remplacements)"
     )
 
-    # === Propriétés ===
+    # =========================================================================
+    # PROPERTIES DE RÉTRO-COMPATIBILITÉ (v4.8 transitoire)
+    #
+    # Ces properties permettent au code existant de continuer à utiliser
+    # user.email et user.rpps pendant la transition. Elles seront retirées
+    # progressivement au fil des sprints suivants.
+    # =========================================================================
+
+    @property
+    def email(self) -> str:
+        """
+        Accès à l'email (rétro-compatibilité).
+
+        ATTENTION : retourne la valeur brute de email_encrypted.
+        - Après expunge+decrypt : contient le clair
+        - En session active : contient le chiffré AES
+        """
+        return self.email_encrypted
+
+    @email.setter
+    def email(self, value: str):
+        """Setter pour rétro-compatibilité (expunge+decrypt)."""
+        self.email_encrypted = value
+
+    @property
+    def rpps(self) -> str | None:
+        """Accès au RPPS (rétro-compatibilité)."""
+        return self.rpps_encrypted
+
+    @rpps.setter
+    def rpps(self, value: str | None):
+        """Setter pour rétro-compatibilité."""
+        self.rpps_encrypted = value
+
+    # =========================================================================
+    # PROPRIÉTÉS MÉTIER
+    # =========================================================================
 
     @property
     def full_name(self) -> str:
@@ -267,37 +372,77 @@ class User(TimestampMixin, Base):
     def permissions(self) -> List["Permission"]:
         """
         Liste de toutes les permissions de l'utilisateur (via ses rôles).
-        
+
         Returns:
             Liste des objets Permission uniques
         """
         seen_ids: Set[int] = set()
         permissions: List["Permission"] = []
-        
+
         for role in self.roles:
             for perm in role.permissions:
                 if perm.id not in seen_ids:
                     seen_ids.add(perm.id)
                     permissions.append(perm)
-        
+
         return permissions
 
     @property
     def all_permissions(self) -> Set[str]:
         """
         Ensemble de tous les codes de permissions de l'utilisateur.
-        
+
         Utilise les relations normalisées (Role → RolePermission → Permission).
-        
+
         Returns:
             Set des codes de permissions (ex: {"PATIENT_VIEW", "USER_EDIT"})
         """
         permission_codes: Set[str] = set()
-        
+
         for role in self.roles:
             permission_codes.update(role.permission_codes)
-        
+
         return permission_codes
+
+    @property
+    def effective_permission_codes(self) -> Set[str]:
+        """
+        Permissions effectives = profession (base) ∪ rôles (additifs).
+
+        S4 — Résolution complète des permissions :
+            1. Permissions héritées de la profession (diplôme)
+            2. + Permissions apportées par les rôles fonctionnels
+            3. Court-circuit si ADMIN_FULL détecté
+
+        Returns:
+            Set des codes de permissions effectives
+        """
+        perms: Set[str] = set()
+
+        # 1. Permissions de la profession (socle métier)
+        if self.profession:
+            perms.update(get_profession_permissions(self.profession))
+
+        # 2. Permissions des rôles fonctionnels (additifs)
+        for role in self.roles:
+            role_perm_codes = role.permission_codes
+            if "ADMIN_FULL" in role_perm_codes:
+                return {"ADMIN_FULL"}  # Court-circuit admin
+            perms.update(role_perm_codes)
+
+        return perms
+
+    @property
+    def effective_permissions(self) -> List[str]:
+        """
+        Alias listé pour sérialisation Pydantic (approche B, S4).
+
+        - Post-expunge : retourne le cache calculé par le service
+        - En session : calcule à la volée via effective_permission_codes
+        """
+        if hasattr(self, '_cached_effective_permissions'):
+            return self._cached_effective_permissions
+        return sorted(self.effective_permission_codes)
 
     @property
     def all_tenant_ids(self) -> List[int]:
@@ -329,10 +474,36 @@ class User(TimestampMixin, Base):
         """
         return target_tenant_id in self.all_tenant_ids
 
+    @property
+    def is_locked(self) -> bool:
+        """Vérifie si le compte est actuellement verrouillé."""
+        if not self.locked_until:
+            return False
+        return datetime.now(timezone.utc) < self.locked_until
+
+    def record_login_success(self) -> None:
+        """Enregistre une connexion réussie."""
+        self.last_login = datetime.now(timezone.utc)
+        self.failed_login_attempts = 0
+        self.locked_until = None
+
+    def record_login_failure(self, max_attempts: int = 5, lock_duration_minutes: int = 30) -> None:
+        """
+        Enregistre une tentative de connexion échouée.
+
+        Args:
+            max_attempts: Nombre max d'échecs avant verrouillage
+            lock_duration_minutes: Durée du verrouillage en minutes
+        """
+        self.failed_login_attempts += 1
+        if self.failed_login_attempts >= max_attempts:
+            self.locked_until = datetime.now(timezone.utc) + timedelta(minutes=lock_duration_minutes)
+
     # === Méthodes ===
 
     def __repr__(self) -> str:
-        return f"<User(id={self.id}, email='{self.email}', rpps='{self.rpps}')>"
+        # v4.8 : ne plus logger de données chiffrées
+        return f"<User(id={self.id}, name='{self.full_name}', tenant={self.tenant_id})>"
 
     def __str__(self) -> str:
         return self.full_name
@@ -340,10 +511,12 @@ class User(TimestampMixin, Base):
     def has_permission(self, permission_code: str) -> bool:
         """
         Vérifie si l'utilisateur possède une permission spécifique.
-        
+
+        S4 : utilise effective_permission_codes (profession + rôles).
+
         Args:
             permission_code: Code de la permission à vérifier
-            
+
         Returns:
             True si l'utilisateur a la permission
         """
@@ -351,46 +524,53 @@ class User(TimestampMixin, Base):
             return True
 
         # ADMIN_FULL donne toutes les permissions
-        if "ADMIN_FULL" in self.all_permissions:
+        effective = self.effective_permission_codes
+        if "ADMIN_FULL" in effective:
             return True
 
-        return permission_code in self.all_permissions
+        return permission_code in effective
 
     def has_any_permission(self, permission_codes: List[str]) -> bool:
         """
         Vérifie si l'utilisateur possède au moins une des permissions.
-        
+
+        S4 : utilise effective_permission_codes (profession + rôles).
+
         Args:
             permission_codes: Liste des codes de permissions à vérifier
-            
+
         Returns:
             True si l'utilisateur a au moins une des permissions
         """
         if self.is_admin:
             return True
-            
-        if "ADMIN_FULL" in self.all_permissions:
+
+        effective = self.effective_permission_codes
+        if "ADMIN_FULL" in effective:
             return True
 
-        return any(code in self.all_permissions for code in permission_codes)
+        return any(code in effective for code in permission_codes)
 
     def has_all_permissions(self, permission_codes: List[str]) -> bool:
         """
         Vérifie si l'utilisateur possède toutes les permissions.
-        
+
+        S4 : utilise effective_permission_codes (profession + rôles).
+
         Args:
             permission_codes: Liste des codes de permissions à vérifier
-            
+
         Returns:
             True si l'utilisateur a toutes les permissions
         """
         if self.is_admin:
             return True
-            
-        if "ADMIN_FULL" in self.all_permissions:
+
+        effective = self.effective_permission_codes
+        if "ADMIN_FULL" in effective:
             return True
 
-        return all(code in self.all_permissions for code in permission_codes)
+        return all(code in effective for code in permission_codes)
 
     def has_role(self, role_name: str) -> bool:
         """Vérifie si l'utilisateur a un rôle spécifique."""

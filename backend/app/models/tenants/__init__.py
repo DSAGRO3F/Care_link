@@ -8,7 +8,8 @@ leurs abonnements et le suivi de consommation.
 Classes exportées:
     - Tenant: Client/locataire de la plateforme
     - TenantStatus: Statuts possibles d'un tenant
-    - TenantType: Types de tenant (GCSMS, SSIAD, etc.)
+    - TenantType: Types de tenant (GCSMS, GTSMS, SSIAD, etc.)
+    - IntegrationType: Types d'intégration dans un groupement
     - Subscription: Abonnement d'un tenant
     - SubscriptionPlan: Plans d'abonnement (S, M, L, XL, ENTERPRISE)
     - SubscriptionStatus: Statuts d'abonnement
@@ -16,6 +17,11 @@ Classes exportées:
     - SubscriptionUsage: Suivi de consommation mensuelle
 """
 
+from app.models.enums import (
+    IntegrationType,
+    TenantStatus,
+    TenantType,
+)
 from app.models.tenants.subscription import (
     Subscription,
     SubscriptionPlan,
@@ -23,17 +29,14 @@ from app.models.tenants.subscription import (
     BillingCycle,
 )
 from app.models.tenants.subscription_usage import SubscriptionUsage
-from app.models.tenants.tenant import (
-    Tenant,
-    TenantStatus,
-    TenantType,
-)
+from app.models.tenants.tenant import Tenant
 
 __all__ = [
     # Tenant
     "Tenant",
     "TenantStatus",
     "TenantType",
+    "IntegrationType",
     # Subscription
     "Subscription",
     "SubscriptionPlan",

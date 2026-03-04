@@ -37,8 +37,7 @@ class UserRole(Base):
 
     __tablename__ = "user_roles"
     __table_args__ = (
-        UniqueConstraint("user_id", "role_id", name="uq_user_role"),
-        {"comment": "Table de jonction User ↔ Role (many-to-many)"}
+        {"comment": "Table de jonction User ↔ Role (many-to-many)"},
     )
 
     # === Clés primaires composites ===

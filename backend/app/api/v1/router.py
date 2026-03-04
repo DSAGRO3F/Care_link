@@ -19,6 +19,7 @@ from .organization import router as organization_router
 from .patient import router as patient_router
 from .tenants import router as tenants_router
 from .user import router as user_router
+from .platform import router as platform_router
 
 # =============================================================================
 # ROUTER PRINCIPAL
@@ -35,6 +36,7 @@ api_router.include_router(careplan_router)
 api_router.include_router(coordination_router)
 api_router.include_router(organization_router)
 api_router.include_router(tenants_router)
+api_router.include_router(platform_router)
 
 
 # =============================================================================

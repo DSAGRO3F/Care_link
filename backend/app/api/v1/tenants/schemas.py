@@ -12,10 +12,23 @@ Conventions :
 from datetime import date, datetime
 from typing import Optional, Dict, Any, List
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
 
-from app.models.enums import SubscriptionPlan, SubscriptionStatus, BillingCycle
-from app.models.tenants.tenant import TenantType, TenantStatus
+from app.models.enums import (
+    IntegrationType,
+    SubscriptionPlan,
+    SubscriptionStatus,
+    BillingCycle,
+    TenantType,
+    TenantStatus,
+)
+
+
+# =============================================================================
+# TYPES FÉDÉRATEURS (ne peuvent pas avoir de parent)
+# =============================================================================
+
+FEDERATION_PARENT_TYPES = {TenantType.GCSMS, TenantType.GTSMS}
 
 
 # =============================================================================
@@ -34,6 +47,20 @@ class TenantCreate(BaseModel):
     # Identification (optionnel)
     legal_name: Optional[str] = Field(None, max_length=255)
     siret: Optional[str] = Field(None, pattern=r"^\d{14}$")
+
+    # Fédération (optionnel)
+    parent_tenant_id: Optional[int] = Field(
+        None,
+        description="ID du groupement fédérateur (GCSMS/GTSMS) de rattachement"
+    )
+    integration_type: Optional[IntegrationType] = Field(
+        None,
+        description="Type de rattachement : MANAGED, FEDERATED, CONVENTION"
+    )
+    federation_date: Optional[date] = Field(
+        None,
+        description="Date de rattachement au groupement"
+    )
 
     # Contact (optionnel)
     contact_phone: Optional[str] = Field(None, max_length=20)
@@ -58,6 +85,36 @@ class TenantCreate(BaseModel):
     # Paramètres personnalisés
     settings: Dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def validate_federation(self) -> "TenantCreate":
+        """Valide la cohérence des champs de fédération."""
+        # Un GCSMS/GTSMS ne peut pas avoir de parent
+        if self.tenant_type in FEDERATION_PARENT_TYPES and self.parent_tenant_id is not None:
+            raise ValueError(
+                f"Un tenant de type {self.tenant_type.value} est un groupement fédérateur "
+                f"et ne peut pas être rattaché à un parent."
+            )
+
+        # Si parent_tenant_id est fourni, integration_type est obligatoire
+        if self.parent_tenant_id is not None and self.integration_type is None:
+            raise ValueError(
+                "Le type d'intégration (integration_type) est obligatoire "
+                "lorsqu'un groupement fédérateur (parent_tenant_id) est spécifié."
+            )
+
+        # Si pas de parent, pas d'integration_type ni de federation_date
+        if self.parent_tenant_id is None:
+            if self.integration_type is not None:
+                raise ValueError(
+                    "Le type d'intégration ne peut pas être spécifié sans groupement fédérateur."
+                )
+            if self.federation_date is not None:
+                raise ValueError(
+                    "La date de fédération ne peut pas être spécifiée sans groupement fédérateur."
+                )
+
+        return self
+
 
 class TenantUpdate(BaseModel):
     """Données modifiables d'un tenant (tous champs optionnels)."""
@@ -65,6 +122,14 @@ class TenantUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=255)
     legal_name: Optional[str] = None
     siret: Optional[str] = Field(None, pattern=r"^\d{14}$")
+
+    # Fédération (rattacher / détacher / modifier le lien)
+    parent_tenant_id: Optional[int] = Field(
+        None,
+        description="ID du groupement fédérateur. Envoyer null pour détacher."
+    )
+    integration_type: Optional[IntegrationType] = None
+    federation_date: Optional[date] = None
 
     contact_email: Optional[EmailStr] = None
     contact_phone: Optional[str] = None
@@ -105,6 +170,50 @@ class TenantSummary(BaseModel):
     city: Optional[str]
     created_at: datetime
 
+    # Fédération (aperçu)
+    parent_tenant_id: Optional[int] = None
+    integration_type: Optional[IntegrationType] = None
+
+
+class ParentTenantInfo(BaseModel):
+    """Info minimale sur le groupement fédérateur (pour affichage dans la réponse)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    tenant_type: TenantType
+
+
+class MemberTenantInfo(BaseModel):
+    """Info minimale sur un tenant membre (pour affichage dans la réponse d'un GCSMS/GTSMS)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    tenant_type: TenantType
+    status: TenantStatus
+    integration_type: Optional[IntegrationType] = None
+    federation_date: Optional[date] = None
+
+
+class FederationView(BaseModel):
+    """Vue arborescente d'un groupement fédérateur et ses membres."""
+    model_config = ConfigDict(from_attributes=True)
+
+    # Le groupement
+    parent: ParentTenantInfo
+
+    # Ses membres
+    members: List[MemberTenantInfo] = []
+
+    # Stats agrégées
+    total_members: int = 0
+    active_members: int = 0
+    total_patients: int = 0
+    total_users: int = 0
+
 
 class TenantResponse(BaseModel):
     """Réponse complète pour un tenant."""
@@ -118,6 +227,13 @@ class TenantResponse(BaseModel):
 
     tenant_type: TenantType
     status: TenantStatus
+
+    # Fédération
+    parent_tenant_id: Optional[int] = None
+    integration_type: Optional[IntegrationType] = None
+    federation_date: Optional[date] = None
+    parent_tenant: Optional[ParentTenantInfo] = None
+    member_tenants: Optional[List[MemberTenantInfo]] = None
 
     contact_email: str
     contact_phone: Optional[str]
@@ -151,6 +267,11 @@ class TenantWithStats(TenantResponse):
     current_patients_count: int = 0
     current_users_count: int = 0
     current_storage_used_mb: int = 0
+
+    # Stats fédération (si groupement)
+    federation_patients_count: int = 0
+    federation_users_count: int = 0
+    members_count: int = 0
 
     # Abonnement actif
     active_subscription: Optional["SubscriptionSummary"] = None

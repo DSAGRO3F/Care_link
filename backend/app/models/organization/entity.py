@@ -6,7 +6,7 @@ de soins (SSIAD, EHPAD, SAAD, etc.) dans lesquelles les professionnels
 exercent et les patients sont suivis.
 
 Une entité peut être :
-- Rattachée à une organisation (GCSMS) de manière intégrée ou fédérée
+- Rattachée à un tenant de type groupement (GCSMS/GTSMS) en mode intégré
 - Avoir des sous-entités (agences géographiques)
 - Avoir une capacité autorisée (places SSIAD, lits EHPAD)
 """
@@ -37,16 +37,16 @@ if TYPE_CHECKING:
 class Entity(TimestampMixin, StatusMixin, Base):
     """
     Représente une entité/structure de soins.
-    
+
     Les entités sont des structures juridiques ou opérationnelles
     qui emploient des professionnels de santé et prennent en charge
     des patients. Exemples : SSIAD, EHPAD, SAAD, DAC, CPTS.
-    
+
     Une entité peut :
-    - Appartenir à une organisation (GCSMS) : via organization_id (à venir)
+    - Appartenir à un tenant de type groupement (GCSMS/GTSMS) : via tenant_id
     - Avoir des sous-entités (agences) : via parent_entity_id
     - Avoir une capacité autorisée : authorized_capacity
-    
+
     Attributes:
         id: Identifiant unique
         name: Nom de la structure
@@ -62,7 +62,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
         country: Pays de rattachement
         users: Professionnels rattachés à cette entité
         patients: Patients suivis par cette entité
-    
+
     Example:
         ssiad = Entity(
             name="SSIAD Paris 12",
@@ -74,12 +74,12 @@ class Entity(TimestampMixin, StatusMixin, Base):
             country_id=1
         )
     """
-    
+
     __tablename__ = "entities"
     __table_args__ = {
         "comment": "Table des entités de soins (SSIAD, EHPAD, SAAD...)"
     }
-    
+
     # =========================================================================
     # COLONNES D'IDENTIFICATION
     # =========================================================================
@@ -91,7 +91,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Clé primaire auto-incrémentée"
         }
     )
-    
+
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -101,7 +101,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "SSIAD Bien Vieillir Paris 12"
         }
     )
-    
+
     short_name: Mapped[Optional[str]] = mapped_column(
         String(50),
         nullable=True,
@@ -115,7 +115,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
     # =========================================================================
     # TYPE ET RATTACHEMENT
     # =========================================================================
-    
+
     entity_type: Mapped[EntityType] = mapped_column(
         SQLEnum(EntityType, name="entity_type_enum", create_constraint=True),
         nullable=False,
@@ -125,7 +125,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "SSIAD"
         }
     )
-    
+
     integration_type: Mapped[Optional[IntegrationType]] = mapped_column(
         SQLEnum(IntegrationType, name="integration_type_enum", create_constraint=True),
         nullable=True,
@@ -135,11 +135,11 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "MANAGED"
         }
     )
-    
+
     # =========================================================================
     # HIÉRARCHIE (auto-référence pour les agences)
     # =========================================================================
-    
+
     parent_entity_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("entities.id", ondelete="SET NULL"),
         nullable=True,
@@ -148,11 +148,11 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Référence vers l'entité mère si c'est une agence"
         }
     )
-    
+
     # =========================================================================
     # IDENTIFIANTS LÉGAUX
     # =========================================================================
-    
+
     siret: Mapped[Optional[str]] = mapped_column(
         String(14),
         unique=True,
@@ -164,7 +164,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "12345678901234"
         }
     )
-    
+
     siren: Mapped[Optional[str]] = mapped_column(
         String(9),
         nullable=True,
@@ -175,7 +175,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "123456789"
         }
     )
-    
+
     finess_ej: Mapped[Optional[str]] = mapped_column(
         String(9),
         nullable=True,
@@ -186,7 +186,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "750000001"
         }
     )
-    
+
     finess_et: Mapped[Optional[str]] = mapped_column(
         String(9),
         unique=True,
@@ -198,11 +198,11 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "750012345"
         }
     )
-    
+
     # =========================================================================
     # AUTORISATION ET CAPACITÉ
     # =========================================================================
-    
+
     authorized_capacity: Mapped[Optional[int]] = mapped_column(
         Integer,
         nullable=True,
@@ -212,7 +212,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": 30
         }
     )
-    
+
     authorization_date: Mapped[Optional[date]] = mapped_column(
         Date,
         nullable=True,
@@ -221,7 +221,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Date de délivrance de l'autorisation ARS/CD"
         }
     )
-    
+
     authorization_reference: Mapped[Optional[str]] = mapped_column(
         String(100),
         nullable=True,
@@ -230,11 +230,11 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Numéro ou référence de l'arrêté d'autorisation"
         }
     )
-    
+
     # =========================================================================
     # COORDONNÉES
     # =========================================================================
-    
+
     address: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,
@@ -243,7 +243,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Adresse du siège ou de l'établissement"
         }
     )
-    
+
     postal_code: Mapped[Optional[str]] = mapped_column(
         String(10),
         nullable=True,
@@ -253,7 +253,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "75012"
         }
     )
-    
+
     city: Mapped[Optional[str]] = mapped_column(
         String(100),
         nullable=True,
@@ -263,7 +263,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "Paris"
         }
     )
-    
+
     phone: Mapped[Optional[str]] = mapped_column(
         String(20),
         nullable=True,
@@ -273,7 +273,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "example": "0148123456"
         }
     )
-    
+
     email: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
@@ -283,7 +283,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "format": "email"
         }
     )
-    
+
     website: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
@@ -313,7 +313,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
         default=30,
         comment="Rayon d'intervention par défaut en km"
     )
-    
+
     # =========================================================================
     # CLÉS ÉTRANGÈRES
     # =========================================================================
@@ -336,7 +336,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
             "description": "Référence vers le tenant (client) propriétaire de cette entité"
         }
     )
-    
+
 
     # =========================================================================
     # RELATIONS
@@ -353,7 +353,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
         back_populates="entities",
         doc="Pays de rattachement de l'entité"
     )
-    
+
     # Auto-référence pour la hiérarchie parent/enfants
     parent_entity: Mapped[Optional["Entity"]] = relationship(
         "Entity",
@@ -362,21 +362,21 @@ class Entity(TimestampMixin, StatusMixin, Base):
         foreign_keys=[parent_entity_id],
         doc="Entité parente (si c'est une agence)"
     )
-    
+
     child_entities: Mapped[List["Entity"]] = relationship(
         "Entity",
         back_populates="parent_entity",
         foreign_keys=[parent_entity_id],
         doc="Sous-entités (agences) de cette entité"
     )
-    
+
     user_associations: Mapped[List["UserEntity"]] = relationship(
         "UserEntity",
         back_populates="entity",
         cascade="all, delete-orphan",
         doc="Associations avec les utilisateurs (via table de jonction)"
     )
-    
+
     patients: Mapped[List["Patient"]] = relationship(
         "Patient",
         back_populates="entity",
@@ -403,60 +403,53 @@ class Entity(TimestampMixin, StatusMixin, Base):
         doc="Disponibilités des professionnels pour cette entité"
     )
 
-    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="entities")
-    
-    # NOTE: Relations à ajouter plus tard
-    # organization: Mapped[Optional["Organization"]] = relationship(...)
-    # territories: Mapped[List["EntityTerritory"]] = relationship(...)
-    # services: Mapped[List["EntityService"]] = relationship(...)
-    
     # =========================================================================
     # PROPRIÉTÉS
     # =========================================================================
-    
+
     @property
     def users(self) -> List["User"]:
         """Liste des utilisateurs actifs rattachés à cette entité."""
         return [ua.user for ua in self.user_associations if ua.end_date is None]
-    
+
     @property
     def active_users_count(self) -> int:
         """Nombre d'utilisateurs actifs dans cette entité."""
         return len([ua for ua in self.user_associations if ua.end_date is None])
-    
+
     @property
     def patients_count(self) -> int:
         """Nombre de patients actifs suivis par cette entité."""
         return len([p for p in self.patients if p.status == "active"])
-    
+
     @property
     def is_parent(self) -> bool:
         """Indique si cette entité a des sous-entités (agences)."""
         return len(self.child_entities) > 0
-    
+
     @property
     def is_child(self) -> bool:
         """Indique si cette entité est une sous-entité (agence)."""
         return self.parent_entity_id is not None
-    
+
     @property
     def capacity_usage(self) -> Optional[float]:
         """
         Taux d'occupation de la capacité autorisée.
-        
+
         Returns:
             Pourcentage d'occupation (0-100) ou None si pas de capacité définie
         """
         if not self.authorized_capacity:
             return None
         return (self.patients_count / self.authorized_capacity) * 100
-    
+
     # =========================================================================
     # MÉTHODES
     # =========================================================================
-    
+
     def __repr__(self) -> str:
         return f"<Entity(id={self.id}, name='{self.name}', type='{self.entity_type.value if self.entity_type else 'N/A'}')>"
-    
+
     def __str__(self) -> str:
         return f"{self.name} ({self.entity_type.value if self.entity_type else 'N/A'})"

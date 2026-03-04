@@ -32,6 +32,7 @@ from app.api.v1.auth.schemas import (
     AuthStatusResponse,
     AuthErrorResponse,
     AuthMethod,
+    PasswordChangeRequest,
 )
 from app.api.v1.auth.services import (
     get_auth_service,
@@ -266,8 +267,9 @@ async def login(
 
     try:
         user = auth_service.authenticate_local(
-            email=credentials.email,
-            password=credentials.password
+            email=str(credentials.email),
+            password=credentials.password,
+            tenant_code=credentials.tenant_code,
         )
 
         return auth_service.build_login_response(user, auth_method=AuthMethod.PASSWORD)
@@ -282,6 +284,51 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e)
+        )
+
+
+# =============================================================================
+# CHANGEMENT DE MOT DE PASSE
+# =============================================================================
+
+@router.post(
+    "/change-password",
+    response_model=LoginResponse,
+    summary="Changer le mot de passe",
+    description="""
+    Change le mot de passe de l'utilisateur connecté.
+
+    Utilisé en particulier lors de la première connexion d'un admin client
+    (must_change_password=true). Retourne de nouveaux tokens après le changement.
+    """,
+    responses={
+        401: {"model": AuthErrorResponse, "description": "Mot de passe actuel incorrect"},
+    }
+)
+async def change_password(
+        request: PasswordChangeRequest,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+) -> LoginResponse:
+    """
+    Change le mot de passe et retourne de nouveaux tokens.
+    """
+    auth_service = get_auth_service(db)
+
+    try:
+        user = auth_service.change_password(
+            user=current_user,
+            current_password=request.current_password,
+            new_password=request.new_password,
+        )
+
+        # Retourner de nouveaux tokens (must_change_password=false dans le JWT)
+        return auth_service.build_login_response(user, auth_method=AuthMethod.PASSWORD)
+
+    except InvalidCredentialsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
         )
 
 

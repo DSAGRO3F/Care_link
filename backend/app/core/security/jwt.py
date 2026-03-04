@@ -59,9 +59,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({
         "exp": expire,
         "iat": datetime.now(timezone.utc),
-        "iss": "carelink",  # Issuer (ton application)
-        "type": "access"
+        "iss": "carelink",
     })
+    if "type" not in to_encode:
+        to_encode["type"] = "access"
 
     # Signature avec clé privée ES256
     private_key = _load_private_key()
@@ -91,8 +92,10 @@ def create_refresh_token(data: dict) -> str:
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "iss": "carelink",
-        "type": "refresh"
     })
+    # Ne pas écraser le type s'il est déjà défini
+    if "type" not in to_encode:
+        to_encode["type"] = "refresh"
 
     private_key = _load_private_key()
     encoded_jwt = jwt.encode(

@@ -186,7 +186,7 @@ class PatientEvaluationBase(BaseModel):
     schema_version: str = Field("v1", max_length=20)
     evaluation_data: Dict[str, Any] = Field(..., description="Données JSON de l'évaluation")
     evaluation_date: date = Field(..., description="Date de l'évaluation")
-    # gir_score: Optional[int] = Field(None, ge=1, le=6, description="Score GIR (1-6)") # gir_score retiré de Base car calculé automatiquement
+    # gir_score: Optional[int] = Field(None, ge=1, le=6, description="Score GIR (1-6)") # gir_score retiré de Base car calculé par backend/app/services/aggir/calculator.py
 
     @field_validator("schema_type")
     @classmethod

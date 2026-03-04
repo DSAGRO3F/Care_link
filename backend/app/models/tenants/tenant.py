@@ -1,17 +1,35 @@
 # app/models/tenants/tenant.py
 """
 Modèle Tenant - Représente un client/locataire de la plateforme CareLink.
-Un tenant peut être un GCSMS (avec ses entités enfants) ou une structure indépendante.
+
+Un tenant peut être :
+- Un groupement fédérateur (GCSMS, GTSMS) avec des tenants membres
+- Une structure indépendante (SSIAD, SAAD, etc.)
+- Une structure membre d'un groupement (modèle fédéré)
+
+Hiérarchie de fédération :
+    GCSMS/GTSMS (parent_tenant_id = NULL)
+     ├── SSIAD Arcachon  (parent_tenant_id → GCSMS, integration_type = FEDERATED)
+     ├── SAAD La Teste   (parent_tenant_id → GCSMS, integration_type = FEDERATED)
+     └── Cabinet kiné    (parent_tenant_id → GCSMS, integration_type = CONVENTION)
 """
 
-from datetime import datetime
-from enum import Enum as PyEnum
+from datetime import date, datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Enum, ForeignKey, Integer, String, DateTime
+from sqlalchemy import (
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    DateTime,
+    Date,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
+from app.models.enums import IntegrationType, TenantType, TenantStatus
 from app.models.mixins import TimestampMixin
 from app.models.types import JSONBCompatible
 
@@ -26,32 +44,14 @@ if TYPE_CHECKING:
     from app.models.user.user_tenant_assignment import UserTenantAssignment
 
 
-class TenantStatus(str, PyEnum):
-    """Statuts possibles d'un tenant."""
-    ACTIVE = "ACTIVE"
-    SUSPENDED = "SUSPENDED"
-    TERMINATED = "TERMINATED"
-
-
-class TenantType(str, PyEnum):
-    """Types de tenant (alignés sur EntityType pour cohérence)."""
-    GCSMS = "GCSMS"
-    SSIAD = "SSIAD"
-    SAAD = "SAAD"
-    SPASAD = "SPASAD"
-    EHPAD = "EHPAD"
-    DAC = "DAC"
-    CPTS = "CPTS"
-    OTHER = "OTHER"
-
-
 class Tenant(Base, TimestampMixin):
     """
     Représente un client de CareLink (locataire).
 
     Un tenant correspond à l'entité facturée :
-    - Soit un GCSMS (groupement) avec ses structures membres
+    - Soit un groupement fédérateur (GCSMS, GTSMS) avec ses structures membres
     - Soit une structure indépendante (SSIAD, SAAD, etc.)
+    - Soit une structure autonome rattachée à un groupement (modèle fédéré)
 
     Chaque tenant a :
     - Sa propre clé de chiffrement AES-256
@@ -60,6 +60,31 @@ class Tenant(Base, TimestampMixin):
     """
 
     __tablename__ = "tenants"
+    __table_args__ = (
+        # Un tenant ne peut pas être son propre parent
+        CheckConstraint(
+            "parent_tenant_id != id",
+            name="ck_tenant_no_self_parent"
+        ),
+        # Un GCSMS ou GTSMS ne peut pas avoir de parent (c'est lui le fédérateur)
+        CheckConstraint(
+            """
+            NOT (
+                tenant_type IN ('GCSMS', 'GTSMS')
+                AND parent_tenant_id IS NOT NULL
+            )
+            """,
+            name="ck_federation_parent_cannot_have_parent"
+        ),
+        # integration_type doit être renseigné si et seulement si parent_tenant_id est renseigné
+        CheckConstraint(
+            """
+            (parent_tenant_id IS NULL AND integration_type IS NULL)
+            OR (parent_tenant_id IS NOT NULL AND integration_type IS NOT NULL)
+            """,
+            name="ck_integration_type_requires_parent"
+        ),
+    )
 
     # ========================
     # Clé primaire
@@ -102,6 +127,26 @@ class Tenant(Base, TimestampMixin):
         default=TenantStatus.ACTIVE,
         nullable=False,
         comment="Statut du tenant"
+    )
+
+    # ========================
+    # Fédération (rattachement à un groupement)
+    # ========================
+    parent_tenant_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ID du groupement fédérateur (GCSMS/GTSMS) de rattachement"
+    )
+    integration_type: Mapped[Optional[IntegrationType]] = mapped_column(
+        Enum(IntegrationType, name="integration_type_enum", create_constraint=False),
+        nullable=True,
+        comment="Type de rattachement au groupement (MANAGED, FEDERATED, CONVENTION)"
+    )
+    federation_date: Mapped[Optional[date]] = mapped_column(
+        Date,
+        nullable=True,
+        comment="Date de rattachement au groupement"
     )
 
     # ========================
@@ -236,6 +281,22 @@ class Tenant(Base, TimestampMixin):
         doc="Rôles personnalisés créés par ce tenant"
     )
 
+    # --- Fédération : auto-référence parent/membres ---
+    parent_tenant: Mapped[Optional["Tenant"]] = relationship(
+        "Tenant",
+        remote_side="Tenant.id",
+        back_populates="member_tenants",
+        foreign_keys=[parent_tenant_id],
+        doc="Groupement fédérateur (GCSMS/GTSMS) dont ce tenant est membre"
+    )
+
+    member_tenants: Mapped[List["Tenant"]] = relationship(
+        "Tenant",
+        back_populates="parent_tenant",
+        foreign_keys=[parent_tenant_id],
+        doc="Tenants membres de ce groupement (si GCSMS/GTSMS)"
+    )
+
     # ========================
     # Méthodes
     # ========================
@@ -251,3 +312,23 @@ class Tenant(Base, TimestampMixin):
     def is_suspended(self) -> bool:
         """Vérifie si le tenant est suspendu."""
         return self.status == TenantStatus.SUSPENDED
+
+    @property
+    def is_federation_parent(self) -> bool:
+        """Vérifie si ce tenant est un groupement fédérateur (GCSMS/GTSMS)."""
+        return self.tenant_type in (TenantType.GCSMS, TenantType.GTSMS)
+
+    @property
+    def is_federation_member(self) -> bool:
+        """Vérifie si ce tenant est rattaché à un groupement."""
+        return self.parent_tenant_id is not None
+
+    @property
+    def is_independent(self) -> bool:
+        """Vérifie si ce tenant est indépendant (ni fédérateur, ni membre)."""
+        return not self.is_federation_parent and not self.is_federation_member
+
+    @property
+    def members_count(self) -> int:
+        """Nombre de tenants membres (si groupement fédérateur)."""
+        return len(self.member_tenants)

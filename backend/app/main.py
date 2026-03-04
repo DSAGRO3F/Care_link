@@ -28,7 +28,7 @@ app.add_middleware(
 app.add_middleware(TenantContextMiddleware)
 
 # Inclure les routes API v1
-app.include_router(api_router)  # ← Ajouter cette ligne
+app.include_router(api_router)
 
 
 @app.get("/")

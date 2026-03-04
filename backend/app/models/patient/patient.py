@@ -6,15 +6,20 @@ des patients suivis dans CareLink.
 
 IMPORTANT - SÉCURITÉ :
 - Les données personnelles sont chiffrées AES-256-GCM
+- Les blind indexes permettent la recherche sans déchiffrement
 - Conforme RGPD et HDS (Hébergement Données de Santé)
 - La clé de chiffrement est dans .env (ENCRYPTION_KEY)
+
+Architecture de chiffrement:
+- Colonnes *_encrypted : données chiffrées (AES-256-GCM)
+- Colonnes *_blind : empreintes HMAC-SHA256 pour recherche
 """
 
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, List
 
-from sqlalchemy import String, ForeignKey, Numeric, DateTime
+from sqlalchemy import String, ForeignKey, Numeric, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -39,14 +44,32 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
     Représente un patient/usager suivi dans CareLink.
 
     ATTENTION : Les données personnelles sont stockées CHIFFRÉES.
-    Utiliser les propriétés `first_name`, `last_name`, etc. pour
-    accéder aux valeurs déchiffrées.
+    Utiliser PatientEncryptor pour chiffrer/déchiffrer les données.
+
+    Champs chiffrés (AES-256-GCM):
+    - nir_encrypted, ins_encrypted : Identifiants nationaux
+    - first_name_encrypted, last_name_encrypted : Identification
+    - birth_date_encrypted : Date de naissance
+    - address_encrypted, phone_encrypted, email_encrypted : Coordonnées
+
+    Blind indexes (HMAC-SHA256, pour recherche):
+    - nir_blind, ins_blind : Recherche par identifiants
+    - first_name_blind, last_name_blind : Recherche par nom
     """
 
     __tablename__ = "patients"
-    __table_args__ = {
-        "comment": "Table des patients (données chiffrées AES-256-GCM)"
-    }
+    __table_args__ = (
+        # Index sur les blind indexes pour recherche performante
+        Index('ix_patients_nir_blind', 'nir_blind'),
+        Index('ix_patients_ins_blind', 'ins_blind'),
+        Index('ix_patients_last_name_blind', 'last_name_blind'),
+        Index('ix_patients_first_name_blind', 'first_name_blind'),
+        # Index composé pour recherche nom + prénom
+        Index('ix_patients_name_blind', 'last_name_blind', 'first_name_blind'),
+        {
+            "comment": "Table des patients (données chiffrées AES-256-GCM, blind indexes HMAC-SHA256)"
+        }
+    )
 
     # === Colonnes ===
 
@@ -56,7 +79,9 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={"description": "Clé primaire auto-incrémentée"}
     )
 
-    # --- Données chiffrées (AES-256-GCM) ---
+    # =========================================================================
+    # DONNÉES CHIFFRÉES (AES-256-GCM)
+    # =========================================================================
 
     nir_encrypted: Mapped[str | None] = mapped_column(
         String(500),
@@ -114,7 +139,59 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={"description": "Email chiffré AES-256-GCM", "encrypted": True, "pii": True}
     )
 
-    # --- Statut ---
+    # =========================================================================
+    # BLIND INDEXES (HMAC-SHA256 pour recherche)
+    # =========================================================================
+    # Ces colonnes permettent de rechercher des patients sans déchiffrer
+    # les données. L'empreinte est calculée avec une clé dérivée distincte.
+
+    nir_blind: Mapped[str | None] = mapped_column(
+        String(64),  # SHA256 = 64 caractères hex
+        nullable=True,
+        doc="Blind index du NIR pour recherche",
+        info={
+            "description": "HMAC-SHA256 du NIR normalisé",
+            "blind_index": True,
+            "searchable": True
+        }
+    )
+
+    ins_blind: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        doc="Blind index de l'INS pour recherche",
+        info={
+            "description": "HMAC-SHA256 de l'INS normalisé",
+            "blind_index": True,
+            "searchable": True
+        }
+    )
+
+    first_name_blind: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        doc="Blind index du prénom pour recherche",
+        info={
+            "description": "HMAC-SHA256 du prénom normalisé (minuscules, sans accents)",
+            "blind_index": True,
+            "searchable": True
+        }
+    )
+
+    last_name_blind: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        doc="Blind index du nom pour recherche",
+        info={
+            "description": "HMAC-SHA256 du nom normalisé (minuscules, sans accents)",
+            "blind_index": True,
+            "searchable": True
+        }
+    )
+
+    # =========================================================================
+    # STATUT ET MÉTADONNÉES
+    # =========================================================================
 
     status: Mapped[str] = mapped_column(
         String(20),

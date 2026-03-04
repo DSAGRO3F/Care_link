@@ -33,8 +33,9 @@ class EntityType(str, Enum):
     IME = "IME"                          # Institut Médico-Éducatif
     ESAT = "ESAT"                        # Établissement et Service d'Aide par le Travail
 
-    # Structures de coordination
+    # Structures de coordination et groupements
     GCSMS = "GCSMS"                      # Groupement de Coopération Sociale et Médico-Sociale
+    GTSMS = "GTSMS"                      # Groupement Territorial Social et Médico-Social (loi Bien Vieillir 2024)
     DAC = "DAC"                          # Dispositif d'Appui à la Coordination
     CPTS = "CPTS"                        # Communauté Professionnelle Territoriale de Santé
     PCPE = "PCPE"                        # Pôle de Compétences et de Prestations Externalisées
@@ -50,6 +51,12 @@ class EntityType(str, Enum):
     HALTE_REPIT = "HALTE_REPIT"          # Halte répit
     FORMATION = "FORMATION"              # Organisme de formation
     OTHER = "OTHER"                      # Autre
+
+    # Structures rattachées à un SSIAD, SSAD, ... portent le même SIRET que leur entité de rattachement
+    ANTENNE = "ANTENNE"
+    BUREAU = "BUREAU"
+    AGENCE = "AGENCE"
+
 
 
 class IntegrationType(str, Enum):
@@ -89,17 +96,19 @@ class ProfessionCategory(str, Enum):
 
 
 class RoleName(str, Enum):
-    """Noms des rôles système."""
-    ADMIN = "ADMIN"                      # Administrateur système
-    COORDINATEUR = "COORDINATEUR"        # Coordinateur de soins
-    MEDECIN_TRAITANT = "MEDECIN_TRAITANT"  # Médecin traitant référent
-    MEDECIN_SPECIALISTE = "MEDECIN_SPECIALISTE"  # Médecin spécialiste
-    INFIRMIERE = "INFIRMIERE"            # Infirmier(ère)
-    AIDE_SOIGNANTE = "AIDE_SOIGNANTE"    # Aide-soignant(e)
-    KINESITHERAPEUTE = "KINESITHERAPEUTE"  # Kinésithérapeute
-    AUXILIAIRE_VIE = "AUXILIAIRE_VIE"    # Auxiliaire de vie
-    ASSISTANT_SOCIAL = "ASSISTANT_SOCIAL"  # Assistant(e) social(e)
-    INTERVENANT = "INTERVENANT"          # Intervenant générique
+    """
+    Noms des rôles fonctionnels système (S3).
+
+    Les rôles expriment une responsabilité dans CareLink, pas une profession.
+    La profession (diplôme d'État) est portée par la table `professions`.
+
+    Exemple : Marie est IDE (profession) + COORDINATEUR (rôle).
+    """
+    ADMIN = "ADMIN"                      # Administrateur du tenant
+    COORDINATEUR = "COORDINATEUR"        # Coordinateur de parcours de soins
+    REFERENT = "REFERENT"                # Référent patient désigné
+    EVALUATEUR = "EVALUATEUR"            # Habilité aux évaluations AGGIR
+    INTERVENANT = "INTERVENANT"          # Intervenant ponctuel (lecture seule)
 
 
 class ContractType(str, Enum):
@@ -116,7 +125,7 @@ class ContractType(str, Enum):
 class PermissionCategory(str, Enum):
     """
     Catégories de permissions pour le regroupement dans l'UI.
-    
+
     Utilisé pour organiser les permissions par domaine fonctionnel.
     """
     ADMIN = "ADMIN"                      # Permissions administrateur
@@ -191,70 +200,74 @@ class VitalSource(str, Enum):
 
 
 class DeviceType(str, Enum):
-    """Types de devices connectés."""
-    WITHINGS_SCALE = "WITHINGS_SCALE"    # Balance Withings
-    WITHINGS_BPM = "WITHINGS_BPM"        # Tensiomètre Withings
-    APPLE_WATCH = "APPLE_WATCH"          # Apple Watch
-    FREESTYLE_LIBRE = "FREESTYLE_LIBRE"  # Capteur FreeStyle Libre
-    GENERIC = "GENERIC"                  # Device générique
+    """Types d'appareils connectés."""
+    SCALE = "SCALE"                      # Balance connectée
+    BLOOD_PRESSURE = "BLOOD_PRESSURE"    # Tensiomètre connecté
+    PULSE_OXIMETER = "PULSE_OXIMETER"    # Oxymètre de pouls
+    THERMOMETER = "THERMOMETER"          # Thermomètre connecté
+    GLUCOMETER = "GLUCOMETER"            # Glucomètre connecté
+    WATCH = "WATCH"                      # Montre connectée
+    OTHER = "OTHER"                      # Autre appareil
 
 
 class EvaluationSchemaType(str, Enum):
-    """Types de schémas d'évaluation JSON."""
-    EVALUATION_COMPLETE = "EVALUATION_COMPLETE"  # Évaluation complète
-    AGGIR_ONLY = "AGGIR_ONLY"            # Évaluation AGGIR seule
-    SOCIAL_ONLY = "SOCIAL_ONLY"          # Évaluation sociale seule
-    MEDICAL_ONLY = "MEDICAL_ONLY"        # Évaluation médicale seule
+    """Types de schémas d'évaluation."""
+    AGGIR = "AGGIR"                      # Grille AGGIR
+    PATHOS = "PATHOS"                    # Modèle PATHOS
+    CUSTOM = "CUSTOM"                    # Grille personnalisée
 
 
 class DocumentType(str, Enum):
-    """Types de documents générés."""
-    PPA = "PPA"                          # Plan Personnalisé d'Accompagnement
-    PPCS = "PPCS"                        # Plan Personnalisé de Coordination en Santé
-    RECOMMENDATION = "RECOMMENDATION"    # Recommandation générée par IA
-    OTHER = "OTHER"                      # Autre document
+    """Types de documents du dossier patient."""
+    PRESCRIPTION = "PRESCRIPTION"        # Ordonnance
+    CARE_PROTOCOL = "CARE_PROTOCOL"      # Protocole de soins
+    LAB_RESULT = "LAB_RESULT"            # Résultat de laboratoire
+    IMAGING = "IMAGING"                  # Imagerie médicale
+    CORRESPONDENCE = "CORRESPONDENCE"    # Courrier médical
+    CONSENT = "CONSENT"                  # Formulaire de consentement
+    ID_DOCUMENT = "ID_DOCUMENT"          # Pièce d'identité
+    INSURANCE = "INSURANCE"              # Document d'assurance
+    OTHER = "OTHER"                      # Autre
 
 
 class DocumentFormat(str, Enum):
-    """Formats de fichiers de documents."""
-    PDF = "pdf"
-    DOCX = "docx"
+    """Formats de fichiers autorisés."""
+    PDF = "PDF"
+    JPEG = "JPEG"
+    PNG = "PNG"
+    DICOM = "DICOM"
+    HL7 = "HL7"
 
 
 # =============================================================================
-# MODULE: EVALUATION - Évaluations patient (NOUVEAU)
+# MODULE: EVALUATION - Évaluations patient
 # =============================================================================
 
 class EvaluationStatus(str, Enum):
-    """Statuts d'une évaluation patient."""
-    DRAFT = "DRAFT"                          # En cours de saisie
-    PENDING_COMPLETION = "PENDING_COMPLETION" # Saisie incomplète, en attente
-    COMPLETE = "COMPLETE"                    # Saisie terminée, non soumise
-    PENDING_MEDICAL = "PENDING_MEDICAL"      # En attente validation médecin coord.
-    PENDING_DEPARTMENT = "PENDING_DEPARTMENT" # En attente validation CD
-    VALIDATED = "VALIDATED"                  # Validée (GIR officiel)
-    EXPIRED = "EXPIRED"                      # Expirée (délai J+7 dépassé)
-    CANCELLED = "CANCELLED"                  # Annulée manuellement
+    """Statuts d'une évaluation."""
+    IN_PROGRESS = "IN_PROGRESS"          # En cours de saisie
+    COMPLETED = "COMPLETED"              # Terminée
+    VALIDATED = "VALIDATED"              # Validée par un responsable
+    CANCELLED = "CANCELLED"              # Annulée
 
 
 class EvaluationSessionStatus(str, Enum):
-    """Statuts d'une session de saisie."""
-    IN_PROGRESS = "IN_PROGRESS"              # Session en cours
-    COMPLETED = "COMPLETED"                  # Session terminée
-    INTERRUPTED = "INTERRUPTED"              # Session interrompue (perte connexion)
+    """Statuts d'une session d'évaluation."""
+    DRAFT = "DRAFT"                      # Brouillon
+    IN_PROGRESS = "IN_PROGRESS"          # En cours
+    COMPLETED = "COMPLETED"              # Terminée
+    VALIDATED = "VALIDATED"              # Validée
 
 
 class SyncStatus(str, Enum):
-    """Statuts de synchronisation pour le mode hors-ligne."""
-    SYNCED = "SYNCED"                        # Synchronisé avec le serveur
-    PENDING = "PENDING"                      # En attente de synchronisation
-    CONFLICT = "CONFLICT"                    # Conflit détecté
-    ERROR = "ERROR"                          # Erreur de synchronisation
+    """Statuts de synchronisation."""
+    PENDING = "PENDING"                  # En attente
+    SYNCED = "SYNCED"                    # Synchronisé
+    ERROR = "ERROR"                      # Erreur de synchronisation
 
 
 class AggirVariableCode(str, Enum):
-    """Codes des variables AGGIR (17 variables officielles)."""
-    # Variables discriminantes
+    """Codes des variables discriminantes AGGIR."""
     COHERENCE = "COHERENCE"
     ORIENTATION = "ORIENTATION"
     TOILETTE = "TOILETTE"
@@ -263,26 +276,12 @@ class AggirVariableCode(str, Enum):
     ELIMINATION = "ELIMINATION"
     TRANSFERTS = "TRANSFERTS"
     DEPLACEMENT_INTERIEUR = "DEPLACEMENT_INTERIEUR"
-    # Variables illustratives
     DEPLACEMENT_EXTERIEUR = "DEPLACEMENT_EXTERIEUR"
-    ALERTER = "ALERTER"
-    CUISINE = "CUISINE"
-    MENAGE = "MENAGE"
-    TRANSPORTS = "TRANSPORTS"
-    ACHATS = "ACHATS"
-    SUIVI_TRAITEMENT = "SUIVI_TRAITEMENT"
-    ACTIVITES_TEMPS_LIBRE = "ACTIVITES_TEMPS_LIBRE"
-    GESTION = "GESTION"
+    COMMUNICATION = "COMMUNICATION"
 
 
 class AggirSubVariableCode(str, Enum):
     """Codes des sous-variables AGGIR."""
-    # Cohérence
-    COMMUNICATION = "COMMUNICATION"
-    COMPORTEMENT = "COMPORTEMENT"
-    # Orientation
-    TEMPS = "TEMPS"
-    ESPACE = "ESPACE"
     # Toilette
     TOILETTE_HAUT = "TOILETTE_HAUT"
     TOILETTE_BAS = "TOILETTE_BAS"
@@ -291,60 +290,52 @@ class AggirSubVariableCode(str, Enum):
     HABILLAGE_MOYEN = "HABILLAGE_MOYEN"
     HABILLAGE_BAS = "HABILLAGE_BAS"
     # Alimentation
-    SE_SERVIR = "SE_SERVIR"
-    MANGER = "MANGER"
+    ALIMENTATION_SE_SERVIR = "ALIMENTATION_SE_SERVIR"
+    ALIMENTATION_MANGER = "ALIMENTATION_MANGER"
     # Élimination
-    URINAIRE = "URINAIRE"
-    FECALE = "FECALE"
+    ELIMINATION_URINAIRE = "ELIMINATION_URINAIRE"
+    ELIMINATION_FECALE = "ELIMINATION_FECALE"
 
 
 class AggirResultLetter(str, Enum):
-    """Résultats possibles pour une variable AGGIR."""
-    A = "A"  # Fait seul, totalement, correctement, habituellement
-    B = "B"  # Fait partiellement, ou incorrectement, ou non habituellement
+    """Lettres de résultat AGGIR (A, B, C)."""
+    A = "A"  # Fait seul, spontanément, totalement, habituellement, correctement
+    B = "B"  # Fait partiellement, ou non habituellement, ou non correctement
     C = "C"  # Ne fait pas
 
 
 # =============================================================================
-# MODULE: COORDINATION - Carnet de coordination
+# MODULE: COORDINATION
 # =============================================================================
 
 class CoordinationCategory(str, Enum):
-    """Catégories d'interventions dans le carnet de coordination."""
-    SOINS = "SOINS"                      # Soins médicaux et paramédicaux
-    HYGIENE = "HYGIENE"                  # Toilette, habillage
-    ALIMENTATION = "ALIMENTATION"        # Repas, hydratation
-    MOBILITE = "MOBILITE"                # Lever, coucher, déplacements
-    MEDICAL = "MEDICAL"                  # Consultations, examens
-    SOCIAL = "SOCIAL"                    # Accompagnement social
-    ADMINISTRATIF = "ADMINISTRATIF"      # Démarches administratives
-    OBSERVATION = "OBSERVATION"          # Observation générale
+    """Catégories d'entrées de coordination."""
+    OBSERVATION = "OBSERVATION"          # Observation clinique
+    TRANSMISSION = "TRANSMISSION"        # Transmission ciblée
+    INCIDENT = "INCIDENT"                # Incident ou événement indésirable
+    EVOLUTION = "EVOLUTION"              # Évolution de l'état du patient
 
 
 # =============================================================================
-# MODULE: CATALOG - Services
+# MODULE: CATALOG - Services de soins
 # =============================================================================
 
 class ServiceCategory(str, Enum):
-    """Catégories de services du catalogue."""
-    SOINS = "SOINS"                      # Soins médicaux et paramédicaux
-    HYGIENE = "HYGIENE"                  # Toilette, habillage
-    REPAS = "REPAS"                      # Préparation et aide aux repas
-    MOBILITE = "MOBILITE"                # Lever, coucher, déplacements
-    COURSES = "COURSES"                  # Aide aux courses
-    MENAGE = "MENAGE"                    # Entretien du logement
-    ADMINISTRATIF = "ADMINISTRATIF"      # Démarches administratives
-    SOCIAL = "SOCIAL"                    # Accompagnement, convivialité
-    AUTRE = "AUTRE"                      # Autres services
+    """Catégories de services."""
+    NURSING = "NURSING"                  # Soins infirmiers
+    PERSONAL_CARE = "PERSONAL_CARE"      # Aide à la personne (toilette, habillage)
+    DOMESTIC = "DOMESTIC"                # Aide domestique (ménage, courses)
+    REHABILITATION = "REHABILITATION"    # Rééducation (kiné, ergo)
+    SOCIAL = "SOCIAL"                    # Accompagnement social
+    MEDICAL = "MEDICAL"                  # Actes médicaux
+    COORDINATION = "COORDINATION"        # Coordination de parcours
 
 
 class ServiceType(str, Enum):
-    """Types de services (acte médical vs aide à la personne)."""
-    MEDICAL_ACT = "MEDICAL_ACT"          # Acte médical (nécessite prescription)
-    PARAMEDICAL_ACT = "PARAMEDICAL_ACT"  # Acte paramédical
-    PERSONAL_ASSISTANCE = "PERSONAL_ASSISTANCE"  # Aide à la personne
-    DOMESTIC_HELP = "DOMESTIC_HELP"      # Aide ménagère
-    SOCIAL_SUPPORT = "SOCIAL_SUPPORT"    # Accompagnement social
+    """Types de services."""
+    INDIVIDUAL = "INDIVIDUAL"            # Service individuel
+    COLLECTIVE = "COLLECTIVE"            # Service collectif
+    TELECARE = "TELECARE"                # Télésoin
 
 
 class ServiceUnit(str, Enum):
@@ -412,7 +403,7 @@ class InterventionStatus(str, Enum):
 
 
 # =============================================================================
-# MODULE: TENANT - Multi-tenant (NOUVEAU v4.1)
+# MODULE: TENANT - Multi-tenant (v4.1, mis à jour v4.4)
 # =============================================================================
 
 class TenantType(str, Enum):
@@ -421,20 +412,22 @@ class TenantType(str, Enum):
     Reprend les principaux types d'EntityType qui peuvent être
     des clients directs de la plateforme CareLink.
     """
-    # Groupements (clients principaux)
+    # Groupements fédérateurs (clients principaux)
     GCSMS = "GCSMS"                      # Groupement de Coopération Sociale et Médico-Sociale
+    GTSMS = "GTSMS"                      # Groupement Territorial Social et Médico-Social (loi Bien Vieillir 2024)
 
-    # Services à domicile (clients indépendants)
+    # Services à domicile (clients indépendants ou membres d'un groupement)
     SSIAD = "SSIAD"                      # Service de Soins Infirmiers À Domicile
     SAAD = "SAAD"                        # Service d'Aide et d'Accompagnement à Domicile
     SPASAD = "SPASAD"                    # Service Polyvalent d'Aide et de Soins À Domicile
 
-    # Établissements (clients indépendants)
+    # Établissements (clients indépendants ou membres d'un groupement)
     EHPAD = "EHPAD"                      # Établissement d'Hébergement pour Personnes Âgées Dépendantes
 
     # Structures de coordination
     DAC = "DAC"                          # Dispositif d'Appui à la Coordination
     CPTS = "CPTS"                        # Communauté Professionnelle Territoriale de Santé
+
 
     # Autres
     OTHER = "OTHER"                      # Autre type de structure
@@ -448,7 +441,7 @@ class TenantStatus(str, Enum):
 
 
 # =============================================================================
-# MODULE: SUBSCRIPTION - Abonnements (existant, complété)
+# MODULE: SUBSCRIPTION - Abonnements
 # =============================================================================
 
 class SubscriptionPlan(str, Enum):
@@ -490,7 +483,7 @@ __all__ = [
     "ProfessionCategory",
     "RoleName",
     "ContractType",
-    "PermissionCategory",  # NOUVEAU v4.3
+    "PermissionCategory",
 
     # Patient
     "PatientStatus",
@@ -512,7 +505,7 @@ __all__ = [
     "AggirSubVariableCode",
     "AggirResultLetter",
 
-    # Coordination (existant)
+    # Coordination
     "CoordinationCategory",
 
     # Catalog
@@ -529,7 +522,7 @@ __all__ = [
     # Interventions
     "InterventionStatus",
 
-    # Tenant (NOUVEAU v4.1)
+    # Tenant (v4.1, mis à jour v4.4)
     "TenantType",
     "TenantStatus",
 

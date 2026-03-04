@@ -63,6 +63,7 @@ async def get_current_super_admin(
         )
 
     # Vérifier que c'est un token SuperAdmin
+    # Défense en profondeur délibérée (car vérification déja faite ligne 57)
     token_type = payload.get("type")
     if token_type != "super_admin":
         raise HTTPException(
@@ -200,7 +201,7 @@ async def get_optional_super_admin(
         return None
 
     try:
-        payload = verify_token(credentials.credentials)
+        payload = verify_token(credentials.credentials, token_type="super_admin")
     except Exception:
         return None
 

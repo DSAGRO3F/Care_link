@@ -98,7 +98,8 @@ packages = ["app"]
 
 # === Pytest ===
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+pythonpath = ["backend"]  # Permet à pytest de résoudre "from app.xxx" depuis la racine
+testpaths = ["backend/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -172,10 +173,10 @@ disallow_untyped_defs = false
 
 # === Coverage ===
 [tool.coverage.run]
-source = ["app"]
+source = ["backend/app"]
 branch = true
 omit = [
-    "app/dash_app/*",  # À supprimer après nettoyage
+    "app/dash_app/*",
     "alembic/*",
 ]
 

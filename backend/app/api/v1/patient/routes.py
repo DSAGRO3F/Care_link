@@ -55,6 +55,7 @@ from app.api.v1.patient.services import (
     EvaluationNotFoundError, ThresholdNotFoundError, VitalsNotFoundError,
     DeviceNotFoundError, DocumentNotFoundError, AccessNotFoundError,
     DuplicateThresholdError, DuplicateDeviceError, EvaluationAlreadyValidatedError, InvalidEvaluationDataError,
+    DuplicateNIRError, SessionNotFoundError, SessionAlreadyActiveError,
 )
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
 from app.core.auth.user_auth import get_current_user, require_role
@@ -111,17 +112,19 @@ def list_patients(
 def get_patient(
     patient_id: int,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    tenant_id: int = Depends(get_current_tenant_id),
     current_user: User = Depends(get_current_user),
 ):
     """
     Récupère un patient par son ID.
 
     **MULTI-TENANT**: Vérifie que le patient appartient au tenant de l'utilisateur.
+    **CHIFFREMENT**: Les données personnelles sont déchiffrées.
     """
     try:
         service = PatientService(db, tenant_id)
-        return service.get_by_id(patient_id)
+        # MODIFIÉ: Utiliser get_by_id_decrypted() au lieu de get_by_id()
+        return service.get_by_id_decrypted(patient_id)
     except PatientNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -130,41 +133,62 @@ def get_patient(
 def create_patient(
     data: PatientCreate,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    tenant_id: int = Depends(get_current_tenant_id),
     current_user: User = Depends(get_current_user),
 ):
     """
     Crée un nouveau patient.
 
     **MULTI-TENANT**: Le tenant_id est automatiquement injecté.
+    **CHIFFREMENT**: Les données personnelles sont chiffrées avant stockage.
     """
     try:
         service = PatientService(db, tenant_id)
-        return service.create(data, created_by=current_user.id)
+        patient = service.create(data, created_by=current_user.id)
+        # Déchiffrer pour la réponse API
+        return service.get_by_id_decrypted(patient.id)
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except UserNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    # Gérer le doublon de NIR
+    except DuplicateNIRError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
 
 
 @patients_router.patch("/{patient_id}", response_model=PatientResponse)
 def update_patient(
-    patient_id: int,
-    data: PatientUpdate,
-    db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-    current_user: User = Depends(get_current_user),
+        patient_id: int,
+        data: PatientUpdate,
+        db: Session = Depends(get_db),
+        tenant_id: int = Depends(get_current_tenant_id),
+        current_user: User = Depends(get_current_user),
 ):
-    """Met à jour un patient."""
+    """
+    Met à jour un patient.
+
+    **CHIFFREMENT**: Seuls les champs modifiés sont re-chiffrés.
+    """
     try:
         service = PatientService(db, tenant_id)
-        return service.update(patient_id, data)
+        patient = service.update(patient_id, data, updated_by=current_user.id)
+        # MODIFIÉ: Déchiffrer pour la réponse API
+        return service.get_by_id_decrypted(patient.id)
     except PatientNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except UserNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    # NOUVEAU: Gérer le doublon de NIR
+    except DuplicateNIRError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
 
 
 @patients_router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -180,6 +204,69 @@ def delete_patient(
         service.delete(patient_id)
     except PatientNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+# =============================================================================
+# ENDPOINT OPTIONNEL : Recherche par NIR
+# =============================================================================
+# AJOUTER cet endpoint après delete_patient si vous voulez une recherche dédiée :
+
+@patients_router.get("/search/by-nir/{nir}", response_model=PatientResponse)
+def search_patient_by_nir(
+        nir: str,
+        db: Session = Depends(get_db),
+        tenant_id: int = Depends(get_current_tenant_id),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    Recherche un patient par son NIR (N° Sécurité Sociale).
+
+    **Recherche instantanée** via blind index (pas de déchiffrement nécessaire).
+    """
+    service = PatientService(db, tenant_id)
+    patient = service.search_by_nir(nir)
+
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Aucun patient trouvé avec ce NIR"
+        )
+
+    return service.get_by_id_decrypted(patient.id)
+
+
+@patients_router.get("/search/by-name", response_model=PatientList)
+def search_patients_by_name(
+        last_name: Optional[str] = Query(None, description="Nom de famille"),
+        first_name: Optional[str] = Query(None, description="Prénom"),
+        db: Session = Depends(get_db),
+        tenant_id: int = Depends(get_current_tenant_id),
+        current_user: User = Depends(get_current_user),
+):
+    """
+    Recherche des patients par nom et/ou prénom.
+
+    **Recherche exacte** (après normalisation: minuscules, sans accents).
+    """
+    if not last_name and not first_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Au moins un critère de recherche requis (last_name ou first_name)"
+        )
+
+    service = PatientService(db, tenant_id)
+    patients = service.search_by_name(last_name=last_name, first_name=first_name)
+
+    # Déchiffrer les résultats
+    items = [service._decrypt_patient_summary(p) for p in patients]
+
+    return PatientList(
+        items=items,
+        total=len(items),
+        page=1,
+        size=len(items),
+        pages=1
+    )
 
 
 # =============================================================================
@@ -428,6 +515,8 @@ def start_evaluation_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except EvaluationNotEditableError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except SessionAlreadyActiveError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
 
 @patients_router.post("/{patient_id}/evaluations/{evaluation_id}/sessions/{session_id}/end", response_model=EvaluationSessionResponse)
@@ -447,7 +536,7 @@ def end_evaluation_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except EvaluationNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except EntityNotFoundError as e:
+    except SessionNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 

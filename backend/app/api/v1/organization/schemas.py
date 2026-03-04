@@ -94,7 +94,8 @@ class EntityBase(BaseModel):
         None,
         description="Type de rattachement (MANAGED, FEDERATED, CONVENTION)"
     )
-    parent_entity_id: Optional[int] = Field(None, description="ID de l'entité parente")
+    parent_entity_id: Optional[int] = Field(None, validation_alias="parent_id", description="ID de l'entité parente")
+    model_config = ConfigDict(populate_by_name=True)
 
     # Identifiants légaux
     siret: Optional[str] = Field(None, min_length=14, max_length=14, description="Numéro SIRET (14 chiffres)")
@@ -170,7 +171,8 @@ class EntityUpdate(BaseModel):
     short_name: Optional[str] = Field(None, max_length=50)
     entity_type: Optional[EntityType] = None
     integration_type: Optional[IntegrationType] = None
-    parent_entity_id: Optional[int] = None
+    parent_entity_id: Optional[int] = Field(None, validation_alias="parent_id")
+    model_config = ConfigDict(populate_by_name=True)
 
     siret: Optional[str] = Field(None, min_length=14, max_length=14)
     siren: Optional[str] = Field(None, min_length=9, max_length=9)
@@ -240,7 +242,7 @@ class EntityResponse(BaseModel):
     short_name: Optional[str] = None
     entity_type: EntityType
     integration_type: Optional[IntegrationType] = None
-    parent_entity_id: Optional[int] = None
+    parent_id: Optional[int] = Field(None, validation_alias="parent_entity_id")
 
     # Identifiants légaux
     siret: Optional[str] = None
@@ -277,7 +279,7 @@ class EntityResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     # Statistiques (propriétés calculées)
-    active_users_count: Optional[int] = None
+    users_count: Optional[int] = Field(None, validation_alias="active_users_count")
     patients_count: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)

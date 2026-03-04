@@ -25,7 +25,8 @@ from app.models.organization.entity import Entity
 from app.models.patient.patient import Patient
 from app.models.platform.platform_audit_log import PlatformAuditLog
 from app.models.platform.super_admin import SuperAdmin, SuperAdminRole
-from app.models.tenants.tenant import Tenant, TenantStatus, TenantType
+from app.models.tenants.tenant import Tenant
+from app.models.enums import TenantStatus, TenantType
 from app.models.user.user import User
 from app.models.user.user_tenant_assignment import UserTenantAssignment
 
