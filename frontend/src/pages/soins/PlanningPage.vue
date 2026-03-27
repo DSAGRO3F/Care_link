@@ -1,15 +1,15 @@
 <script setup lang="ts">
-/**
- * Page Planning
- * Vue calendrier des interventions (jour, semaine)
- */
-import { ref } from 'vue'
-import Card from 'primevue/card'
-import Button from 'primevue/button'
-import Calendar from 'primevue/calendar'
+  /**
+   * Page Planning
+   * Vue calendrier des interventions (jour, semaine)
+   */
+  import { ref } from 'vue';
+  import Card from 'primevue/card';
+  import Button from 'primevue/button';
+  import Calendar from 'primevue/calendar';
 
-const selectedDate = ref(new Date())
-const viewMode = ref<'day' | 'week'>('day')
+  const selectedDate = ref(new Date());
+  const viewMode = ref<'day' | 'week'>('day');
 </script>
 
 <template>
@@ -24,11 +24,7 @@ const viewMode = ref<'day' | 'week'>('day')
           outlined
           @click="viewMode = viewMode === 'day' ? 'week' : 'day'"
         />
-        <Calendar
-          v-model="selectedDate"
-          dateFormat="dd/mm/yy"
-          showIcon
-        />
+        <Calendar v-model="selectedDate" dateFormat="dd/mm/yy" showIcon />
       </div>
     </div>
 
@@ -41,11 +37,16 @@ const viewMode = ref<'day' | 'week'>('day')
             Vue {{ viewMode === 'day' ? 'journalière' : 'hebdomadaire' }}
           </h3>
           <p class="text-neutral-600 mt-2">
-            {{ selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}
+            {{
+              selectedDate.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })
+            }}
           </p>
-          <p class="text-sm text-neutral-400 mt-4">
-            (Composant calendrier à implémenter)
-          </p>
+          <p class="text-sm text-neutral-400 mt-4">(Composant calendrier à implémenter)</p>
         </div>
       </template>
     </Card>

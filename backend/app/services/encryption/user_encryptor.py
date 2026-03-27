@@ -34,7 +34,7 @@ Usage:
     blind = user_encryptor.get_blind_index("email@example.com", "email", tenant_id)
 """
 
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from app.services.encryption.base_encryptor import BaseEncryptor
 
@@ -60,7 +60,7 @@ class UserEncryptor(BaseEncryptor):
     """
 
     @property
-    def encrypted_fields(self) -> Dict[str, str]:
+    def encrypted_fields(self) -> dict[str, str]:
         """
         Définition des champs à chiffrer pour User.
 
@@ -72,7 +72,7 @@ class UserEncryptor(BaseEncryptor):
         }
 
     @property
-    def blind_index_fields(self) -> Set[str]:
+    def blind_index_fields(self) -> set[str]:
         """
         Champs nécessitant un blind index pour la recherche.
 
@@ -85,11 +85,7 @@ class UserEncryptor(BaseEncryptor):
     # MÉTHODES SÉMANTIQUES SPÉCIFIQUES USER
     # =========================================================================
 
-    def search_by_email(
-            self,
-            email: str,
-            tenant_id: int
-    ) -> str:
+    def search_by_email(self, email: str, tenant_id: int) -> str:
         """
         Génère le blind index pour recherche par email.
 
@@ -106,11 +102,7 @@ class UserEncryptor(BaseEncryptor):
         """
         return self.get_blind_index(email, "email", tenant_id)
 
-    def search_by_rpps(
-            self,
-            rpps: str,
-            tenant_id: Optional[int] = None
-    ) -> str:
+    def search_by_rpps(self, rpps: str, tenant_id: int | None = None) -> str:
         """
         Génère le blind index pour recherche par RPPS.
 
@@ -128,10 +120,8 @@ class UserEncryptor(BaseEncryptor):
         return self.get_blind_index(rpps, "rpps", tenant_id)
 
     def prepare_for_update(
-            self,
-            update_data: Dict[str, Any],
-            tenant_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+        self, update_data: dict[str, Any], tenant_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Prépare des données partielles pour une mise à jour.
 
@@ -164,7 +154,8 @@ user_encryptor = UserEncryptor()
 # FONCTIONS HELPER (pour imports simplifiés)
 # =============================================================================
 
-def encrypt_user_data(data: Dict[str, Any], tenant_id: int) -> Dict[str, Any]:
+
+def encrypt_user_data(data: dict[str, Any], tenant_id: int) -> dict[str, Any]:
     """
     Helper pour chiffrer des données utilisateur.
 
@@ -175,7 +166,7 @@ def encrypt_user_data(data: Dict[str, Any], tenant_id: int) -> Dict[str, Any]:
     return user_encryptor.encrypt_for_db(data, tenant_id)
 
 
-def decrypt_user_data(user: Any) -> Dict[str, Any]:
+def decrypt_user_data(user: Any) -> dict[str, Any]:
     """
     Helper pour déchiffrer un utilisateur.
 

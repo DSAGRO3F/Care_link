@@ -23,29 +23,29 @@
   --color-secondary: #10b981;
   --color-warning: #f97316;
   --color-danger: #ef4444;
-  
+
   /* Typographie */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  
+
   /* Espacements standards */
   --spacing-card: 1.5rem;
   --spacing-section: 2rem;
-  
+
   /* Rayons de bordure */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-  
+
   /* Ombres */
   --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  
+
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 200ms ease;
   --transition-slow: 300ms ease;
-  
+
   /* Z-index scale */
   --z-dropdown: 100;
   --z-modal: 200;
@@ -64,26 +64,37 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  
+
   body {
     @apply bg-neutral-50 text-neutral-900;
     min-height: 100vh;
   }
-  
+
   /* Headings */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold text-neutral-900;
   }
-  
-  h1 { @apply text-2xl lg:text-3xl; }
-  h2 { @apply text-xl lg:text-2xl; }
-  h3 { @apply text-lg lg:text-xl; }
-  
+
+  h1 {
+    @apply text-2xl lg:text-3xl;
+  }
+  h2 {
+    @apply text-xl lg:text-2xl;
+  }
+  h3 {
+    @apply text-lg lg:text-xl;
+  }
+
   /* Links */
   a {
     @apply text-primary-600 hover:text-primary-700 transition-colors;
   }
-  
+
   /* Focus visible pour l'accessibilité */
   :focus-visible {
     @apply outline-none ring-2 ring-primary-500 ring-offset-2;
@@ -99,104 +110,113 @@
   .card {
     @apply bg-white rounded-lg shadow-card p-4 lg:p-6;
   }
-  
+
   .card-hover {
     @apply card transition-shadow hover:shadow-card-hover;
   }
-  
+
   /* Boutons personnalisés */
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition-all;
     @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
     @apply disabled:opacity-50 disabled:cursor-not-allowed;
   }
-  
+
   .btn-primary {
     @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
   }
-  
+
   .btn-secondary {
     @apply btn bg-white text-neutral-700 border border-neutral-300;
     @apply hover:bg-neutral-50 focus:ring-primary-500;
   }
-  
+
   .btn-danger {
     @apply btn bg-danger-600 text-white hover:bg-danger-700 focus:ring-danger-500;
   }
-  
+
   .btn-icon {
     @apply btn p-2 rounded-full;
   }
-  
+
   /* Badge de statut */
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
-  
+
   .badge-success {
     @apply badge bg-secondary-100 text-secondary-800;
   }
-  
+
   .badge-warning {
     @apply badge bg-warning-100 text-warning-800;
   }
-  
+
   .badge-danger {
     @apply badge bg-danger-100 text-danger-800;
   }
-  
+
   .badge-info {
     @apply badge bg-primary-100 text-primary-800;
   }
-  
+
   .badge-neutral {
     @apply badge bg-neutral-100 text-neutral-800;
   }
-  
+
   /* GIR Badge spécifique */
   .gir-badge {
     @apply inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold;
   }
-  
-  .gir-1, .gir-2 { @apply bg-danger-100 text-danger-700; }
-  .gir-3, .gir-4 { @apply bg-warning-100 text-warning-700; }
-  .gir-5, .gir-6 { @apply bg-secondary-100 text-secondary-700; }
-  
+
+  .gir-1,
+  .gir-2 {
+    @apply bg-danger-100 text-danger-700;
+  }
+  .gir-3,
+  .gir-4 {
+    @apply bg-warning-100 text-warning-700;
+  }
+  .gir-5,
+  .gir-6 {
+    @apply bg-secondary-100 text-secondary-700;
+  }
+
   /* Input groups */
   .input-group {
     @apply space-y-1;
   }
-  
+
   .input-label {
     @apply block text-sm font-medium text-neutral-700;
   }
-  
+
   .input-error {
     @apply text-sm text-danger-600 mt-1;
   }
-  
+
   /* Page header */
   .page-header {
     @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6;
   }
-  
+
   .page-title {
     @apply text-2xl font-bold text-neutral-900;
   }
-  
+
   /* Empty state */
   .empty-state {
     @apply flex flex-col items-center justify-center py-12 text-center;
   }
-  
+
   .empty-state-icon {
     @apply w-16 h-16 text-neutral-300 mb-4;
   }
-  
+
   .empty-state-title {
     @apply text-lg font-medium text-neutral-900 mb-2;
   }
-  
+
   .empty-state-description {
     @apply text-neutral-500 max-w-sm;
   }
@@ -207,31 +227,36 @@
    ============================================================================= */
 
 @layer utilities {
+  /* Affichage noms propres en majuscules (convention médico-sociale) */
+  .text-display-uppercase {
+    text-transform: uppercase;
+  }
+
   /* Scrollbar personnalisée */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: theme('colors.neutral.300') transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: theme('colors.neutral.300');
     border-radius: 3px;
   }
-  
+
   /* Animation skeleton loading */
   .skeleton {
     @apply animate-pulse bg-neutral-200 rounded;
   }
-  
+
   /* Truncate multi-lignes */
   .line-clamp-2 {
     display: -webkit-box;
@@ -239,19 +264,19 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
+
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
+
   /* Safe area pour iOS */
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
-  
+
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -270,7 +295,7 @@
   @apply rounded-lg text-sm;
   border: 1px solid #e2e8f0;
   padding: 0.5rem 0.75rem;
-  line-height: 1.25rem;  /* 20px — verrou hauteur identique au Dropdown */
+  line-height: 1.25rem; /* 20px — verrou hauteur identique au Dropdown */
 }
 
 .p-inputtext:enabled:focus {
@@ -285,7 +310,7 @@
 
 /* Textarea — même style que InputText (PrimeVue applique aussi .p-inputtext) */
 textarea.p-inputtext {
-  line-height: 1.5;  /* Override le 1.25rem pour le multi-ligne */
+  line-height: 1.5; /* Override le 1.25rem pour le multi-ligne */
   resize: vertical;
 }
 
@@ -343,9 +368,15 @@ textarea.p-inputtext {
   border-left: 4px solid #ef4444 !important;
   color: #991b1b !important;
 }
-.p-toast .p-toast-message.p-toast-message-error .p-toast-summary { color: #b91c1c !important; }
-.p-toast .p-toast-message.p-toast-message-error .p-toast-detail { color: #7f1d1d !important; }
-.p-toast .p-toast-message.p-toast-message-error .p-toast-icon-close { color: #dc2626 !important; }
+.p-toast .p-toast-message.p-toast-message-error .p-toast-summary {
+  color: #b91c1c !important;
+}
+.p-toast .p-toast-message.p-toast-message-error .p-toast-detail {
+  color: #7f1d1d !important;
+}
+.p-toast .p-toast-message.p-toast-message-error .p-toast-icon-close {
+  color: #dc2626 !important;
+}
 
 /* Succès — fond vert opaque */
 .p-toast .p-toast-message.p-toast-message-success {
@@ -353,9 +384,15 @@ textarea.p-inputtext {
   border-left: 4px solid #22c55e !important;
   color: #166534 !important;
 }
-.p-toast .p-toast-message.p-toast-message-success .p-toast-summary { color: #15803d !important; }
-.p-toast .p-toast-message.p-toast-message-success .p-toast-detail { color: #14532d !important; }
-.p-toast .p-toast-message.p-toast-message-success .p-toast-icon-close { color: #16a34a !important; }
+.p-toast .p-toast-message.p-toast-message-success .p-toast-summary {
+  color: #15803d !important;
+}
+.p-toast .p-toast-message.p-toast-message-success .p-toast-detail {
+  color: #14532d !important;
+}
+.p-toast .p-toast-message.p-toast-message-success .p-toast-icon-close {
+  color: #16a34a !important;
+}
 
 /* Info — fond bleu opaque */
 .p-toast .p-toast-message.p-toast-message-info {
@@ -363,9 +400,15 @@ textarea.p-inputtext {
   border-left: 4px solid #3b82f6 !important;
   color: #1e40af !important;
 }
-.p-toast .p-toast-message.p-toast-message-info .p-toast-summary { color: #1d4ed8 !important; }
-.p-toast .p-toast-message.p-toast-message-info .p-toast-detail { color: #1e3a8a !important; }
-.p-toast .p-toast-message.p-toast-message-info .p-toast-icon-close { color: #2563eb !important; }
+.p-toast .p-toast-message.p-toast-message-info .p-toast-summary {
+  color: #1d4ed8 !important;
+}
+.p-toast .p-toast-message.p-toast-message-info .p-toast-detail {
+  color: #1e3a8a !important;
+}
+.p-toast .p-toast-message.p-toast-message-info .p-toast-icon-close {
+  color: #2563eb !important;
+}
 
 /* Warning — fond ambre opaque */
 .p-toast .p-toast-message.p-toast-message-warn {
@@ -373,9 +416,15 @@ textarea.p-inputtext {
   border-left: 4px solid #f59e0b !important;
   color: #92400e !important;
 }
-.p-toast .p-toast-message.p-toast-message-warn .p-toast-summary { color: #b45309 !important; }
-.p-toast .p-toast-message.p-toast-message-warn .p-toast-detail { color: #78350f !important; }
-.p-toast .p-toast-message.p-toast-message-warn .p-toast-icon-close { color: #d97706 !important; }
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-summary {
+  color: #b45309 !important;
+}
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-detail {
+  color: #78350f !important;
+}
+.p-toast .p-toast-message.p-toast-message-warn .p-toast-icon-close {
+  color: #d97706 !important;
+}
 
 /* Bouton fermer */
 .p-toast .p-toast-icon-close {
@@ -397,13 +446,17 @@ textarea.p-inputtext {
   transition: opacity 0.2s ease;
 }
 .modal-fade-enter-active > div:last-child {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease;
 }
 .modal-fade-leave-active {
   transition: opacity 0.15s ease;
 }
 .modal-fade-leave-active > div:last-child {
-  transition: transform 0.15s ease, opacity 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    opacity 0.15s ease;
 }
 .modal-fade-enter-from {
   opacity: 0;
@@ -457,7 +510,9 @@ textarea.p-inputtext {
   min-width: 200px;
   border-radius: 0.75rem;
   border: 1px solid #e4e4e7;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.04);
   padding: 0.375rem;
   overflow: hidden;
   background: white;
@@ -467,7 +522,9 @@ textarea.p-inputtext {
   padding: 0.625rem 0.875rem !important;
   border-radius: 0.5rem !important;
   gap: 0.625rem !important;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .carelink-context-menu .p-menuitem-link:hover {
@@ -507,7 +564,9 @@ textarea.p-inputtext {
   background: white !important;
   border: 1px solid #e4e4e7 !important;
   border-radius: 0.75rem !important;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06) !important;
   overflow: hidden;
 }
 
@@ -576,7 +635,9 @@ textarea.p-inputtext {
   background: white !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 0.875rem !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.08),
+    0 2px 12px rgba(0, 0, 0, 0.04) !important;
   overflow: hidden;
   padding: 6px !important;
 }
@@ -590,7 +651,9 @@ textarea.p-inputtext {
   font-size: 0.875rem !important;
   color: #374151 !important;
   border-radius: 0.5rem !important;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
   margin-bottom: 1px !important;
   border: none !important;
   position: relative !important;
@@ -644,7 +707,7 @@ textarea.p-inputtext {
   align-items: center;
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
-  padding: 0;  /* Reset PrimeVue default — seul le label gère le padding */
+  padding: 0; /* Reset PrimeVue default — seul le label gère le padding */
 }
 
 .p-select:not(.p-disabled):hover {
@@ -659,10 +722,10 @@ textarea.p-inputtext {
 .p-select .p-select-label {
   @apply text-sm text-slate-700;
   padding: 0.5rem 0.75rem;
-  line-height: 1.25rem;  /* Identique à .p-inputtext */
+  line-height: 1.25rem; /* Identique à .p-inputtext */
   flex: 1;
   min-width: 0;
-  border: none;        /* Neutralise le border hérité de .p-inputtext (piège v3/v4) */
+  border: none; /* Neutralise le border hérité de .p-inputtext (piège v3/v4) */
   border-radius: 0;
 }
 
@@ -691,14 +754,30 @@ textarea.p-inputtext {
  * Centralisé : audit V4A, correction Y5 (26/02/2026)
  * ────────────────────────────────────────────────────────────────────────── */
 
-.slide-panel-enter-active { transition: opacity 0.25s ease; }
-.slide-panel-enter-active > div:last-child { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.slide-panel-leave-active { transition: opacity 0.2s ease; }
-.slide-panel-leave-active > div:last-child { transition: transform 0.2s ease; }
-.slide-panel-enter-from { opacity: 0; }
-.slide-panel-enter-from > div:last-child { transform: translateX(100%); }
-.slide-panel-leave-to { opacity: 0; }
-.slide-panel-leave-to > div:last-child { transform: translateX(100%); }
+.slide-panel-enter-active {
+  transition: opacity 0.25s ease;
+}
+.slide-panel-enter-active > div:last-child {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.slide-panel-leave-active {
+  transition: opacity 0.2s ease;
+}
+.slide-panel-leave-active > div:last-child {
+  transition: transform 0.2s ease;
+}
+.slide-panel-enter-from {
+  opacity: 0;
+}
+.slide-panel-enter-from > div:last-child {
+  transform: translateX(100%);
+}
+.slide-panel-leave-to {
+  opacity: 0;
+}
+.slide-panel-leave-to > div:last-child {
+  transform: translateX(100%);
+}
 
 /* ── DataTable Admin ───────────────────────────────────────────────────────
  * Thème commun aux tables admin (UsersPage, PatientsPage).
@@ -744,8 +823,9 @@ textarea.p-inputtext {
 .action-menu {
   @apply fixed w-48 bg-white rounded-xl border border-slate-200 overflow-hidden;
   z-index: 100;
-  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.1),
-              0 2px 8px -2px rgba(15, 23, 42, 0.06);
+  box-shadow:
+    0 8px 24px -4px rgba(15, 23, 42, 0.1),
+    0 2px 8px -2px rgba(15, 23, 42, 0.06);
 }
 
 .action-menu__group {
@@ -871,7 +951,9 @@ textarea.p-inputtext {
   @apply bg-white flex-shrink-0 overflow-hidden;
   width: 310px;
   border-radius: 1.25rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .wizard-nav-header {
@@ -943,7 +1025,9 @@ textarea.p-inputtext {
 .wizard-section-item--active {
   border-color: #0d9488;
   background: #f0fdfa;
-  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.10), 0 1px 3px rgba(13, 148, 136, 0.06);
+  box-shadow:
+    0 4px 16px rgba(13, 148, 136, 0.1),
+    0 1px 3px rgba(13, 148, 136, 0.06);
 }
 
 .wizard-section-label {
@@ -985,16 +1069,56 @@ textarea.p-inputtext {
 }
 
 /* Variantes de couleur — chaque section a sa teinte */
-.wizard-icon--blue       { background: #eff6ff; border-color: #bfdbfe; color: #3b82f6; }
-.wizard-icon--violet     { background: #faf5ff; border-color: #ddd6fe; color: #8b5cf6; }
-.wizard-icon--teal       { background: #f0fdfa; border-color: #99f6e4; color: #0d9488; }
-.wizard-icon--amber      { background: #fffbeb; border-color: #fde68a; color: #d97706; }
-.wizard-icon--pink       { background: #fdf2f8; border-color: #fbcfe8; color: #db2777; }
-.wizard-icon--emerald    { background: #ecfdf5; border-color: #a7f3d0; color: #059669; }
-.wizard-icon--slate      { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
-.wizard-icon--orange     { background: #fff7ed; border-color: #fed7aa; color: #ea580c; }
-.wizard-icon--red        { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
-.wizard-icon--indigo     { background: #eef2ff; border-color: #c7d2fe; color: #4f46e5; }
+.wizard-icon--blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #3b82f6;
+}
+.wizard-icon--violet {
+  background: #faf5ff;
+  border-color: #ddd6fe;
+  color: #8b5cf6;
+}
+.wizard-icon--teal {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+  color: #0d9488;
+}
+.wizard-icon--amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #d97706;
+}
+.wizard-icon--pink {
+  background: #fdf2f8;
+  border-color: #fbcfe8;
+  color: #db2777;
+}
+.wizard-icon--emerald {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #059669;
+}
+.wizard-icon--slate {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+.wizard-icon--orange {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #ea580c;
+}
+.wizard-icon--red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+.wizard-icon--indigo {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4f46e5;
+}
 
 /* ── Indicateurs de statut ─────────────────────────────────────────────── */
 
@@ -1006,9 +1130,22 @@ textarea.p-inputtext {
   transition: all 0.2s ease;
 }
 
-.wizard-status--empty .wizard-status__icon    { color: #94a3b8; opacity: 0.6; }
-.wizard-status--partial .wizard-status__icon  { color: #d97706; opacity: 0.8; }
-.wizard-status--complete .wizard-status__icon { color: #059669; opacity: 1; }
+.wizard-status--empty .wizard-status__icon {
+  color: #94a3b8;
+  opacity: 0.6;
+}
+.wizard-status--partial .wizard-status__icon {
+  color: #d97706;
+  opacity: 0.8;
+}
+.wizard-status--complete .wizard-status__icon {
+  color: #059669;
+  opacity: 1;
+}
+.wizard-status--confirmed .wizard-status__icon {
+  color: #0d9488;
+  opacity: 1;
+}
 
 .wizard-status__fields {
   @apply text-slate-400;
@@ -1021,7 +1158,9 @@ textarea.p-inputtext {
 .wizard-content {
   @apply flex-1 bg-white overflow-hidden;
   border-radius: 1.25rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .wizard-content-header {
@@ -1128,12 +1267,16 @@ textarea.p-inputtext {
   background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
   border: none;
   font-size: 0.8125rem;
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.28), 0 1px 3px rgba(13, 148, 136, 0.12);
+  box-shadow:
+    0 4px 14px rgba(13, 148, 136, 0.28),
+    0 1px 3px rgba(13, 148, 136, 0.12);
   transition: all 0.2s ease;
 }
 
 .wizard-btn-submit:hover {
-  box-shadow: 0 6px 20px rgba(13, 148, 136, 0.35), 0 2px 4px rgba(13, 148, 136, 0.15);
+  box-shadow:
+    0 6px 20px rgba(13, 148, 136, 0.35),
+    0 2px 4px rgba(13, 148, 136, 0.15);
   transform: translateY(-1px);
 }
 
@@ -1161,7 +1304,9 @@ textarea.p-inputtext {
 /* ── Transition section (switch de contenu) ────────────────────────────── */
 
 .wizard-section-fade-enter-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .wizard-section-fade-leave-active {
@@ -1236,7 +1381,125 @@ textarea.p-inputtext {
 
 .form-fieldset {
   @apply border border-slate-200 rounded-xl p-5 pb-6 bg-white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+/* ── Fieldsets colorés (style C2 — bordure gauche + fond teinté) ────── */
+
+.form-fieldset--amber {
+  border-left: 4px solid theme('colors.amber.400');
+  background: #fffcf5;
+  border-color: theme('colors.amber.200');
+  border-left-color: theme('colors.amber.400');
+}
+
+.form-fieldset--emerald {
+  border-left: 4px solid theme('colors.emerald.400');
+  background: #f7fefb;
+  border-color: theme('colors.emerald.200');
+  border-left-color: theme('colors.emerald.400');
+}
+
+.form-fieldset--violet {
+  border-left: 4px solid theme('colors.violet.400');
+  background: #faf8ff;
+  border-color: theme('colors.violet.200');
+  border-left-color: theme('colors.violet.400');
+}
+
+.form-fieldset--slate {
+  border-left: 4px solid theme('colors.slate.400');
+  background: #f9fafb;
+  border-color: theme('colors.slate.200');
+  border-left-color: theme('colors.slate.400');
+}
+
+.form-fieldset--red {
+  border-left: 4px solid theme('colors.red.400');
+  background: #fef7f7;
+  border-color: theme('colors.red.200');
+  border-left-color: theme('colors.red.400');
+}
+
+.form-fieldset--teal {
+  border-left: 4px solid theme('colors.teal.400');
+  background: #f5fffe;
+  border-color: theme('colors.teal.200');
+  border-left-color: theme('colors.teal.400');
+}
+
+.form-fieldset--blue {
+  border-left: 4px solid theme('colors.blue.400');
+  background: #f7faff;
+  border-color: theme('colors.blue.200');
+  border-left-color: theme('colors.blue.400');
+}
+
+.form-fieldset--pink {
+  border-left: 4px solid theme('colors.pink.400');
+  background: #fef7fa;
+  border-color: theme('colors.pink.200');
+  border-left-color: theme('colors.pink.400');
+}
+
+.form-fieldset--cyan {
+  border-left: 4px solid theme('colors.cyan.400');
+  background: #f5feff;
+  border-color: theme('colors.cyan.200');
+  border-left-color: theme('colors.cyan.400');
+}
+
+.form-fieldset--orange {
+  border-left: 4px solid theme('colors.orange.400');
+  background: #fffaf5;
+  border-color: theme('colors.orange.200');
+  border-left-color: theme('colors.orange.400');
+}
+
+.form-fieldset--lime {
+  border-left: 4px solid theme('colors.lime.400');
+  background: #fafff5;
+  border-color: theme('colors.lime.200');
+  border-left-color: theme('colors.lime.400');
+}
+
+.form-fieldset--purple {
+  border-left: 4px solid theme('colors.purple.400');
+  background: #fbf8ff;
+  border-color: theme('colors.purple.200');
+  border-left-color: theme('colors.purple.400');
+}
+
+.form-fieldset--rose {
+  border-left: 4px solid theme('colors.rose.400');
+  background: #fff7f8;
+  border-color: theme('colors.rose.200');
+  border-left-color: theme('colors.rose.400');
+}
+
+/* ── Séparateur entre blocs (unifié social + santé — dette 4.1) ──────── */
+
+.bloc-separator {
+  @apply flex items-center gap-0 my-2;
+  padding: 0 40px;
+}
+.bloc-separator::before,
+.bloc-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    theme('colors.slate.200') 40%,
+    theme('colors.slate.200') 60%,
+    transparent
+  );
+}
+.bloc-separator__dot {
+  @apply w-1.5 h-1.5 rounded-full bg-slate-300 mx-3 flex-shrink-0;
 }
 
 .form-legend {
@@ -1251,14 +1514,45 @@ textarea.p-inputtext {
   transition: background-color 0.2s ease;
 }
 
-.form-legend-icon--blue    { @apply bg-blue-50 text-blue-500; }
-.form-legend-icon--amber   { @apply bg-amber-50 text-amber-500; }
-.form-legend-icon--emerald { @apply bg-emerald-50 text-emerald-500; }
-.form-legend-icon--violet  { @apply bg-violet-50 text-violet-500; }
-.form-legend-icon--teal    { @apply bg-teal-50 text-teal-500; }
-.form-legend-icon--pink    { @apply bg-pink-50 text-pink-500; }
-.form-legend-icon--red     { @apply bg-red-50 text-red-500; }
-.form-legend-icon--slate   { @apply bg-slate-100 text-slate-500; }
+.form-legend-icon--blue {
+  @apply bg-blue-50 text-blue-500;
+}
+.form-legend-icon--amber {
+  @apply bg-amber-50 text-amber-500;
+}
+.form-legend-icon--emerald {
+  @apply bg-emerald-50 text-emerald-500;
+}
+.form-legend-icon--violet {
+  @apply bg-violet-50 text-violet-500;
+}
+.form-legend-icon--teal {
+  @apply bg-teal-50 text-teal-500;
+}
+.form-legend-icon--pink {
+  @apply bg-pink-50 text-pink-500;
+}
+.form-legend-icon--red {
+  @apply bg-red-50 text-red-500;
+}
+.form-legend-icon--slate {
+  @apply bg-slate-100 text-slate-500;
+}
+.form-legend-icon--cyan {
+  @apply bg-cyan-50 text-cyan-500;
+}
+.form-legend-icon--orange {
+  @apply bg-orange-50 text-orange-500;
+}
+.form-legend-icon--lime {
+  @apply bg-lime-50 text-lime-600;
+}
+.form-legend-icon--purple {
+  @apply bg-purple-50 text-purple-500;
+}
+.form-legend-icon--rose {
+  @apply bg-rose-50 text-rose-500;
+}
 
 /* ── Grilles ─────────────────────────────────────────────────────────── */
 
@@ -1315,6 +1609,77 @@ textarea.p-inputtext {
          rounded-xl text-sm text-blue-700;
 }
 
+/* ── Listes dynamiques (seuils, comorbidités, matériels, dispositifs) ─
+ * Utilisé par : forms/SanteForm.vue, forms/MaterielsForm.vue,
+ *               forms/DispositifsForm.vue (et tout form avec liste +/−)
+ * Ajouté : 09/03/2026
+ * ────────────────────────────────────────────────────────────────────── */
+
+/* Bouton "+ Ajouter une ligne" */
+.wizard-add-row {
+  @apply inline-flex items-center gap-1.5
+         text-sm font-medium
+         text-teal-600 hover:text-teal-700
+         transition-colors;
+}
+
+/* Bouton corbeille en fin de ligne */
+.wizard-delete-row {
+  @apply text-slate-400 hover:text-red-500 transition-colors;
+}
+
+/* Table inline (seuils, matériels, dispositifs…) */
+.wizard-inline-table {
+  @apply w-full text-sm;
+  border-collapse: collapse;
+}
+
+.wizard-inline-table thead tr {
+  @apply bg-slate-100 text-slate-600 text-xs uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wizard-inline-table thead th {
+  @apply text-left px-3 py-2 font-semibold;
+}
+
+.wizard-inline-table tbody tr {
+  @apply border-b border-slate-100;
+}
+
+.wizard-inline-table tbody tr:nth-child(even) {
+  @apply bg-slate-50;
+}
+
+.wizard-inline-table td {
+  @apply px-2 py-1.5 align-middle;
+}
+
+/* ── Date split — 3 champs JJ / MM / AAAA ────────────────────────────
+ * Pattern générique pour toutes les dates en saisie 3 champs séparés
+ * avec pré-remplissage mois+année. Plus léger que birth-date-input
+ * (pas de badge âge, pas de focus custom).
+ * Utilisé par : PoaProblemeCard, PoaAutonomieForm, DispositifsForm,
+ *               SocialForm, SanteForm.
+ * Ajouté : 14/03/2026
+ * ────────────────────────────────────────────────────────────────────── */
+
+.split-date-input {
+  @apply flex items-center gap-1;
+}
+.split-date-input__jour {
+  @apply w-12 text-center;
+}
+.split-date-input__mois {
+  @apply w-12 text-center;
+}
+.split-date-input__annee {
+  @apply w-16 text-center;
+}
+.split-date-input__sep {
+  @apply text-slate-400 font-medium;
+}
+
 /* ── Date de naissance — 3 champs séparés + badge âge ────────────────
  * Composant réutilisable pour dates de naissance en contexte gériatrique.
  * Évite la navigation mensuelle du Calendar PrimeVue (pénible pour 1920-1960).
@@ -1332,7 +1697,7 @@ textarea.p-inputtext {
          outline-none transition-all duration-200;
   padding: 0.5rem 0.25rem;
   border: 1px solid #e2e8f0;
-  line-height: 1.25rem;  /* Identique à .p-inputtext et .p-select-label */
+  line-height: 1.25rem; /* Identique à .p-inputtext et .p-select-label */
   font-variant-numeric: tabular-nums;
 }
 
@@ -1377,19 +1742,19 @@ textarea.p-inputtext {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DATEPICKER PRIMEVUE 4 — Fix superposition + style « Soft médical »
-   ⚠️  TODO vague C/D : PrimeVue 4 renomme Calendar→DatePicker et change
-       la structure interne des cellules (td > span → .p-day-cell > .p-day).
-       Ces styles fonctionnent partiellement en v4 (panel, header, nav).
-       Les sélecteurs de jours (.p-datepicker table td > span, .p-highlight)
-       devront être migrés quand DatePicker est utilisé activement.
-   Ajouté : 01/03/2026 | Noté migration : 04/03/2026
+   Migré Vague E (04/03/2026) : sélecteurs v3 (table td > span, .p-highlight,
+   .p-datepicker-prev/next) → sélecteurs v4 (.p-datepicker-day,
+   .p-datepicker-day-selected, .p-datepicker-prev-button).
+   Ajouté : 01/03/2026 | Migré v4 : 04/03/2026
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .p-datepicker {
   z-index: 9999 !important;
   border-radius: 0.875rem !important;
   border: 1px solid #e5e7eb !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.08),
+    0 2px 12px rgba(0, 0, 0, 0.04) !important;
   overflow: hidden;
   padding: 0.5rem !important;
 }
@@ -1399,36 +1764,42 @@ textarea.p-inputtext {
   padding-bottom: 0.5rem !important;
 }
 
-.p-datepicker table td > span {
+/* v4 : les jours sont des boutons .p-datepicker-day (plus de td > span) */
+.p-datepicker-day {
   border-radius: 0.5rem !important;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.p-datepicker table td > span:hover {
+.p-datepicker-day:not(.p-disabled):hover {
   background-color: #ecfdf5 !important;
   color: #065f46 !important;
 }
 
-.p-datepicker table td > span.p-highlight {
+/* v4 : jour sélectionné → .p-datepicker-day-selected (ex .p-highlight) */
+.p-datepicker-day.p-datepicker-day-selected {
   background-color: #0d9488 !important;
   color: white !important;
   font-weight: 600 !important;
 }
 
-.p-datepicker .p-datepicker-today > span:not(.p-highlight) {
+/* v4 : jour courant non sélectionné (ex .p-datepicker-today > span:not(.p-highlight)) */
+.p-datepicker-day.p-datepicker-day-today:not(.p-datepicker-day-selected) {
   border: 1.5px solid #0d9488 !important;
   color: #0d9488 !important;
   font-weight: 600 !important;
 }
 
-.p-datepicker .p-datepicker-prev,
-.p-datepicker .p-datepicker-next {
+/* v4 : boutons navigation → .p-datepicker-prev-button / .p-datepicker-next-button */
+.p-datepicker .p-datepicker-prev-button,
+.p-datepicker .p-datepicker-next-button {
   border-radius: 0.5rem !important;
   transition: background-color 0.15s ease;
 }
 
-.p-datepicker .p-datepicker-prev:hover,
-.p-datepicker .p-datepicker-next:hover {
+.p-datepicker .p-datepicker-prev-button:hover,
+.p-datepicker .p-datepicker-next-button:hover {
   background-color: #f0fdfa !important;
   color: #0d9488 !important;
 }
@@ -1461,7 +1832,9 @@ textarea.p-inputtext {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04);
   font-size: 0.75rem;
   line-height: 1.625;
   color: #475569;
@@ -1469,7 +1842,10 @@ textarea.p-inputtext {
   visibility: hidden;
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
   z-index: 50;
   pointer-events: none;
 }
@@ -1491,4 +1867,237 @@ textarea.p-inputtext {
   visibility: visible;
   opacity: 1;
   transform: translateY(0);
+}
+
+/* ── Animation pulse — nœud actif de la chaîne ─────────────────────────── */
+@keyframes eval-chain-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(20, 184, 166, 0.12),
+      0 2px 8px rgba(20, 184, 166, 0.25);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(20, 184, 166, 0.06),
+      0 2px 8px rgba(20, 184, 166, 0.25);
+  }
+}
+
+/* ─── Habitat Rooms — Cascade composant (SocialForm) ──────────────────────
+   Composition (chips+stepper) → Flags+détails (accordion Option C)
+   Convention : préfixe habitat-* pour éviter collision                    */
+
+/* Section wrapper */
+.habitat-rooms-section {
+  @apply p-4 rounded-lg bg-white;
+  border: 1px solid theme('colors.emerald.200');
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Chips pièces ── */
+.habitat-room-chips {
+  @apply flex flex-wrap gap-2 mb-3;
+}
+
+.habitat-room-chip {
+  @apply flex items-center gap-2 pl-3 pr-1 py-1 bg-white rounded-full text-sm font-medium text-slate-700;
+  border: 1px solid theme('colors.slate.200');
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.habitat-room-chip__label {
+  @apply font-semibold text-xs;
+}
+
+.habitat-room-chip__remove {
+  @apply w-6 h-6 flex items-center justify-center rounded-full text-slate-400 text-sm font-bold;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.habitat-room-chip__remove:hover {
+  @apply bg-red-50 text-red-500;
+}
+
+/* ── Stepper +/- ── */
+.habitat-stepper {
+  @apply inline-flex items-center rounded-full overflow-hidden;
+  border: 1px solid theme('colors.slate.200');
+}
+
+.habitat-stepper__btn {
+  @apply w-7 h-7 flex items-center justify-center text-sm font-semibold text-slate-600;
+  background: theme('colors.slate.50');
+  border: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.habitat-stepper__btn:hover {
+  @apply bg-emerald-100 text-emerald-700;
+}
+
+.habitat-stepper__btn:disabled {
+  @apply opacity-30 cursor-default;
+}
+
+.habitat-stepper__btn:disabled:hover {
+  background: theme('colors.slate.50');
+  color: theme('colors.slate.600');
+}
+
+.habitat-stepper__val {
+  @apply w-7 text-center font-semibold text-xs text-slate-700;
+  border-left: 1px solid theme('colors.slate.200');
+  border-right: 1px solid theme('colors.slate.200');
+  padding: 4px 0;
+}
+
+/* ── Barre ajout pièce ── */
+.habitat-add-bar {
+  @apply flex items-center gap-2;
+}
+
+.habitat-add-bar__select {
+  width: auto !important;
+  min-width: 170px;
+}
+
+.habitat-add-bar__btn {
+  @apply inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-600;
+  background: white;
+  border: 1px dashed theme('colors.emerald.300');
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+.habitat-add-bar__btn:hover {
+  @apply bg-emerald-50;
+  border-color: theme('colors.emerald.400');
+}
+
+.habitat-add-bar__btn:disabled {
+  @apply opacity-40 cursor-default;
+}
+
+/* ── Séparateur ── */
+.habitat-separator {
+  @apply my-4;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, theme('colors.emerald.200'), transparent);
+}
+
+/* ── Texte aide ── */
+.habitat-help-text {
+  @apply text-xs text-slate-400 italic mb-3;
+}
+
+/* ── Accordion items ── */
+.habitat-accordion {
+  @apply flex flex-col gap-1.5;
+}
+
+.habitat-accordion__item {
+  @apply rounded-lg bg-white overflow-hidden;
+  border: 1px solid theme('colors.slate.200');
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.habitat-accordion__item--flagged {
+  border-color: theme('colors.amber.400');
+}
+
+/* ── Accordion header ── */
+.habitat-accordion__header {
+  @apply flex items-center gap-3 px-3.5 py-2.5 cursor-pointer select-none;
+  transition: background 200ms ease;
+}
+
+.habitat-accordion__header:hover {
+  @apply bg-slate-50;
+}
+
+.habitat-accordion__chevron {
+  @apply text-slate-400 flex-shrink-0;
+  transition: transform 200ms ease;
+}
+
+.habitat-accordion__item--open .habitat-accordion__chevron {
+  transform: rotate(90deg);
+}
+
+.habitat-accordion__name {
+  @apply font-semibold text-sm text-slate-700 flex-1;
+}
+
+/* ── Badge OK / Difficultés ── */
+.habitat-accordion__badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
+}
+
+.habitat-accordion__badge--slate {
+  @apply bg-slate-100 text-slate-500;
+}
+
+.habitat-accordion__badge--amber {
+  @apply bg-amber-100 text-amber-600;
+}
+
+/* ── Toggle switch ── */
+.habitat-toggle {
+  @apply relative flex-shrink-0;
+  width: 38px;
+  height: 22px;
+  background: theme('colors.slate.200');
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+
+.habitat-toggle--on {
+  background: theme('colors.amber.400');
+}
+
+.habitat-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: transform 200ms ease;
+}
+
+.habitat-toggle--on::after {
+  transform: translateX(16px);
+}
+
+/* ── Accordion body ── */
+.habitat-accordion__body {
+  @apply px-3.5 pb-3.5;
+  padding-left: 42px; /* aligné avec le texte après le chevron */
+  animation: habitat-slide-down 200ms ease-out;
+}
+
+@keyframes habitat-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.habitat-accordion__empty {
+  @apply text-sm text-slate-400;
 }

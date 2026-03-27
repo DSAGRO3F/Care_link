@@ -5,28 +5,28 @@ Routes CRUD pour les Subscriptions.
 Toutes les routes sont réservées aux SuperAdmins (équipe CareLink).
 """
 
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.platform.super_admin_security import (
-    require_super_admin_permission,
     SuperAdminPermissions,
+    require_super_admin_permission,
 )
 from app.database.session_rls import get_db_no_rls
 from app.models.enums import SubscriptionStatus
 from app.models.platform.super_admin import SuperAdmin
 from app.models.tenants.subscription import Subscription
 from app.models.tenants.tenant import Tenant
+
 from .schemas import (
-    SubscriptionCreate,
-    SubscriptionUpdate,
-    SubscriptionStatusUpdate,
-    SubscriptionResponse,
-    SubscriptionSummary,
     PaginatedSubscriptions,
+    SubscriptionCreate,
+    SubscriptionResponse,
+    SubscriptionStatusUpdate,
+    SubscriptionSummary,
+    SubscriptionUpdate,
 )
+
 
 router = APIRouter(prefix="/tenants/{tenant_id}/subscriptions", tags=["Subscriptions"])
 
@@ -35,34 +35,31 @@ router = APIRouter(prefix="/tenants/{tenant_id}/subscriptions", tags=["Subscript
 # HELPERS
 # =============================================================================
 
+
 def get_tenant_or_404(db: Session, tenant_id: int) -> Tenant:
     """Récupère un tenant ou lève une 404."""
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
     return tenant
 
 
 def get_subscription_or_404(db: Session, tenant_id: int, subscription_id: int) -> Subscription:
     """Récupère un abonnement ou lève une 404."""
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id,
-        Subscription.tenant_id == tenant_id
-    ).first()
+    subscription = (
+        db.query(Subscription)
+        .filter(Subscription.id == subscription_id, Subscription.tenant_id == tenant_id)
+        .first()
+    )
     if not subscription:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Abonnement non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abonnement non trouvé")
     return subscription
 
 
 # =============================================================================
 # LIST
 # =============================================================================
+
 
 @router.get(
     "",
@@ -74,7 +71,7 @@ async def list_subscriptions(
     tenant_id: int,
     admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)),
     db: Session = Depends(get_db_no_rls),
-    status_filter: Optional[SubscriptionStatus] = Query(None, alias="status"),
+    status_filter: SubscriptionStatus | None = Query(None, alias="status"),
 ):
     """Liste les abonnements d'un tenant."""
 
@@ -93,13 +90,14 @@ async def list_subscriptions(
         total=len(subscriptions),
         page=1,
         size=len(subscriptions),
-        pages=1
+        pages=1,
     )
 
 
 # =============================================================================
 # GET ACTIVE
 # =============================================================================
+
 
 @router.get(
     "/active",
@@ -117,15 +115,18 @@ async def get_active_subscription(
     # Vérifier que le tenant existe
     get_tenant_or_404(db, tenant_id)
 
-    subscription = db.query(Subscription).filter(
-        Subscription.tenant_id == tenant_id,
-        Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL])
-    ).first()
+    subscription = (
+        db.query(Subscription)
+        .filter(
+            Subscription.tenant_id == tenant_id,
+            Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL]),
+        )
+        .first()
+    )
 
     if not subscription:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Aucun abonnement actif pour ce tenant"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Aucun abonnement actif pour ce tenant"
         )
 
     return SubscriptionResponse.model_validate(subscription)
@@ -134,6 +135,7 @@ async def get_active_subscription(
 # =============================================================================
 # GET BY ID
 # =============================================================================
+
 
 @router.get(
     "/{subscription_id}",
@@ -157,6 +159,7 @@ async def get_subscription(
 # CREATE
 # =============================================================================
 
+
 @router.post(
     "",
     response_model=SubscriptionResponse,
@@ -167,7 +170,9 @@ async def get_subscription(
 async def create_subscription(
     tenant_id: int,
     subscription_data: SubscriptionCreate,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Crée un abonnement."""
@@ -176,19 +181,20 @@ async def create_subscription(
     tenant = get_tenant_or_404(db, tenant_id)
 
     # Désactiver l'abonnement actif existant
-    active_sub = db.query(Subscription).filter(
-        Subscription.tenant_id == tenant_id,
-        Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL])
-    ).first()
+    active_sub = (
+        db.query(Subscription)
+        .filter(
+            Subscription.tenant_id == tenant_id,
+            Subscription.status.in_([SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL]),
+        )
+        .first()
+    )
 
     if active_sub:
         active_sub.status = SubscriptionStatus.CANCELLED
 
     # Créer le nouvel abonnement
-    subscription = Subscription(
-        tenant_id=tenant_id,
-        **subscription_data.model_dump()
-    )
+    subscription = Subscription(tenant_id=tenant_id, **subscription_data.model_dump())
 
     db.add(subscription)
     db.commit()
@@ -201,6 +207,7 @@ async def create_subscription(
 # UPDATE
 # =============================================================================
 
+
 @router.patch(
     "/{subscription_id}",
     response_model=SubscriptionResponse,
@@ -211,7 +218,9 @@ async def update_subscription(
     tenant_id: int,
     subscription_id: int,
     subscription_data: SubscriptionUpdate,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Met à jour un abonnement."""
@@ -232,6 +241,7 @@ async def update_subscription(
 # STATUS CHANGES
 # =============================================================================
 
+
 @router.post(
     "/{subscription_id}/activate",
     response_model=SubscriptionResponse,
@@ -241,7 +251,9 @@ async def update_subscription(
 async def activate_subscription(
     tenant_id: int,
     subscription_id: int,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Active un abonnement."""
@@ -251,7 +263,7 @@ async def activate_subscription(
     if subscription.status == SubscriptionStatus.CANCELLED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Impossible d'activer un abonnement annulé. Créez un nouvel abonnement."
+            detail="Impossible d'activer un abonnement annulé. Créez un nouvel abonnement.",
         )
 
     subscription.status = SubscriptionStatus.ACTIVE
@@ -272,7 +284,9 @@ async def cancel_subscription(
     tenant_id: int,
     subscription_id: int,
     data: SubscriptionStatusUpdate,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Annule un abonnement."""
@@ -281,8 +295,7 @@ async def cancel_subscription(
 
     if subscription.status == SubscriptionStatus.CANCELLED:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cet abonnement est déjà annulé"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cet abonnement est déjà annulé"
         )
 
     subscription.status = SubscriptionStatus.CANCELLED
@@ -307,7 +320,9 @@ async def cancel_subscription(
 async def mark_subscription_past_due(
     tenant_id: int,
     subscription_id: int,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Marque un abonnement comme en retard de paiement."""
@@ -317,7 +332,7 @@ async def mark_subscription_past_due(
     if subscription.status != SubscriptionStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Seul un abonnement actif peut être marqué en retard de paiement"
+            detail="Seul un abonnement actif peut être marqué en retard de paiement",
         )
 
     subscription.status = SubscriptionStatus.PAST_DUE

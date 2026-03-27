@@ -10,6 +10,7 @@ Modules disponibles:
 
 from app.services.aggir import AggirCalculator, AggirParser
 
+
 __all__ = [
     "AggirCalculator",
     "AggirParser",

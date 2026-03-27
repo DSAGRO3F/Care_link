@@ -12,9 +12,9 @@ Pour la sécurité SuperAdmin, voir :
     app/api/v1/platform/super_admin_security.py
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import Query, Depends
+from fastapi import Depends, Query
 
 
 class PaginationParams:
@@ -29,11 +29,13 @@ class PaginationParams:
     """
 
     def __init__(
-            self,
-            page: Annotated[int, Query(ge=1, description="Numéro de page (commence à 1)")] = 1,
-            size: Annotated[int, Query(ge=1, le=100, description="Nombre d'éléments par page")] = 20,
-            sort_by: Annotated[Optional[str], Query(description="Champ de tri")] = None,
-            sort_order: Annotated[str, Query(pattern="^(asc|desc)$", description="Ordre de tri")] = "asc",
+        self,
+        page: Annotated[int, Query(ge=1, description="Numéro de page (commence à 1)")] = 1,
+        size: Annotated[int, Query(ge=1, le=100, description="Nombre d'éléments par page")] = 20,
+        sort_by: Annotated[str | None, Query(description="Champ de tri")] = None,
+        sort_order: Annotated[
+            str, Query(pattern="^(asc|desc)$", description="Ordre de tri")
+        ] = "asc",
     ):
         self.page = page
         self.size = size

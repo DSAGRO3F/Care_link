@@ -5,21 +5,22 @@ Ce module définit des mixins qui ajoutent des fonctionnalités communes
 à plusieurs modèles (timestamps, audit, versioning, chiffrement).
 """
 
-from datetime import datetime, date, timezone
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Type
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Integer, String, DateTime
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 # Imports pour le chiffrement
-from app.core.security.cipher import encrypt_field, decrypt_field
+from app.core.security.cipher import decrypt_field, encrypt_field
 from app.core.security.encryption import (
     create_blind_index,
-    encrypt_date,
     decrypt_date,
-    encrypt_datetime,
     decrypt_datetime,
+    encrypt_date,
+    encrypt_datetime,
 )
+
 
 if TYPE_CHECKING:
     pass
@@ -40,17 +41,17 @@ class TimestampMixin:
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),  # <-- TIMESTAMP WITH TIME ZONE
-        default=datetime.now(timezone.utc),
+        default=datetime.now(UTC),
         doc="Date et heure de création",
-        info={"description": "Timestamp de création", "auto_generated": True}
+        info={"description": "Timestamp de création", "auto_generated": True},
     )
 
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),  # <-- TIMESTAMP WITH TIME ZONE
         default=None,
-        onupdate=datetime.now(timezone.utc),
+        onupdate=datetime.now(UTC),
         doc="Date et heure de dernière modification",
-        info={"description": "Timestamp de mise à jour", "auto_generated": True}
+        info={"description": "Timestamp de mise à jour", "auto_generated": True},
     )
 
 
@@ -70,14 +71,14 @@ class AuditMixin:
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID de l'utilisateur ayant créé l'enregistrement",
-        info={"description": "Référence vers le créateur"}
+        info={"description": "Référence vers le créateur"},
     )
 
     updated_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID de l'utilisateur ayant modifié l'enregistrement",
-        info={"description": "Référence vers le modificateur"}
+        info={"description": "Référence vers le modificateur"},
     )
 
 
@@ -106,7 +107,7 @@ class VersionedMixin:
         default=1,
         nullable=False,
         doc="Version pour verrouillage optimiste",
-        info={"description": "Incrémenté à chaque modification", "auto_generated": True}
+        info={"description": "Incrémenté à chaque modification", "auto_generated": True},
     )
 
 
@@ -124,13 +125,14 @@ class StatusMixin:
         String(20),
         default="active",
         doc="Statut de l'enregistrement",
-        info={"description": "active, inactive, archived, etc.", "default": "active"}
+        info={"description": "active, inactive, archived, etc.", "default": "active"},
     )
 
 
 # =============================================================================
 # ENCRYPTED FIELDS MIXIN
 # =============================================================================
+
 
 class EncryptedFieldsMixin:
     """
@@ -203,19 +205,15 @@ class EncryptedFieldsMixin:
     """
 
     # À surcharger dans les classes enfants
-    __encrypted_fields__: Dict[str, str] = {}
-    __blind_index_fields__: Set[str] = set()
+    __encrypted_fields__: dict[str, str] = {}
+    __blind_index_fields__: set[str] = set()
 
     # =========================================================================
     # MÉTHODES DE CLASSE (pour chiffrement avant création)
     # =========================================================================
 
     @classmethod
-    def encrypt_fields(
-        cls,
-        data: Dict[str, Any],
-        tenant_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+    def encrypt_fields(cls, data: dict[str, Any], tenant_id: int | None = None) -> dict[str, Any]:
         """
         Chiffre les champs sensibles d'un dictionnaire de données.
 
@@ -263,18 +261,13 @@ class EncryptedFieldsMixin:
                 blind_key = f"{field_name}_blind"
                 # Le blind index utilise la valeur EN CLAIR (avant chiffrement)
                 result[blind_key] = create_blind_index(
-                    cls._value_to_string(value, field_type),
-                    field_name,
-                    tenant_id
+                    cls._value_to_string(value, field_type), field_name, tenant_id
                 )
 
         return result
 
     @classmethod
-    def decrypt_fields(
-        cls,
-        data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def decrypt_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
         """
         Déchiffre les champs sensibles d'un dictionnaire de données.
 
@@ -301,11 +294,8 @@ class EncryptedFieldsMixin:
 
     @classmethod
     def get_blind_index(
-        cls,
-        value: Any,
-        field_name: str,
-        tenant_id: Optional[int] = None
-    ) -> Optional[str]:
+        cls, value: Any, field_name: str, tenant_id: int | None = None
+    ) -> str | None:
         """
         Génère un blind index pour une valeur de recherche.
 
@@ -338,12 +328,12 @@ class EncryptedFieldsMixin:
         return create_blind_index(string_value, field_name, tenant_id)
 
     @classmethod
-    def get_encrypted_field_names(cls) -> List[str]:
+    def get_encrypted_field_names(cls) -> list[str]:
         """Retourne la liste des noms de champs chiffrés."""
         return list(cls.__encrypted_fields__.keys())
 
     @classmethod
-    def get_blind_index_field_names(cls) -> List[str]:
+    def get_blind_index_field_names(cls) -> list[str]:
         """Retourne la liste des noms de champs avec blind index."""
         return list(cls.__blind_index_fields__)
 
@@ -351,7 +341,7 @@ class EncryptedFieldsMixin:
     # MÉTHODES D'INSTANCE (pour déchiffrement après lecture)
     # =========================================================================
 
-    def get_decrypted_fields(self) -> Dict[str, Any]:
+    def get_decrypted_fields(self) -> dict[str, Any]:
         """
         Retourne tous les champs chiffrés sous forme déchiffrée.
 
@@ -403,10 +393,7 @@ class EncryptedFieldsMixin:
         return self._decrypt_value(encrypted_value, field_type)
 
     def set_encrypted_field(
-        self,
-        field_name: str,
-        value: Any,
-        tenant_id: Optional[int] = None
+        self, field_name: str, value: Any, tenant_id: int | None = None
     ) -> None:
         """
         Définit un champ avec chiffrement automatique.
@@ -419,9 +406,7 @@ class EncryptedFieldsMixin:
             tenant_id: ID du tenant
         """
         if field_name not in self.__encrypted_fields__:
-            raise ValueError(
-                f"Le champ '{field_name}' n'est pas configuré comme chiffré."
-            )
+            raise ValueError(f"Le champ '{field_name}' n'est pas configuré comme chiffré.")
 
         field_type = self.__encrypted_fields__[field_name]
 
@@ -442,10 +427,8 @@ class EncryptedFieldsMixin:
             setattr(self, f"{field_name}_blind", blind)
 
     def to_dict_decrypted(
-        self,
-        include_fields: Optional[List[str]] = None,
-        exclude_fields: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, include_fields: list[str] | None = None, exclude_fields: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Convertit l'instance en dictionnaire avec déchiffrement automatique.
 
@@ -465,12 +448,12 @@ class EncryptedFieldsMixin:
 
         for key in dir(self):
             # Ignorer les attributs privés et méthodes
-            if key.startswith('_'):
+            if key.startswith("_"):
                 continue
             if callable(getattr(self, key)):
                 continue
             # Ignorer les blind indexes (données internes)
-            if key.endswith('_blind'):
+            if key.endswith("_blind"):
                 continue
             # Appliquer les filtres
             if include_fields and key not in include_fields:
@@ -495,7 +478,7 @@ class EncryptedFieldsMixin:
     # =========================================================================
 
     @staticmethod
-    def _encrypt_value(value: Any, field_type: str) -> Optional[str]:
+    def _encrypt_value(value: Any, field_type: str) -> str | None:
         """
         Chiffre une valeur selon son type.
 
@@ -512,20 +495,19 @@ class EncryptedFieldsMixin:
         if field_type == "string":
             return encrypt_field(str(value))
 
-        elif field_type == "date":
+        if field_type == "date":
             if isinstance(value, str):
                 # Conversion string ISO → date
                 value = date.fromisoformat(value)
             return encrypt_date(value)
 
-        elif field_type == "datetime":
+        if field_type == "datetime":
             if isinstance(value, str):
                 value = datetime.fromisoformat(value)
             return encrypt_datetime(value)
 
-        else:
-            # Type inconnu, traiter comme string
-            return encrypt_field(str(value))
+        # Type inconnu, traiter comme string
+        return encrypt_field(str(value))
 
     @staticmethod
     def _decrypt_value(encrypted_value: str, field_type: str) -> Any:
@@ -545,14 +527,13 @@ class EncryptedFieldsMixin:
         if field_type == "string":
             return decrypt_field(encrypted_value)
 
-        elif field_type == "date":
+        if field_type == "date":
             return decrypt_date(encrypted_value)
 
-        elif field_type == "datetime":
+        if field_type == "datetime":
             return decrypt_datetime(encrypted_value)
 
-        else:
-            return decrypt_field(encrypted_value)
+        return decrypt_field(encrypted_value)
 
     @staticmethod
     def _value_to_string(value: Any, field_type: str) -> str:
@@ -576,10 +557,9 @@ class EncryptedFieldsMixin:
                 return value.isoformat()
             return str(value)
 
-        elif field_type == "datetime":
+        if field_type == "datetime":
             if isinstance(value, datetime):
                 return value.isoformat()
             return str(value)
 
-        else:
-            return str(value)
+        return str(value)

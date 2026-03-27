@@ -13,54 +13,95 @@ Endpoints pour :
 MULTI-TENANT: Tous les endpoints injectent automatiquement le tenant_id
 depuis l'utilisateur authentifié.
 """
-from datetime import datetime
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.patient.schemas import (
-    # Patient
-    PatientCreate, PatientUpdate, PatientResponse, PatientList,
-    PatientFilters,
-    # Access
-    PatientAccessCreate, PatientAccessResponse, PatientAccessList,
-    # Evaluation
-    PatientEvaluationCreate, PatientEvaluationUpdate,
-    PatientEvaluationResponse, PatientEvaluationList, EvaluationSessionCreate, EvaluationSessionResponse,
+    DepartmentValidation,
+    EvaluationSessionCreate,
     EvaluationSessionList,
+    EvaluationSessionResponse,
+    # Calcul GIR préliminaire (mode DRAFT)
+    GirComputeRequest,
+    GirComputeResponse,
+    # Pré-remplissage nouvelle évaluation
+    LatestSubmittedEvaluationResponse,
+    # Access
+    PatientAccessCreate,
+    PatientAccessList,
+    PatientAccessResponse,
+    # Patient
+    PatientCreate,
+    # Device
+    PatientDeviceCreate,
+    PatientDeviceList,
+    PatientDeviceResponse,
+    PatientDeviceUpdate,
+    PatientDocumentList,
+    # Document
+    PatientDocumentResponse,
+    # Evaluation
+    PatientEvaluationCreate,
+    PatientEvaluationList,
+    PatientEvaluationResponse,
+    PatientEvaluationUpdate,
+    PatientFilters,
+    PatientList,
+    PatientResponse,
+    # Threshold
+    PatientThresholdCreate,
+    PatientThresholdList,
+    PatientThresholdResponse,
+    PatientThresholdUpdate,
+    PatientUpdate,
+    # Vitals
+    PatientVitalsCreate,
+    PatientVitalsList,
+    PatientVitalsResponse,
+    SyncPayload,
+    SyncResponse,
     # Validation données d'évaluation versus JSON Schema
     ValidationErrorResponse,
-    SyncPayload, SyncResponse,
-    DepartmentValidation,
-    # Threshold
-    PatientThresholdCreate, PatientThresholdUpdate,
-    PatientThresholdResponse, PatientThresholdList,
-    # Vitals
-    PatientVitalsCreate, PatientVitalsResponse, PatientVitalsList, VitalsFilters,
-    # Device
-    PatientDeviceCreate, PatientDeviceUpdate,
-    PatientDeviceResponse, PatientDeviceList,
-    # Document
-    PatientDocumentResponse, PatientDocumentList,
+    VitalsFilters,
 )
 from app.api.v1.patient.services import (
-    PatientService, PatientAccessService, PatientEvaluationService,
-    EvaluationExpiredError, EvaluationNotEditableError,
-    PatientThresholdService, PatientVitalsService, PatientDeviceService,
+    AccessNotFoundError,
+    DeviceNotFoundError,
+    DocumentNotFoundError,
+    DuplicateDeviceError,
+    DuplicateNIRError,
+    DuplicateThresholdError,
+    EntityNotFoundError,
+    EvaluationAlreadyValidatedError,
+    EvaluationExpiredError,
+    EvaluationNotEditableError,
+    EvaluationNotFoundError,
+    InvalidEvaluationDataError,
+    PatientAccessService,
+    PatientDeviceService,
     PatientDocumentService,
+    PatientEvaluationService,
     # Exceptions
-    PatientNotFoundError, EntityNotFoundError, UserNotFoundError,
-    EvaluationNotFoundError, ThresholdNotFoundError, VitalsNotFoundError,
-    DeviceNotFoundError, DocumentNotFoundError, AccessNotFoundError,
-    DuplicateThresholdError, DuplicateDeviceError, EvaluationAlreadyValidatedError, InvalidEvaluationDataError,
-    DuplicateNIRError, SessionNotFoundError, SessionAlreadyActiveError,
+    PatientNotFoundError,
+    PatientService,
+    PatientThresholdService,
+    PatientVitalsService,
+    SessionAlreadyActiveError,
+    SessionNotFoundError,
+    ThresholdNotFoundError,
+    UserNotFoundError,
+    VitalsNotFoundError,
 )
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
 from app.core.auth.user_auth import get_current_user, require_role
 from app.database.session_rls import get_db
 from app.models.user.user import User
+from app.services.aggir.calculator import VARIABLE_CODE_MAPPING, Adverbes, AggirCalculator
+
 
 # =============================================================================
 # ROUTERS
@@ -74,13 +115,14 @@ patients_router = APIRouter(prefix="/patients", tags=["Patients"])
 # PATIENT ENDPOINTS (MULTI-TENANT)
 # =============================================================================
 
+
 @patients_router.get("", response_model=PatientList)
 def list_patients(
     pagination: PaginationParams = Depends(),
-    entity_id: Optional[int] = Query(None, description="Filtrer par entité"),
-    status: Optional[str] = Query(None, description="Filtrer par statut"),
-    medecin_traitant_id: Optional[int] = Query(None, description="Filtrer par médecin"),
-    search: Optional[str] = Query(None, description="Recherche textuelle"),
+    entity_id: int | None = Query(None, description="Filtrer par entité"),
+    status: str | None = Query(None, description="Filtrer par statut"),
+    medecin_traitant_id: int | None = Query(None, description="Filtrer par médecin"),
+    search: str | None = Query(None, description="Recherche textuelle"),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
     current_user: User = Depends(get_current_user),
@@ -126,7 +168,7 @@ def get_patient(
         # MODIFIÉ: Utiliser get_by_id_decrypted() au lieu de get_by_id()
         return service.get_by_id_decrypted(patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @patients_router.post("", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
@@ -148,24 +190,21 @@ def create_patient(
         # Déchiffrer pour la réponse API
         return service.get_by_id_decrypted(patient.id)
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     # Gérer le doublon de NIR
     except DuplicateNIRError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @patients_router.patch("/{patient_id}", response_model=PatientResponse)
 def update_patient(
-        patient_id: int,
-        data: PatientUpdate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),
-        current_user: User = Depends(get_current_user),
+    patient_id: int,
+    data: PatientUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Met à jour un patient.
@@ -178,17 +217,14 @@ def update_patient(
         # MODIFIÉ: Déchiffrer pour la réponse API
         return service.get_by_id_decrypted(patient.id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     # NOUVEAU: Gérer le doublon de NIR
     except DuplicateNIRError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @patients_router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -203,7 +239,7 @@ def delete_patient(
         service = PatientService(db, tenant_id)
         service.delete(patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
@@ -211,12 +247,13 @@ def delete_patient(
 # =============================================================================
 # AJOUTER cet endpoint après delete_patient si vous voulez une recherche dédiée :
 
+
 @patients_router.get("/search/by-nir/{nir}", response_model=PatientResponse)
 def search_patient_by_nir(
-        nir: str,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),
-        current_user: User = Depends(get_current_user),
+    nir: str,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Recherche un patient par son NIR (N° Sécurité Sociale).
@@ -228,8 +265,7 @@ def search_patient_by_nir(
 
     if not patient:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Aucun patient trouvé avec ce NIR"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Aucun patient trouvé avec ce NIR"
         )
 
     return service.get_by_id_decrypted(patient.id)
@@ -237,11 +273,11 @@ def search_patient_by_nir(
 
 @patients_router.get("/search/by-name", response_model=PatientList)
 def search_patients_by_name(
-        last_name: Optional[str] = Query(None, description="Nom de famille"),
-        first_name: Optional[str] = Query(None, description="Prénom"),
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),
-        current_user: User = Depends(get_current_user),
+    last_name: str | None = Query(None, description="Nom de famille"),
+    first_name: str | None = Query(None, description="Prénom"),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Recherche des patients par nom et/ou prénom.
@@ -251,7 +287,7 @@ def search_patients_by_name(
     if not last_name and not first_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Au moins un critère de recherche requis (last_name ou first_name)"
+            detail="Au moins un critère de recherche requis (last_name ou first_name)",
         )
 
     service = PatientService(db, tenant_id)
@@ -260,18 +296,13 @@ def search_patients_by_name(
     # Déchiffrer les résultats
     items = [service._decrypt_patient_summary(p) for p in patients]
 
-    return PatientList(
-        items=items,
-        total=len(items),
-        page=1,
-        size=len(items),
-        pages=1
-    )
+    return PatientList(items=items, total=len(items), page=1, size=len(items), pages=1)
 
 
 # =============================================================================
 # PATIENT ACCESS ENDPOINTS (RGPD)
 # =============================================================================
+
 
 @patients_router.get("/{patient_id}/access", response_model=PatientAccessList)
 def get_patient_access_list(
@@ -287,10 +318,14 @@ def get_patient_access_list(
         items = service.get_all_for_patient(patient_id, active_only=active_only)
         return PatientAccessList(items=items, total=len(items))
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/access", response_model=PatientAccessResponse, status_code=status.HTTP_201_CREATED)
+@patients_router.post(
+    "/{patient_id}/access",
+    response_model=PatientAccessResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def grant_patient_access(
     patient_id: int,
     data: PatientAccessCreate,
@@ -301,13 +336,11 @@ def grant_patient_access(
     """Accorde un accès à un dossier patient (RGPD)."""
     try:
         service = PatientAccessService(db, tenant_id)
-        return service.grant_access(
-            patient_id, data, granted_by=current_user.id
-        )
+        return service.grant_access(patient_id, data, granted_by=current_user.id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @patients_router.delete("/{patient_id}/access/{access_id}", response_model=PatientAccessResponse)
@@ -323,14 +356,15 @@ def revoke_patient_access(
         service = PatientAccessService(db, tenant_id)
         return service.revoke_access(access_id, patient_id, revoked_by=current_user.id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except AccessNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # PATIENT EVALUATION ENDPOINTS
 # =============================================================================
+
 
 @patients_router.get("/{patient_id}/evaluations", response_model=PatientEvaluationList)
 def get_patient_evaluations(
@@ -343,18 +377,62 @@ def get_patient_evaluations(
     """Liste les évaluations d'un patient."""
     try:
         service = PatientEvaluationService(db, tenant_id)
-        items, total = service.get_all_for_patient(
-            patient_id, page=pagination.page, size=pagination.size
-        )
-        pages = (total + pagination.size - 1) // pagination.size
-        return PatientEvaluationList(
-            items=items, total=total, page=pagination.page, size=pagination.size, pages=pages
+        # ✅ Fix: get_all_for_patient() retourne une List, pas un tuple (items, total).
+        # Pas de pagination côté service — valeurs neutres pour respecter le schéma Pydantic.
+        items = service.get_all_for_patient(patient_id)
+        total = len(items)
+        return PatientEvaluationList(items=items, total=total, page=1, size=total or 1, pages=1)
+    except PatientNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@patients_router.get(
+    "/{patient_id}/evaluations/latest-submitted",
+    response_model=LatestSubmittedEvaluationResponse,
+    summary="Dernière évaluation soumise (pré-remplissage)",
+    responses={
+        404: {"description": "Aucune évaluation soumise pour ce patient"},
+    },
+)
+def get_latest_submitted_evaluation(
+    patient_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Retourne la dernière évaluation soumise d'un patient.
+
+    Utilisé par le frontend pour pré-remplir les sections stables
+    (usager, contacts, social, matériels, dispositifs) lors de la
+    création d'une nouvelle évaluation.
+
+    Retourne 404 si aucune évaluation soumise n'existe (premier passage).
+    """
+    try:
+        service = PatientEvaluationService(db, tenant_id)
+        evaluation = service.get_latest_submitted(patient_id)
+
+        if not evaluation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Aucune évaluation soumise pour ce patient",
+            )
+
+        return LatestSubmittedEvaluationResponse(
+            evaluation_id=evaluation.id,
+            evaluation_date=evaluation.evaluation_date,
+            evaluation_data=evaluation.evaluation_data,
+            gir_score=evaluation.gir_score,
+            status=evaluation.status,
         )
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.get("/{patient_id}/evaluations/{evaluation_id}", response_model=PatientEvaluationResponse)
+@patients_router.get(
+    "/{patient_id}/evaluations/{evaluation_id}", response_model=PatientEvaluationResponse
+)
 def get_patient_evaluation(
     patient_id: int,
     evaluation_id: int,
@@ -367,12 +445,16 @@ def get_patient_evaluation(
         service = PatientEvaluationService(db, tenant_id)
         return service.get_by_id(evaluation_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/evaluations", response_model=PatientEvaluationResponse, status_code=status.HTTP_201_CREATED)
+@patients_router.post(
+    "/{patient_id}/evaluations",
+    response_model=PatientEvaluationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_patient_evaluation(
     patient_id: int,
     data: PatientEvaluationCreate,
@@ -383,21 +465,21 @@ def create_patient_evaluation(
     """Crée une évaluation pour un patient."""
     try:
         service = PatientEvaluationService(db, tenant_id)
-        return service.create(
-            patient_id, data, evaluator_id=current_user.id
-        )
+        return service.create(patient_id, data, evaluator_id=current_user.id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
     # Gestion des erreurs de validation
     except InvalidEvaluationDataError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"detail": e.message, "errors": e.errors}
-        )
+            detail={"detail": e.message, "errors": e.errors},
+        ) from e
 
 
-@patients_router.patch("/{patient_id}/evaluations/{evaluation_id}", response_model=PatientEvaluationResponse)
+@patients_router.patch(
+    "/{patient_id}/evaluations/{evaluation_id}", response_model=PatientEvaluationResponse
+)
 def update_patient_evaluation(
     patient_id: int,
     evaluation_id: int,
@@ -411,23 +493,25 @@ def update_patient_evaluation(
         service = PatientEvaluationService(db, tenant_id)
         return service.update(evaluation_id, patient_id, data)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationAlreadyValidatedError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except EvaluationNotEditableError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
     # Gestion erreurs évaluation
     except InvalidEvaluationDataError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"detail": e.message, "errors": e.errors}
-        )
+            detail={"detail": e.message, "errors": e.errors},
+        ) from e
 
 
-@patients_router.post("/{patient_id}/evaluations/{evaluation_id}/validate", response_model=PatientEvaluationResponse)
+@patients_router.post(
+    "/{patient_id}/evaluations/{evaluation_id}/validate", response_model=PatientEvaluationResponse
+)
 def validate_patient_evaluation(
     patient_id: int,
     evaluation_id: int,
@@ -440,14 +524,16 @@ def validate_patient_evaluation(
         service = PatientEvaluationService(db, tenant_id)
         return service.validate(evaluation_id, patient_id, validated_by=current_user.id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationAlreadyValidatedError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@patients_router.delete("/{patient_id}/evaluations/{evaluation_id}", status_code=status.HTTP_204_NO_CONTENT)
+@patients_router.delete(
+    "/{patient_id}/evaluations/{evaluation_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def delete_patient_evaluation(
     patient_id: int,
     evaluation_id: int,
@@ -460,18 +546,21 @@ def delete_patient_evaluation(
         service = PatientEvaluationService(db, tenant_id)
         service.delete(evaluation_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationAlreadyValidatedError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 # =============================================================================
-# EVALUATION SESSION ENDPOINTS (NOUVEAU)
+# EVALUATION SESSION ENDPOINTS
 # =============================================================================
 
-@patients_router.get("/{patient_id}/evaluations/{evaluation_id}/sessions", response_model=EvaluationSessionList)
+
+@patients_router.get(
+    "/{patient_id}/evaluations/{evaluation_id}/sessions", response_model=EvaluationSessionList
+)
 def get_evaluation_sessions(
     patient_id: int,
     evaluation_id: int,
@@ -485,12 +574,16 @@ def get_evaluation_sessions(
         items = service.get_sessions(evaluation_id, patient_id)
         return EvaluationSessionList(items=items, total=len(items))
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/evaluations/{evaluation_id}/sessions", response_model=EvaluationSessionResponse, status_code=status.HTTP_201_CREATED)
+@patients_router.post(
+    "/{patient_id}/evaluations/{evaluation_id}/sessions",
+    response_model=EvaluationSessionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def start_evaluation_session(
     patient_id: int,
     evaluation_id: int,
@@ -507,19 +600,21 @@ def start_evaluation_session(
             patient_id=patient_id,
             user_id=current_user.id,
             device_info=data.device_info,
-            local_session_id=data.local_session_id,
         )
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotEditableError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except SessionAlreadyActiveError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/evaluations/{evaluation_id}/sessions/{session_id}/end", response_model=EvaluationSessionResponse)
+@patients_router.post(
+    "/{patient_id}/evaluations/{evaluation_id}/sessions/{session_id}/end",
+    response_model=EvaluationSessionResponse,
+)
 def end_evaluation_session(
     patient_id: int,
     evaluation_id: int,
@@ -533,16 +628,17 @@ def end_evaluation_session(
         service = PatientEvaluationService(db, tenant_id)
         return service.end_session(session_id, evaluation_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except SessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # SYNC ENDPOINT (MODE HORS-LIGNE)
 # =============================================================================
+
 
 @patients_router.post("/{patient_id}/evaluations/{evaluation_id}/sync", response_model=SyncResponse)
 def sync_evaluation_changes(
@@ -558,30 +654,31 @@ def sync_evaluation_changes(
         service = PatientEvaluationService(db, tenant_id)
         return service.sync_offline_changes(evaluation_id, patient_id, payload)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationExpiredError as e:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(e)) from e
 
 
 # =============================================================================
 # VALIDATION WORKFLOW ENDPOINTS
 # =============================================================================
 
+
 @patients_router.post(
     "/{patient_id}/evaluations/{evaluation_id}/submit",
     response_model=PatientEvaluationResponse,
     responses={
         400: {"model": ValidationErrorResponse, "description": "Évaluation incomplète"},
-    }
+    },
 )
 def submit_evaluation_for_validation(
-        patient_id: int,
-        evaluation_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),
-        current_user: User = Depends(get_current_user),
+    patient_id: int,
+    evaluation_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Soumet l'évaluation pour validation médicale.
@@ -590,20 +687,92 @@ def submit_evaluation_for_validation(
     """
     try:
         service = PatientEvaluationService(db, tenant_id)
-        return service.submit_for_validation(evaluation_id, patient_id)
+        return service.submit(evaluation_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotEditableError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except InvalidEvaluationDataError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"detail": e.message, "errors": e.errors}
+            detail={"detail": e.message, "errors": e.errors},
+        ) from e
+
+
+# =============================================================================
+# AGGIR — CALCUL GIR PRÉLIMINAIRE (MODE DRAFT, PAS D'ÉCRITURE EN BASE)
+# =============================================================================
+
+
+@patients_router.post(
+    "/{patient_id}/evaluations/{evaluation_id}/compute-gir",
+    response_model=GirComputeResponse,
+    summary="Calcul GIR préliminaire (DRAFT)",
+    responses={
+        400: {"description": "Variables insuffisantes ou codes inconnus"},
+        404: {"description": "Patient ou évaluation introuvable"},
+    },
+)
+def compute_gir_preview(
+    patient_id: int,
+    evaluation_id: int,
+    data: GirComputeRequest,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Calcule le GIR en temps réel pendant la saisie, sans écrire en base.
+
+    Appelé avec debounce depuis AggirForm.vue dès que les 10 discriminantes
+    sont cotées. Réutilise directement calculator.py (décret 1997-04-28).
+    """
+    # Vérifier que l'évaluation existe et appartient au patient/tenant
+    try:
+        service = PatientEvaluationService(db, tenant_id)
+        service.get_by_id(evaluation_id, patient_id)
+    except PatientNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except EvaluationNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+    # Convertir AggirVariableInput → Dict[Variable, Adverbes]
+    evaluations = {}
+    unknown_codes = []
+
+    for var_input in data.variables:
+        variable_enum = VARIABLE_CODE_MAPPING.get(var_input.code)
+        if variable_enum is None:
+            unknown_codes.append(var_input.code)
+            continue
+        adverbes_dict = {adv.question: adv.reponse for adv in var_input.adverbes}
+        evaluations[variable_enum] = Adverbes.from_dict(adverbes_dict)
+
+    if unknown_codes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Codes de variables AGGIR inconnus : {', '.join(unknown_codes)}",
         )
 
-@patients_router.post("/{patient_id}/evaluations/{evaluation_id}/validate/medical", response_model=PatientEvaluationResponse)
+    if not evaluations:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aucune variable AGGIR valide fournie",
+        )
+
+    # Calcul GIR — aucune écriture en base
+    calculator = AggirCalculator()
+    gir_score, _ = calculator.calculer_gir(evaluations)
+
+    return GirComputeResponse(gir_score=gir_score)
+
+
+@patients_router.post(
+    "/{patient_id}/evaluations/{evaluation_id}/validate/medical",
+    response_model=PatientEvaluationResponse,
+)
 def validate_evaluation_medical(
     patient_id: int,
     evaluation_id: int,
@@ -620,12 +789,15 @@ def validate_evaluation_medical(
         db.refresh(evaluation)
         return evaluation
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/evaluations/{evaluation_id}/validate/department", response_model=PatientEvaluationResponse)
+@patients_router.post(
+    "/{patient_id}/evaluations/{evaluation_id}/validate/department",
+    response_model=PatientEvaluationResponse,
+)
 def validate_evaluation_department(
     patient_id: int,
     evaluation_id: int,
@@ -645,14 +817,15 @@ def validate_evaluation_department(
         db.refresh(evaluation)
         return evaluation
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # PATIENT THRESHOLD ENDPOINTS
 # =============================================================================
+
 
 @patients_router.get("/{patient_id}/thresholds", response_model=PatientThresholdList)
 def get_patient_thresholds(
@@ -667,10 +840,14 @@ def get_patient_thresholds(
         items = service.get_all_for_patient(patient_id)
         return PatientThresholdList(items=items, total=len(items))
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/thresholds", response_model=PatientThresholdResponse, status_code=status.HTTP_201_CREATED)
+@patients_router.post(
+    "/{patient_id}/thresholds",
+    response_model=PatientThresholdResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_patient_threshold(
     patient_id: int,
     data: PatientThresholdCreate,
@@ -683,12 +860,14 @@ def create_patient_threshold(
         service = PatientThresholdService(db, tenant_id)
         return service.create(patient_id, data)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DuplicateThresholdError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@patients_router.patch("/{patient_id}/thresholds/{threshold_id}", response_model=PatientThresholdResponse)
+@patients_router.patch(
+    "/{patient_id}/thresholds/{threshold_id}", response_model=PatientThresholdResponse
+)
 def update_patient_threshold(
     patient_id: int,
     threshold_id: int,
@@ -702,12 +881,14 @@ def update_patient_threshold(
         service = PatientThresholdService(db, tenant_id)
         return service.update(threshold_id, patient_id, data)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ThresholdNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.delete("/{patient_id}/thresholds/{threshold_id}", status_code=status.HTTP_204_NO_CONTENT)
+@patients_router.delete(
+    "/{patient_id}/thresholds/{threshold_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def delete_patient_threshold(
     patient_id: int,
     threshold_id: int,
@@ -720,22 +901,23 @@ def delete_patient_threshold(
         service = PatientThresholdService(db, tenant_id)
         service.delete(threshold_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ThresholdNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # PATIENT VITALS ENDPOINTS
 # =============================================================================
 
+
 @patients_router.get("/{patient_id}/vitals", response_model=PatientVitalsList)
 def get_patient_vitals(
     patient_id: int,
     pagination: PaginationParams = Depends(),
-    vital_type: Optional[str] = Query(None, description="Filtrer par type"),
-    date_from: Optional[datetime] = Query(None, description="Date de début"),
-    date_to: Optional[datetime] = Query(None, description="Date de fin"),
+    vital_type: str | None = Query(None, description="Filtrer par type"),
+    date_from: datetime | None = Query(None, description="Date de début"),
+    date_to: datetime | None = Query(None, description="Date de fin"),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
     current_user: User = Depends(get_current_user),
@@ -756,10 +938,12 @@ def get_patient_vitals(
             items=items, total=total, page=pagination.page, size=pagination.size, pages=pages
         )
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.get("/{patient_id}/vitals/latest/{vital_type}", response_model=PatientVitalsResponse)
+@patients_router.get(
+    "/{patient_id}/vitals/latest/{vital_type}", response_model=PatientVitalsResponse
+)
 def get_patient_latest_vital(
     patient_id: int,
     vital_type: str,
@@ -774,14 +958,18 @@ def get_patient_latest_vital(
         if not vital:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Aucune mesure {vital_type} trouvée pour ce patient"
+                detail=f"Aucune mesure {vital_type} trouvée pour ce patient",
             )
         return vital
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/vitals", response_model=PatientVitalsResponse, status_code=status.HTTP_201_CREATED)
+@patients_router.post(
+    "/{patient_id}/vitals",
+    response_model=PatientVitalsResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_patient_vital(
     patient_id: int,
     data: PatientVitalsCreate,
@@ -792,11 +980,9 @@ def create_patient_vital(
     """Crée une mesure de constante."""
     try:
         service = PatientVitalsService(db, tenant_id)
-        return service.create(
-            patient_id, data, recorded_by=current_user.id
-        )
+        return service.create(patient_id, data, recorded_by=current_user.id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @patients_router.delete("/{patient_id}/vitals/{vitals_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -812,14 +998,15 @@ def delete_patient_vital(
         service = PatientVitalsService(db, tenant_id)
         service.delete(vitals_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except VitalsNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # PATIENT DEVICE ENDPOINTS
 # =============================================================================
+
 
 @patients_router.get("/{patient_id}/devices", response_model=PatientDeviceList)
 def get_patient_devices(
@@ -835,10 +1022,14 @@ def get_patient_devices(
         items = service.get_all_for_patient(patient_id, active_only=active_only)
         return PatientDeviceList(items=items, total=len(items))
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.post("/{patient_id}/devices", response_model=PatientDeviceResponse, status_code=status.HTTP_201_CREATED)
+@patients_router.post(
+    "/{patient_id}/devices",
+    response_model=PatientDeviceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_patient_device(
     patient_id: int,
     data: PatientDeviceCreate,
@@ -851,9 +1042,9 @@ def create_patient_device(
         service = PatientDeviceService(db, tenant_id)
         return service.create(patient_id, data)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DuplicateDeviceError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @patients_router.patch("/{patient_id}/devices/{device_id}", response_model=PatientDeviceResponse)
@@ -870,9 +1061,9 @@ def update_patient_device(
         service = PatientDeviceService(db, tenant_id)
         return service.update(device_id, patient_id, data)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DeviceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @patients_router.delete("/{patient_id}/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -888,19 +1079,20 @@ def delete_patient_device(
         service = PatientDeviceService(db, tenant_id)
         service.delete(device_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DeviceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # PATIENT DOCUMENT ENDPOINTS
 # =============================================================================
 
+
 @patients_router.get("/{patient_id}/documents", response_model=PatientDocumentList)
 def get_patient_documents(
     patient_id: int,
-    document_type: Optional[str] = Query(None, description="Filtrer par type"),
+    document_type: str | None = Query(None, description="Filtrer par type"),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
     current_user: User = Depends(get_current_user),
@@ -908,15 +1100,15 @@ def get_patient_documents(
     """Liste les documents générés pour un patient."""
     try:
         service = PatientDocumentService(db, tenant_id)
-        items = service.get_all_for_patient(
-            patient_id, document_type=document_type
-        )
+        items = service.get_all_for_patient(patient_id, document_type=document_type)
         return PatientDocumentList(items=items, total=len(items))
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.get("/{patient_id}/documents/{document_id}", response_model=PatientDocumentResponse)
+@patients_router.get(
+    "/{patient_id}/documents/{document_id}", response_model=PatientDocumentResponse
+)
 def get_patient_document(
     patient_id: int,
     document_id: int,
@@ -929,12 +1121,14 @@ def get_patient_document(
         service = PatientDocumentService(db, tenant_id)
         return service.get_by_id(document_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DocumentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@patients_router.delete("/{patient_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@patients_router.delete(
+    "/{patient_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def delete_patient_document(
     patient_id: int,
     document_id: int,
@@ -947,9 +1141,9 @@ def delete_patient_document(
         service = PatientDocumentService(db, tenant_id)
         service.delete(document_id, patient_id)
     except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DocumentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================

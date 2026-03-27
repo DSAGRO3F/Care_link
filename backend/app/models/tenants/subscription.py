@@ -7,31 +7,33 @@ et la facturation des clients CareLink.
 """
 
 from datetime import date
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Integer, String, Date, Text
+from sqlalchemy import Date, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
 
+
 # from enum import Enum as PyEnum
 
 # Imports conditionnels pour éviter les imports circulaires
 if TYPE_CHECKING:
-    from app.models.tenants.tenant import Tenant
     from app.models.tenants.subscription_usage import SubscriptionUsage
+    from app.models.tenants.tenant import Tenant
 
 from app.models.enums import (
+    BillingCycle,
     SubscriptionPlan,
     SubscriptionStatus,
-    BillingCycle,
 )
 
 
 # =============================================================================
 # MODÈLE
 # =============================================================================
+
 
 class Subscription(Base, TimestampMixin):
     """
@@ -66,17 +68,12 @@ class Subscription(Base, TimestampMixin):
     """
 
     __tablename__ = "subscriptions"
-    __table_args__ = {
-        "comment": "Abonnements et facturation des tenants"
-    }
+    __table_args__ = {"comment": "Abonnements et facturation des tenants"}
 
     # ========================
     # Clé primaire
     # ========================
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique de l'abonnement"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique de l'abonnement")
 
     # ========================
     # Clé étrangère
@@ -86,7 +83,7 @@ class Subscription(Base, TimestampMixin):
         nullable=False,
         index=True,
         doc="ID du tenant propriétaire",
-        info={"description": "Référence vers le tenant"}
+        info={"description": "Référence vers le tenant"},
     )
 
     # ========================
@@ -98,18 +95,15 @@ class Subscription(Base, TimestampMixin):
         doc="Code du plan d'abonnement",
         info={
             "description": "S=Small, M=Medium, L=Large, XL=Extra-Large, ENTERPRISE=Sur mesure",
-            "example": "L"
-        }
+            "example": "L",
+        },
     )
 
-    plan_name: Mapped[Optional[str]] = mapped_column(
+    plan_name: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
         doc="Libellé du plan",
-        info={
-            "description": "Nom commercial du plan",
-            "example": "Plan Large - 1500 patients"
-        }
+        info={"description": "Nom commercial du plan", "example": "Plan Large - 1500 patients"},
     )
 
     # ========================
@@ -120,28 +114,28 @@ class Subscription(Base, TimestampMixin):
         nullable=False,
         default=SubscriptionStatus.ACTIVE,
         doc="Statut de l'abonnement",
-        info={"description": "TRIAL, ACTIVE, PAST_DUE, CANCELLED"}
+        info={"description": "TRIAL, ACTIVE, PAST_DUE, CANCELLED"},
     )
 
     started_at: Mapped[date] = mapped_column(
         Date,
         nullable=False,
         doc="Date de début de l'abonnement",
-        info={"description": "Date d'activation"}
+        info={"description": "Date d'activation"},
     )
 
-    expires_at: Mapped[Optional[date]] = mapped_column(
+    expires_at: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
         doc="Date d'expiration",
-        info={"description": "NULL = pas d'expiration fixe"}
+        info={"description": "NULL = pas d'expiration fixe"},
     )
 
-    trial_ends_at: Mapped[Optional[date]] = mapped_column(
+    trial_ends_at: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
         doc="Date de fin de la période d'essai",
-        info={"description": "NULL = pas de période d'essai"}
+        info={"description": "NULL = pas de période d'essai"},
     )
 
     # ========================
@@ -153,18 +147,18 @@ class Subscription(Base, TimestampMixin):
         doc="Prix de base mensuel en centimes",
         info={
             "description": "Prix du forfait en centimes d'euros",
-            "example": 50000  # 500€
-        }
+            "example": 50000,  # 500€
+        },
     )
 
-    price_per_extra_patient_cents: Mapped[Optional[int]] = mapped_column(
+    price_per_extra_patient_cents: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         doc="Coût par patient supplémentaire en centimes",
         info={
             "description": "Prix unitaire pour dépassement du forfait",
-            "example": 500  # 5€ par patient supplémentaire
-        }
+            "example": 500,  # 5€ par patient supplémentaire
+        },
     )
 
     currency: Mapped[str] = mapped_column(
@@ -172,7 +166,7 @@ class Subscription(Base, TimestampMixin):
         nullable=False,
         default="EUR",
         doc="Code devise ISO 4217",
-        info={"description": "EUR, USD, CHF...", "example": "EUR"}
+        info={"description": "EUR, USD, CHF...", "example": "EUR"},
     )
 
     billing_cycle: Mapped[BillingCycle] = mapped_column(
@@ -180,7 +174,7 @@ class Subscription(Base, TimestampMixin):
         nullable=False,
         default=BillingCycle.MONTHLY,
         doc="Cycle de facturation",
-        info={"description": "MONTHLY, QUARTERLY, YEARLY"}
+        info={"description": "MONTHLY, QUARTERLY, YEARLY"},
     )
 
     # ========================
@@ -190,51 +184,46 @@ class Subscription(Base, TimestampMixin):
         Integer,
         nullable=False,
         doc="Nombre de patients inclus dans le forfait",
-        info={
-            "description": "Quota de patients avant facturation supplémentaire",
-            "example": 1500
-        }
+        info={"description": "Quota de patients avant facturation supplémentaire", "example": 1500},
     )
 
-    included_users: Mapped[Optional[int]] = mapped_column(
+    included_users: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         doc="Nombre d'utilisateurs inclus",
-        info={"description": "NULL = illimité"}
+        info={"description": "NULL = illimité"},
     )
 
-    included_storage_gb: Mapped[Optional[int]] = mapped_column(
+    included_storage_gb: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         doc="Stockage inclus en Go",
-        info={"description": "Quota de stockage documents", "example": 50}
+        info={"description": "Quota de stockage documents", "example": 50},
     )
 
     # ========================
     # Métadonnées
     # ========================
-    notes: Mapped[Optional[str]] = mapped_column(
+    notes: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         doc="Notes internes sur l'abonnement",
-        info={"description": "Commentaires, conditions particulières..."}
+        info={"description": "Commentaires, conditions particulières..."},
     )
 
     # ========================
     # Relations
     # ========================
     tenant: Mapped["Tenant"] = relationship(
-        "Tenant",
-        back_populates="subscriptions",
-        doc="Tenant propriétaire de cet abonnement"
+        "Tenant", back_populates="subscriptions", doc="Tenant propriétaire de cet abonnement"
     )
 
-    usage_records: Mapped[List["SubscriptionUsage"]] = relationship(
+    usage_records: Mapped[list["SubscriptionUsage"]] = relationship(
         "SubscriptionUsage",
         back_populates="subscription",
         cascade="all, delete-orphan",
         order_by="desc(SubscriptionUsage.period_start)",
-        doc="Historique de consommation mensuelle"
+        doc="Historique de consommation mensuelle",
     )
 
     # ========================
@@ -264,7 +253,7 @@ class Subscription(Base, TimestampMixin):
         return self.base_price_cents / 100
 
     @property
-    def price_per_extra_patient_euros(self) -> Optional[float]:
+    def price_per_extra_patient_euros(self) -> float | None:
         """Prix par patient supplémentaire en euros."""
         if self.price_per_extra_patient_cents:
             return self.price_per_extra_patient_cents / 100

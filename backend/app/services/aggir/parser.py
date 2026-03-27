@@ -35,14 +35,15 @@ Le format JSON CareLink pour AGGIR est :
 """
 
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any
 
 from app.services.aggir.calculator import (
-    Variable,
+    VARIABLE_CODE_MAPPING,
     Adverbes,
     AggirCalculator,
-    VARIABLE_CODE_MAPPING,
+    Variable,
 )
+
 
 # =============================================================================
 # CONSTANTES - Structure officielle AGGIR
@@ -106,7 +107,7 @@ class AggirParser:
         updated_json = parser.update_json_with_gir(evaluation_data, gir, details)
     """
 
-    def parse_evaluation_json(self, evaluation_data: Dict[str, Any]) -> Dict[Variable, Adverbes]:
+    def parse_evaluation_json(self, evaluation_data: dict[str, Any]) -> dict[Variable, Adverbes]:
         """
         Parse le JSON d'évaluation CareLink vers un dictionnaire Variable → Adverbes.
 
@@ -144,9 +145,8 @@ class AggirParser:
         return result
 
     def _parse_variable_or_subvariable(
-            self,
-            data: Dict[str, Any]
-    ) -> Optional[Tuple[Variable, Adverbes]]:
+        self, data: dict[str, Any]
+    ) -> tuple[Variable, Adverbes] | None:
         """
         Parse une variable ou sous-variable depuis le JSON.
 
@@ -173,7 +173,7 @@ class AggirParser:
                 adverbes_dict[question] = bool(reponse)
 
         # Vérifier que tous les adverbes sont présents
-        if not all(k in adverbes_dict for k in ['S', 'T', 'C', 'H']):
+        if not all(k in adverbes_dict for k in ["S", "T", "C", "H"]):
             return None
 
         var_enum = VARIABLE_CODE_MAPPING[code]
@@ -181,7 +181,7 @@ class AggirParser:
 
         return var_enum, adverbes
 
-    def calculate_completion_percent(self, evaluation_data: Dict[str, Any]) -> int:
+    def calculate_completion_percent(self, evaluation_data: dict[str, Any]) -> int:
         """
         Calcule le pourcentage de complétion de l'évaluation AGGIR.
 
@@ -213,7 +213,7 @@ class AggirParser:
 
         return int((completed / TOTAL_SOUS_VARIABLES) * 100)
 
-    def _is_variable_complete(self, data: Dict[str, Any]) -> bool:
+    def _is_variable_complete(self, data: dict[str, Any]) -> bool:
         """
         Vérifie si une variable/sous-variable est complètement renseignée.
         """
@@ -227,7 +227,7 @@ class AggirParser:
 
         return True
 
-    def get_incomplete_variables(self, evaluation_data: Dict[str, Any]) -> List[str]:
+    def get_incomplete_variables(self, evaluation_data: dict[str, Any]) -> list[str]:
         """
         Retourne la liste des codes des variables incomplètes.
 
@@ -257,11 +257,8 @@ class AggirParser:
         return incomplete
 
     def update_json_with_gir(
-            self,
-            evaluation_data: Dict[str, Any],
-            gir: int,
-            details: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, evaluation_data: dict[str, Any], gir: int, details: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Met à jour le JSON d'évaluation avec le GIR calculé.
 
@@ -294,14 +291,14 @@ class AggirParser:
         return result
 
     def update_variable_result(
-            self,
-            evaluation_data: Dict[str, Any],
-            variable_code: str,
-            adverbes: Dict[str, bool],
-            recorded_at: datetime = None,
-            recorded_by_user_id: int = None,
-            session_id: int = None,
-    ) -> Dict[str, Any]:
+        self,
+        evaluation_data: dict[str, Any],
+        variable_code: str,
+        adverbes: dict[str, bool],
+        recorded_at: datetime = None,
+        recorded_by_user_id: int = None,
+        session_id: int = None,
+    ) -> dict[str, Any]:
         """
         Met à jour une variable spécifique dans le JSON d'évaluation.
 
@@ -332,8 +329,7 @@ class AggirParser:
             for sous_var in var_data.get("AggirSousVariable", []):
                 if sous_var.get("Code") == variable_code:
                     self._update_variable_data(
-                        sous_var, adverbes, resultat,
-                        recorded_at, recorded_by_user_id, session_id
+                        sous_var, adverbes, resultat, recorded_at, recorded_by_user_id, session_id
                     )
                     found = True
                     break
@@ -341,8 +337,7 @@ class AggirParser:
             # Ou directement dans la variable
             if var_data.get("Code") == variable_code:
                 self._update_variable_data(
-                    var_data, adverbes, resultat,
-                    recorded_at, recorded_by_user_id, session_id
+                    var_data, adverbes, resultat, recorded_at, recorded_by_user_id, session_id
                 )
                 found = True
                 break
@@ -350,22 +345,19 @@ class AggirParser:
         return result
 
     def _update_variable_data(
-            self,
-            var_data: Dict[str, Any],
-            adverbes: Dict[str, bool],
-            resultat: str,
-            recorded_at: datetime = None,
-            recorded_by_user_id: int = None,
-            session_id: int = None,
+        self,
+        var_data: dict[str, Any],
+        adverbes: dict[str, bool],
+        resultat: str,
+        recorded_at: datetime = None,
+        recorded_by_user_id: int = None,
+        session_id: int = None,
     ) -> None:
         """Met à jour les données d'une variable in-place."""
         # Mettre à jour les adverbes
         adverbes_list = []
-        for q in ['S', 'T', 'C', 'H']:
-            adverbes_list.append({
-                "Question": q,
-                "Reponse": adverbes.get(q, False)
-            })
+        for q in ["S", "T", "C", "H"]:
+            adverbes_list.append({"Question": q, "Reponse": adverbes.get(q, False)})
 
         var_data["AggirAdverbes"] = adverbes_list
         var_data["Resultat"] = resultat
@@ -378,7 +370,7 @@ class AggirParser:
         if session_id:
             var_data["SessionId"] = session_id
 
-    def create_empty_aggir_structure(self) -> Dict[str, Any]:
+    def create_empty_aggir_structure(self) -> dict[str, Any]:
         """
         Crée une structure AGGIR vide avec toutes les variables.
 
@@ -396,7 +388,7 @@ class AggirParser:
                 "Code": var_code,
                 "Resultat": None,
                 "Status": "PENDING",
-                "AggirSousVariable": []
+                "AggirSousVariable": [],
             }
 
             for sous_code in sous_var_codes:
@@ -414,7 +406,7 @@ class AggirParser:
                         {"Question": "T", "Reponse": None},
                         {"Question": "C", "Reponse": None},
                         {"Question": "H", "Reponse": None},
-                    ]
+                    ],
                 }
                 var_data["AggirSousVariable"].append(sous_var)
 
@@ -436,10 +428,10 @@ class AggirParser:
             "dateCalcul": None,
             "groupeAlgorithme": None,
             "scoreAlgorithme": None,
-            "AggirVariable": variables
+            "AggirVariable": variables,
         }
 
-    def _create_simple_variable(self, var_code: str) -> Dict[str, Any]:
+    def _create_simple_variable(self, var_code: str) -> dict[str, Any]:
         """Crée une variable simple (sans sous-variables)."""
         return {
             "Nom": self._get_variable_name(var_code),
@@ -455,7 +447,7 @@ class AggirParser:
                 {"Question": "T", "Reponse": None},
                 {"Question": "C", "Reponse": None},
                 {"Question": "H", "Reponse": None},
-            ]
+            ],
         }
 
     def _get_variable_name(self, code: str) -> str:
@@ -498,7 +490,7 @@ class AggirParser:
         return names.get(code, code)
 
 
-def calculate_gir_from_json(evaluation_data: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+def calculate_gir_from_json(evaluation_data: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     """
     Fonction utilitaire pour calculer le GIR directement depuis le JSON.
 

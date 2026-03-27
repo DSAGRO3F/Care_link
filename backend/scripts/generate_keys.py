@@ -9,12 +9,13 @@ Génère:
     2. Clé AES-256 pour chiffrement des données patients
 """
 
+import base64
 import os
 from pathlib import Path
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import serialization
+
 from cryptography.hazmat.backends import default_backend
-import base64
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 
 def generate_es256_keypair(output_dir: Path):
@@ -24,14 +25,14 @@ def generate_es256_keypair(output_dir: Path):
     # Générer la clé privée
     private_key = ec.generate_private_key(
         ec.SECP256R1(),  # Courbe P-256
-        default_backend()
+        default_backend(),
     )
 
     # Sauvegarder la clé privée au format PEM
     private_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()
+        encryption_algorithm=serialization.NoEncryption(),
     )
 
     private_key_path = output_dir / "jwt_private_key.pem"
@@ -41,8 +42,7 @@ def generate_es256_keypair(output_dir: Path):
     # Générer et sauvegarder la clé publique
     public_key = private_key.public_key()
     public_pem = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
 
     public_key_path = output_dir / "jwt_public_key.pem"
@@ -58,9 +58,9 @@ def generate_aes256_key():
     key = os.urandom(32)
 
     # Encoder en base64 pour faciliter le stockage dans .env
-    key_b64 = base64.b64encode(key).decode('utf-8')
+    key_b64 = base64.b64encode(key).decode("utf-8")
 
-    print(f"✅ Clé AES-256 (à ajouter dans .env):")
+    print("✅ Clé AES-256 (à ajouter dans .env):")
     print(f"\nENCRYPTION_KEY={key_b64}\n")
 
     return key_b64

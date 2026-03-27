@@ -11,18 +11,24 @@ MULTI-TENANT: Les opérations sur User et Role sont filtrées par tenant_id.
 
 v4.3: Architecture permissions normalisée (Permission + RolePermission)
 """
-from datetime import datetime, timezone
-from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func, or_
+from datetime import UTC, datetime
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.user.schemas import (
-    ProfessionCreate, ProfessionUpdate,
-    RoleCreate, RoleUpdate,
-    UserCreate, UserUpdate, UserFilters,
-    UserEntityCreate, UserEntityUpdate,
-    UserAvailabilityCreate, UserAvailabilityUpdate,
+    ProfessionCreate,
+    ProfessionUpdate,
+    RoleCreate,
+    RoleUpdate,
+    UserAvailabilityCreate,
+    UserAvailabilityUpdate,
+    UserCreate,
+    UserEntityCreate,
+    UserEntityUpdate,
+    UserFilters,
+    UserUpdate,
 )
 from app.models.enums import PermissionCategory  # AJOUT v4.3
 from app.models.user.permission import Permission  # AJOUT v4.3
@@ -30,90 +36,75 @@ from app.models.user.profession import Profession
 from app.models.user.role import Role
 from app.models.user.role_permission import RolePermission  # AJOUT v4.3
 from app.models.user.user import User
-from app.models.user.user_associations import UserRole, UserEntity
+from app.models.user.user_associations import UserEntity, UserRole
 from app.models.user.user_availability import UserAvailability
-
 from app.services.encryption import (
-    user_encryptor,
-    encrypt_user_data,
-    decrypt_user_data,
     get_user_search_blind,
+    user_encryptor,
 )
-
 
 
 # =============================================================================
 # EXCEPTIONS
 # =============================================================================
 
+
 class UserNotFoundError(Exception):
     """Utilisateur non trouvé."""
-    pass
 
 
 class RoleNotFoundError(Exception):
     """Rôle non trouvé."""
-    pass
 
 
 class ProfessionNotFoundError(Exception):
     """Profession non trouvée."""
-    pass
 
 
 class AvailabilityNotFoundError(Exception):
     """Disponibilité non trouvée."""
-    pass
 
 
 class EntityNotFoundError(Exception):
     """Entité non trouvée."""
-    pass
 
 
 class DuplicateEmailError(Exception):
     """Email déjà utilisé."""
-    pass
 
 
 class DuplicateRPPSError(Exception):
     """RPPS déjà utilisé."""
-    pass
 
 
 class DuplicateProfessionNameError(Exception):
     """Nom de profession déjà utilisé."""
-    pass
 
 
 class DuplicateProfessionCodeError(Exception):
     """Code de profession déjà utilisé."""
-    pass
 
 
 class DuplicateRoleNameError(Exception):
     """Nom de rôle déjà utilisé."""
-    pass
 
 
 class SystemRoleModificationError(Exception):
     """Tentative de modification d'un rôle système."""
-    pass
 
 
 class UserAlreadyHasRoleError(Exception):
     """L'utilisateur a déjà ce rôle."""
-    pass
 
 
 class UserEntityAlreadyExistsError(Exception):
     """L'utilisateur est déjà rattaché à cette entité."""
-    pass
 
 
 # =============================================================================
 # PROFESSION SERVICE (DONNÉES PARTAGÉES - PAS DE TENANT)
 # =============================================================================
+
 
 class ProfessionService:
     """
@@ -125,11 +116,11 @@ class ProfessionService:
 
     @staticmethod
     def get_all(
-            db: Session,
-            page: int = 1,
-            size: int = 50,
-            category: Optional[str] = None,
-    ) -> Tuple[List[Profession], int]:
+        db: Session,
+        page: int = 1,
+        size: int = 50,
+        category: str | None = None,
+    ) -> tuple[list[Profession], int]:
         """Liste toutes les professions avec pagination."""
         query = select(Profession)
 
@@ -150,13 +141,13 @@ class ProfessionService:
     @staticmethod
     def get_by_id(db: Session, profession_id: int) -> Profession:
         """Récupère une profession par son ID."""
-        profession: Optional[Profession] = db.get(Profession, profession_id)
+        profession: Profession | None = db.get(Profession, profession_id)
         if not profession:
             raise ProfessionNotFoundError(f"Profession {profession_id} non trouvée")
         return profession
 
     @staticmethod
-    def get_by_code(db: Session, code: str) -> Optional[Profession]:
+    def get_by_code(db: Session, code: str) -> Profession | None:
         """Récupère une profession par son code."""
         query = select(Profession).where(Profession.code == code)
         return db.execute(query).scalar_one_or_none()
@@ -198,7 +189,9 @@ class ProfessionService:
                 select(Profession).where(Profession.name == update_data["name"])
             ).scalar_one_or_none()
             if existing:
-                raise DuplicateProfessionNameError(f"Profession '{update_data['name']}' existe déjà")
+                raise DuplicateProfessionNameError(
+                    f"Profession '{update_data['name']}' existe déjà"
+                )
 
         # Vérifier unicité du code
         if "code" in update_data and update_data["code"] != profession.code:
@@ -228,6 +221,7 @@ class ProfessionService:
 # ROLE SERVICE (MULTI-TENANT)
 # =============================================================================
 
+
 class RoleService:
     """
     Service pour la gestion des rôles.
@@ -256,16 +250,16 @@ class RoleService:
         return select(Role).where(
             or_(
                 Role.tenant_id == self.tenant_id,
-                Role.is_system_role == True  # Rôles système partagés
+                Role.is_system_role == True,  # Rôles système partagés
             )
         )
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 50,
-            is_system_role: Optional[bool] = None,
-    ) -> Tuple[List[Role], int]:
+        self,
+        page: int = 1,
+        size: int = 50,
+        is_system_role: bool | None = None,
+    ) -> tuple[list[Role], int]:
         """Liste tous les rôles avec pagination."""
         query = self._base_query()
 
@@ -291,7 +285,7 @@ class RoleService:
             raise RoleNotFoundError(f"Rôle {role_id} non trouvé")
         return role
 
-    def get_by_name(self, name: str) -> Optional[Role]:
+    def get_by_name(self, name: str) -> Role | None:
         """Récupère un rôle par son nom."""
         query = self._base_query().where(Role.name == name)
         return self.db.execute(query).scalar_one_or_none()
@@ -315,7 +309,7 @@ class RoleService:
         # Créer le rôle sans permissions
         role = Role(
             tenant_id=self.tenant_id,  # AUTO-INJECTION DU TENANT
-            **role_data
+            **role_data,
         )
         self.db.add(role)
         self.db.flush()  # Pour obtenir l'ID
@@ -355,18 +349,16 @@ class RoleService:
                 code=code,
                 name=code.replace("_", " ").title(),
                 description=f"Permission {code}",
-                category=cat
+                category=cat,
             )
             self.db.add(perm)
             self.db.flush()
         return perm
 
-    def _set_role_permissions(self, role: Role, permission_codes: List[str]) -> None:
+    def _set_role_permissions(self, role: Role, permission_codes: list[str]) -> None:
         """Définit les permissions d'un rôle (v4.3)."""
         # Supprimer les anciennes associations
-        self.db.query(RolePermission).filter(
-            RolePermission.role_id == role.id
-        ).delete()
+        self.db.query(RolePermission).filter(RolePermission.role_id == role.id).delete()
 
         # Créer les nouvelles associations
         for code in permission_codes:
@@ -426,6 +418,7 @@ class RoleService:
 # =============================================================================
 # USER SERVICE (MULTI-TENANT)
 # =============================================================================
+
 
 class UserService:
     """
@@ -487,13 +480,13 @@ class UserService:
     # ----------Lister les utilisateurs--------------
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            sort_by: str = "last_name",
-            sort_order: str = "asc",
-            filters: Optional[UserFilters] = None,
-    ) -> Tuple[List[User], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        sort_by: str = "last_name",
+        sort_order: str = "asc",
+        filters: UserFilters | None = None,
+    ) -> tuple[list[User], int]:
         """
         Liste les utilisateurs avec pagination et filtres.
 
@@ -516,13 +509,14 @@ class UserService:
 
             if filters.entity_id:
                 query = query.join(User.entity_associations).where(
-                    UserEntity.entity_id == filters.entity_id,
-                    UserEntity.end_date.is_(None)
+                    UserEntity.entity_id == filters.entity_id, UserEntity.end_date.is_(None)
                 )
 
             if filters.role_name:
-                query = query.join(User.role_associations).join(UserRole.role).where(
-                    Role.name == filters.role_name
+                query = (
+                    query.join(User.role_associations)
+                    .join(UserRole.role)
+                    .where(Role.name == filters.role_name)
                 )
 
             if filters.search:
@@ -566,11 +560,15 @@ class UserService:
         CHIFFREMENT: email et rpps sont déchiffrés avant retour.
         """
         if load_relations:
-            query = self._base_query().options(
-                selectinload(User.profession),
-                selectinload(User.role_associations).selectinload(UserRole.role),
-                selectinload(User.entity_associations).selectinload(UserEntity.entity),
-            ).where(User.id == user_id)
+            query = (
+                self._base_query()
+                .options(
+                    selectinload(User.profession),
+                    selectinload(User.role_associations).selectinload(UserRole.role),
+                    selectinload(User.entity_associations).selectinload(UserEntity.entity),
+                )
+                .where(User.id == user_id)
+            )
             user = self.db.execute(query).scalar_one_or_none()
         else:
             query = self._base_query().where(User.id == user_id)
@@ -588,7 +586,7 @@ class UserService:
 
     # ----------Récupérer un utilisateur--------------
 
-    def get_by_email(self, email: str) -> Optional[User]:
+    def get_by_email(self, email: str) -> User | None:
         """
         Récupère un utilisateur par son email (dans le tenant).
         CHIFFREMENT: Utilise le blind index pour la recherche.
@@ -604,7 +602,7 @@ class UserService:
 
     # ----------Récupérer un utilisateur--------------
 
-    def get_by_rpps(self, rpps: str) -> Optional[User]:
+    def get_by_rpps(self, rpps: str) -> User | None:
         """
         Récupère un utilisateur par son RPPS (dans le tenant).
         CHIFFREMENT: Utilise le blind index pour la recherche.
@@ -636,7 +634,7 @@ class UserService:
 
         # Vérifier profession existe
         if data.profession_id:
-            profession: Optional[Profession] = self.db.get(Profession, data.profession_id)
+            profession: Profession | None = self.db.get(Profession, data.profession_id)
             if not profession:
                 raise ProfessionNotFoundError(f"Profession {data.profession_id} non trouvée")
 
@@ -645,8 +643,7 @@ class UserService:
 
         # NOUVEAU: Chiffrer email et rpps + générer blind indexes
         encrypted_data = user_encryptor.encrypt_for_db(
-            {"email": user_data.pop("email"), "rpps": user_data.pop("rpps", None)},
-            self.tenant_id
+            {"email": user_data.pop("email"), "rpps": user_data.pop("rpps", None)}, self.tenant_id
         )
 
         # Créer l'utilisateur avec données chiffrées
@@ -659,6 +656,7 @@ class UserService:
         # Hash du mot de passe si fourni
         if data.password:
             from app.core.security.hashing import hash_password
+
             user.password_hash = hash_password(data.password)
 
         self.db.add(user)
@@ -706,10 +704,12 @@ class UserService:
                     raise DuplicateRPPSError(f"RPPS '{update_data['rpps']}' déjà utilisé")
 
         # 4. Vérifier profession existe
-        if "profession_id" in update_data and update_data["profession_id"]:
-            profession: Optional[Profession] = self.db.get(Profession, update_data["profession_id"])
+        if update_data.get("profession_id"):
+            profession: Profession | None = self.db.get(Profession, update_data["profession_id"])
             if not profession:
-                raise ProfessionNotFoundError(f"Profession {update_data['profession_id']} non trouvée")
+                raise ProfessionNotFoundError(
+                    f"Profession {update_data['profession_id']} non trouvée"
+                )
 
         # 5. Chiffrer email/rpps si présents dans update_data
         if "email" in update_data or "rpps" in update_data:
@@ -720,7 +720,7 @@ class UserService:
                 fields_to_encrypt["rpps"] = update_data.pop("rpps")
 
             # Chiffrer + générer blind indexes
-            encrypted_fields = user_encryptor.prepare_update(fields_to_encrypt, self.tenant_id)
+            encrypted_fields = user_encryptor.prepare_for_update(fields_to_encrypt, self.tenant_id)
             update_data.update(encrypted_fields)
 
         # 6. Appliquer les modifications (tout reste chiffré en session)
@@ -730,6 +730,7 @@ class UserService:
         # Hash du mot de passe si fourni
         if data.password:
             from app.core.security.hashing import hash_password
+
             user.password_hash = hash_password(data.password)
 
         self.db.commit()
@@ -761,7 +762,7 @@ class UserService:
 
     # ----------Ajouter un rôle--------------
 
-    def add_role(self, user_id: int, role_id: int, assigned_by: Optional[int] = None) -> UserRole:
+    def add_role(self, user_id: int, role_id: int, assigned_by: int | None = None) -> UserRole:
         """Attribue un rôle à un utilisateur."""
         self._get_raw(user_id)  # Vérifie existence + tenant
 
@@ -771,10 +772,7 @@ class UserService:
 
         # Vérifier si déjà attribué
         existing = self.db.execute(
-            select(UserRole).where(
-                UserRole.user_id == user_id,
-                UserRole.role_id == role_id
-            )
+            select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
         ).scalar_one_or_none()
 
         if existing:
@@ -785,7 +783,7 @@ class UserService:
             role_id=role_id,
             tenant_id=self.tenant_id,  # AJOUT v4.3
             assigned_by=assigned_by,
-            assigned_at=datetime.now(timezone.utc)
+            assigned_at=datetime.now(UTC),
         )
         self.db.add(user_role)
         self.db.commit()
@@ -797,14 +795,11 @@ class UserService:
     def remove_role(self, user_id: int, role_id: int) -> None:
         """Retire un rôle à un utilisateur."""
         user_role = self.db.execute(
-            select(UserRole).where(
-                UserRole.user_id == user_id,
-                UserRole.role_id == role_id
-            )
+            select(UserRole).where(UserRole.user_id == user_id, UserRole.role_id == role_id)
         ).scalar_one_or_none()
 
         if not user_role:
-            raise RoleNotFoundError(f"L'utilisateur n'a pas ce rôle")
+            raise RoleNotFoundError("L'utilisateur n'a pas ce rôle")
 
         self.db.delete(user_role)
         self.db.commit()
@@ -819,10 +814,7 @@ class UserService:
 
         # Vérifier entité existe ET appartient au tenant
         entity = self.db.execute(
-            select(Entity).where(
-                Entity.id == data.entity_id,
-                Entity.tenant_id == self.tenant_id
-            )
+            select(Entity).where(Entity.id == data.entity_id, Entity.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not entity:
@@ -831,37 +823,36 @@ class UserService:
         # Vérifier si déjà rattaché
         existing = self.db.execute(
             select(UserEntity).where(
-                UserEntity.user_id == user_id,
-                UserEntity.entity_id == data.entity_id
+                UserEntity.user_id == user_id, UserEntity.entity_id == data.entity_id
             )
         ).scalar_one_or_none()
 
         if existing:
-            raise UserEntityAlreadyExistsError(
-                f"L'utilisateur est déjà rattaché à cette entité"
-            )
+            raise UserEntityAlreadyExistsError("L'utilisateur est déjà rattaché à cette entité")
 
         # Si c'est la première entité ou marqué comme primaire, s'assurer qu'il n'y a qu'un seul primaire
         if data.is_primary:
             self.db.execute(
                 select(UserEntity).where(
-                    UserEntity.user_id == user_id,
-                    UserEntity.is_primary == True
+                    UserEntity.user_id == user_id, UserEntity.is_primary == True
                 )
             )
             # Retirer le flag primaire des autres
-            for ue in self.db.execute(
+            for ue in (
+                self.db.execute(
                     select(UserEntity).where(
-                        UserEntity.user_id == user_id,
-                        UserEntity.is_primary == True
+                        UserEntity.user_id == user_id, UserEntity.is_primary == True
                     )
-            ).scalars().all():
+                )
+                .scalars()
+                .all()
+            ):
                 ue.is_primary = False
 
         user_entity = UserEntity(
             user_id=user_id,
             tenant_id=self.tenant_id,  # AJOUT v4.3
-            **data.model_dump()
+            **data.model_dump(),
         )
         self.db.add(user_entity)
         self.db.commit()
@@ -874,25 +865,28 @@ class UserService:
         """Met à jour le rattachement à une entité."""
         user_entity = self.db.execute(
             select(UserEntity).where(
-                UserEntity.user_id == user_id,
-                UserEntity.entity_id == entity_id
+                UserEntity.user_id == user_id, UserEntity.entity_id == entity_id
             )
         ).scalar_one_or_none()
 
         if not user_entity:
-            raise EntityNotFoundError(f"Rattachement non trouvé")
+            raise EntityNotFoundError("Rattachement non trouvé")
 
         update_data = data.model_dump(exclude_unset=True)
 
         # Gérer le flag primaire
         if update_data.get("is_primary"):
-            for ue in self.db.execute(
+            for ue in (
+                self.db.execute(
                     select(UserEntity).where(
                         UserEntity.user_id == user_id,
                         UserEntity.is_primary == True,
-                        UserEntity.entity_id != entity_id
+                        UserEntity.entity_id != entity_id,
                     )
-            ).scalars().all():
+                )
+                .scalars()
+                .all()
+            ):
                 ue.is_primary = False
 
         for field, value in update_data.items():
@@ -908,13 +902,12 @@ class UserService:
         """Détache un utilisateur d'une entité."""
         user_entity = self.db.execute(
             select(UserEntity).where(
-                UserEntity.user_id == user_id,
-                UserEntity.entity_id == entity_id
+                UserEntity.user_id == user_id, UserEntity.entity_id == entity_id
             )
         ).scalar_one_or_none()
 
         if not user_entity:
-            raise EntityNotFoundError(f"Rattachement non trouvé")
+            raise EntityNotFoundError("Rattachement non trouvé")
 
         self.db.delete(user_entity)
         self.db.commit()
@@ -923,6 +916,7 @@ class UserService:
 # =============================================================================
 # USER AVAILABILITY SERVICE
 # =============================================================================
+
 
 class UserAvailabilityService:
     """
@@ -945,10 +939,7 @@ class UserAvailabilityService:
     def _verify_user_access(self, user_id: int) -> User:
         """Vérifie que l'utilisateur appartient au tenant."""
         user = self.db.execute(
-            select(User).where(
-                User.id == user_id,
-                User.tenant_id == self.tenant_id
-            )
+            select(User).where(User.id == user_id, User.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not user:
@@ -956,12 +947,12 @@ class UserAvailabilityService:
         return user
 
     def get_all_for_user(
-            self,
-            user_id: int,
-            entity_id: Optional[int] = None,
-            day_of_week: Optional[int] = None,
-            is_active: Optional[bool] = None,
-    ) -> List[UserAvailability]:
+        self,
+        user_id: int,
+        entity_id: int | None = None,
+        day_of_week: int | None = None,
+        is_active: bool | None = None,
+    ) -> list[UserAvailability]:
         """Liste les disponibilités d'un utilisateur."""
         # Vérifier que l'utilisateur appartient au tenant
         self._verify_user_access(user_id)
@@ -986,7 +977,7 @@ class UserAvailabilityService:
         # Vérifier que l'utilisateur appartient au tenant
         self._verify_user_access(user_id)
 
-        availability: Optional[UserAvailability] = self.db.get(UserAvailability, availability_id)
+        availability: UserAvailability | None = self.db.get(UserAvailability, availability_id)
         if not availability or availability.user_id != user_id:
             raise AvailabilityNotFoundError(f"Disponibilité {availability_id} non trouvée")
         return availability
@@ -999,10 +990,10 @@ class UserAvailabilityService:
         # Vérifier entité existe et appartient au tenant si spécifiée
         if data.entity_id:
             from app.models.organization.entity import Entity
+
             entity = self.db.execute(
                 select(Entity).where(
-                    Entity.id == data.entity_id,
-                    Entity.tenant_id == self.tenant_id
+                    Entity.id == data.entity_id, Entity.tenant_id == self.tenant_id
                 )
             ).scalar_one_or_none()
             if not entity:
@@ -1011,26 +1002,28 @@ class UserAvailabilityService:
         availability = UserAvailability(
             user_id=user_id,
             tenant_id=self.tenant_id,  # AJOUT v4.3
-            **data.model_dump()
+            **data.model_dump(),
         )
         self.db.add(availability)
         self.db.commit()
         self.db.refresh(availability)
         return availability
 
-    def update(self, availability_id: int, user_id: int, data: UserAvailabilityUpdate) -> UserAvailability:
+    def update(
+        self, availability_id: int, user_id: int, data: UserAvailabilityUpdate
+    ) -> UserAvailability:
         """Met à jour une disponibilité."""
         availability = self.get_by_id(availability_id, user_id)
 
         update_data = data.model_dump(exclude_unset=True)
 
         # Vérifier entité existe si modifiée
-        if "entity_id" in update_data and update_data["entity_id"]:
+        if update_data.get("entity_id"):
             from app.models.organization.entity import Entity
+
             entity = self.db.execute(
                 select(Entity).where(
-                    Entity.id == update_data["entity_id"],
-                    Entity.tenant_id == self.tenant_id
+                    Entity.id == update_data["entity_id"], Entity.tenant_id == self.tenant_id
                 )
             ).scalar_one_or_none()
             if not entity:

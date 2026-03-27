@@ -21,7 +21,6 @@ import base64
 import hashlib
 import hmac
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from app.core.config import settings
 
@@ -37,7 +36,7 @@ class KeyManager(ABC):
     """
 
     @abstractmethod
-    def get_encryption_key(self, tenant_id: Optional[int] = None) -> bytes:
+    def get_encryption_key(self, tenant_id: int | None = None) -> bytes:
         """
         Récupère la clé de chiffrement AES-256.
 
@@ -47,10 +46,9 @@ class KeyManager(ABC):
         Returns:
             Clé de 32 bytes pour AES-256
         """
-        pass
 
     @abstractmethod
-    def get_blind_index_key(self, tenant_id: Optional[int] = None) -> bytes:
+    def get_blind_index_key(self, tenant_id: int | None = None) -> bytes:
         """
         Récupère la clé pour les blind indexes (HMAC).
 
@@ -64,7 +62,6 @@ class KeyManager(ABC):
             En Phase 1, cette clé est DÉRIVÉE de la clé principale
             pour garantir la séparation des usages (best practice).
         """
-        pass
 
 
 class EnvKeyManager(KeyManager):
@@ -86,8 +83,8 @@ class EnvKeyManager(KeyManager):
     def __init__(self):
         """Initialise le gestionnaire avec la clé depuis .env"""
         self._master_key = self._load_master_key()
-        self._encryption_key: Optional[bytes] = None
-        self._blind_index_key: Optional[bytes] = None
+        self._encryption_key: bytes | None = None
+        self._blind_index_key: bytes | None = None
 
     def _load_master_key(self) -> bytes:
         """
@@ -99,26 +96,23 @@ class EnvKeyManager(KeyManager):
         Raises:
             ValueError: Si la clé est absente ou invalide
         """
-        encryption_key = getattr(settings, 'ENCRYPTION_KEY', None)
+        encryption_key = getattr(settings, "ENCRYPTION_KEY", None)
 
         if not encryption_key:
             raise ValueError(
                 "ENCRYPTION_KEY non définie dans .env. "
-                "Générez une clé avec: python -c \"import secrets; import base64; "
-                "print(base64.b64encode(secrets.token_bytes(32)).decode())\""
+                'Générez une clé avec: python -c "import secrets; import base64; '
+                'print(base64.b64encode(secrets.token_bytes(32)).decode())"'
             )
 
         try:
             key = base64.b64decode(encryption_key)
         except Exception as e:
-            raise ValueError(
-                f"ENCRYPTION_KEY invalide (doit être en base64): {e}"
-            )
+            raise ValueError(f"ENCRYPTION_KEY invalide (doit être en base64): {e}") from e
 
         if len(key) != 32:
             raise ValueError(
-                f"ENCRYPTION_KEY doit faire 32 bytes (256 bits), "
-                f"actuellement: {len(key)} bytes"
+                f"ENCRYPTION_KEY doit faire 32 bytes (256 bits), actuellement: {len(key)} bytes"
             )
 
         return key
@@ -136,13 +130,9 @@ class EnvKeyManager(KeyManager):
         Returns:
             Clé dérivée de 32 bytes
         """
-        return hmac.new(
-            key=self._master_key,
-            msg=context,
-            digestmod=hashlib.sha256
-        ).digest()
+        return hmac.new(key=self._master_key, msg=context, digestmod=hashlib.sha256).digest()
 
-    def get_encryption_key(self, tenant_id: Optional[int] = None) -> bytes:
+    def get_encryption_key(self, tenant_id: int | None = None) -> bytes:
         """
         Récupère la clé de chiffrement AES-256.
 
@@ -160,7 +150,7 @@ class EnvKeyManager(KeyManager):
             self._encryption_key = self._master_key
         return self._encryption_key
 
-    def get_blind_index_key(self, tenant_id: Optional[int] = None) -> bytes:
+    def get_blind_index_key(self, tenant_id: int | None = None) -> bytes:
         """
         Récupère la clé pour les blind indexes.
 
@@ -213,7 +203,7 @@ class EnvKeyManager(KeyManager):
 # SINGLETON ET FACTORY
 # =============================================================================
 
-_key_manager: Optional[KeyManager] = None
+_key_manager: KeyManager | None = None
 
 
 def get_key_manager() -> KeyManager:

@@ -12,41 +12,67 @@ Endpoints pour :
 MULTI-TENANT: Les endpoints User et Role injectent automatiquement le tenant_id
 depuis l'utilisateur authentifié.
 """
-from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.schemas import (
     # Profession
-    ProfessionCreate, ProfessionUpdate, ProfessionResponse, ProfessionList,
+    ProfessionCreate,
+    ProfessionList,
+    ProfessionResponse,
+    ProfessionUpdate,
     # Role
-    RoleCreate, RoleUpdate, RoleResponse, RoleList,
-    # User
-    UserCreate, UserUpdate, UserResponse, UserList, UserWithEntities, UserFilters,
-    # UserEntity
-    UserEntityCreate, UserEntityUpdate, UserEntityResponse,
-    # UserRole
-    UserRoleCreate, UserRoleResponse,
+    RoleCreate,
+    RoleList,
+    RoleResponse,
+    RoleUpdate,
     # UserAvailability
-    UserAvailabilityCreate, UserAvailabilityUpdate,
-    UserAvailabilityResponse, UserAvailabilityList,
+    UserAvailabilityCreate,
+    UserAvailabilityList,
+    UserAvailabilityResponse,
+    UserAvailabilityUpdate,
+    # User
+    UserCreate,
+    # UserEntity
+    UserEntityCreate,
+    UserEntityResponse,
+    UserEntityUpdate,
+    UserFilters,
+    UserList,
+    UserResponse,
+    # UserRole
+    UserRoleCreate,
+    UserRoleResponse,
+    UserUpdate,
+    UserWithEntities,
 )
 from app.api.v1.user.services import (
-    ProfessionService, RoleService, UserService, UserAvailabilityService,
+    AvailabilityNotFoundError,
+    DuplicateEmailError,
+    DuplicateProfessionCodeError,
+    DuplicateProfessionNameError,
+    DuplicateRoleNameError,
+    DuplicateRPPSError,
+    EntityNotFoundError,
+    ProfessionNotFoundError,
+    ProfessionService,
+    RoleNotFoundError,
+    RoleService,
+    SystemRoleModificationError,
+    UserAlreadyHasRoleError,
+    UserAvailabilityService,
+    UserEntityAlreadyExistsError,
     # Exceptions
-    UserNotFoundError, RoleNotFoundError, ProfessionNotFoundError,
-    AvailabilityNotFoundError, EntityNotFoundError,
-    DuplicateEmailError, DuplicateRPPSError,
-    DuplicateProfessionNameError, DuplicateProfessionCodeError,
-    DuplicateRoleNameError, SystemRoleModificationError,
-    UserAlreadyHasRoleError, UserEntityAlreadyExistsError,
+    UserNotFoundError,
+    UserService,
 )
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
 from app.core.auth.user_auth import get_current_user, require_role
 from app.database.session_rls import get_db
 from app.models.user.user import User
+
 
 # =============================================================================
 # ROUTERS
@@ -62,12 +88,13 @@ users_router = APIRouter(prefix="/users", tags=["Users"])
 # PROFESSION ENDPOINTS (DONNÉES PARTAGÉES - PAS DE TENANT)
 # =============================================================================
 
+
 @professions_router.get("", response_model=ProfessionList)
 def list_professions(
-        pagination: PaginationParams = Depends(),
-        category: Optional[str] = Query(None, description="Filtrer par catégorie"),
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    pagination: PaginationParams = Depends(),
+    category: str | None = Query(None, description="Filtrer par catégorie"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Liste toutes les professions.
@@ -85,72 +112,73 @@ def list_professions(
 
 @professions_router.get("/{profession_id}", response_model=ProfessionResponse)
 def get_profession(
-        profession_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    profession_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère une profession par son ID."""
     try:
         return ProfessionService.get_by_id(db, profession_id)
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @professions_router.post("", response_model=ProfessionResponse, status_code=status.HTTP_201_CREATED)
 def create_profession(
-        data: ProfessionCreate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    data: ProfessionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Crée une nouvelle profession (admin uniquement)."""
     try:
         return ProfessionService.create(db, data)
     except DuplicateProfessionNameError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except DuplicateProfessionCodeError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @professions_router.patch("/{profession_id}", response_model=ProfessionResponse)
 def update_profession(
-        profession_id: int,
-        data: ProfessionUpdate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    profession_id: int,
+    data: ProfessionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Met à jour une profession (admin uniquement)."""
     try:
         return ProfessionService.update(db, profession_id, data)
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except (DuplicateProfessionNameError, DuplicateProfessionCodeError) as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @professions_router.delete("/{profession_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_profession(
-        profession_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    profession_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Supprime une profession (admin uniquement)."""
     try:
         ProfessionService.delete(db, profession_id)
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # ROLE ENDPOINTS (MULTI-TENANT)
 # =============================================================================
 
+
 @roles_router.get("", response_model=RoleList)
 def list_roles(
-        pagination: PaginationParams = Depends(),
-        is_system_role: Optional[bool] = Query(None, description="Filtrer par rôle système"),
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    pagination: PaginationParams = Depends(),
+    is_system_role: bool | None = Query(None, description="Filtrer par rôle système"),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """
     Liste tous les rôles.
@@ -169,25 +197,25 @@ def list_roles(
 
 @roles_router.get("/{role_id}", response_model=RoleResponse)
 def get_role(
-        role_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    role_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère un rôle par son ID."""
     try:
         service = RoleService(db, tenant_id)
         return service.get_by_id(role_id)
     except RoleNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @roles_router.post("", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
 def create_role(
-        data: RoleCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    data: RoleCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Crée un nouveau rôle (admin uniquement).
@@ -198,62 +226,63 @@ def create_role(
         service = RoleService(db, tenant_id)
         return service.create(data)
     except DuplicateRoleNameError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @roles_router.patch("/{role_id}", response_model=RoleResponse)
 def update_role(
-        role_id: int,
-        data: RoleUpdate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    role_id: int,
+    data: RoleUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Met à jour un rôle (admin uniquement)."""
     try:
         service = RoleService(db, tenant_id)
         return service.update(role_id, data)
     except RoleNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DuplicateRoleNameError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except SystemRoleModificationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
 
 @roles_router.delete("/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_role(
-        role_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    role_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Supprime un rôle (admin uniquement)."""
     try:
         service = RoleService(db, tenant_id)
         service.delete(role_id)
     except RoleNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except SystemRoleModificationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
 
 # =============================================================================
 # USER ENDPOINTS (MULTI-TENANT)
 # =============================================================================
 
+
 @users_router.get("", response_model=UserList)
 def list_users(
-        pagination: PaginationParams = Depends(),
-        profession_id: Optional[int] = Query(None),
-        role_name: Optional[str] = Query(None),
-        entity_id: Optional[int] = Query(None),
-        is_active: Optional[bool] = Query(None),
-        is_admin: Optional[bool] = Query(None),
-        search: Optional[str] = Query(None, description="Recherche sur nom, prénom, email, RPPS"),
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    pagination: PaginationParams = Depends(),
+    profession_id: int | None = Query(None),
+    role_name: str | None = Query(None),
+    entity_id: int | None = Query(None),
+    is_active: bool | None = Query(None),
+    is_admin: bool | None = Query(None),
+    search: str | None = Query(None, description="Recherche sur nom, prénom, email, RPPS"),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """
     Liste les utilisateurs avec filtres.
@@ -284,9 +313,9 @@ def list_users(
 
 @users_router.get("/me", response_model=UserWithEntities)
 def get_current_user_profile(
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère le profil de l'utilisateur connecté."""
     service = UserService(db, tenant_id)
@@ -295,25 +324,25 @@ def get_current_user_profile(
 
 @users_router.get("/{user_id}", response_model=UserWithEntities)
 def get_user(
-        user_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère un utilisateur par son ID."""
     try:
         service = UserService(db, tenant_id)
         return service.get_by_id(user_id)
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @users_router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
-        data: UserCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    data: UserCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Crée un nouvel utilisateur (admin uniquement).
@@ -324,27 +353,27 @@ def create_user(
         service = UserService(db, tenant_id)
         return service.create(data)
     except DuplicateEmailError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except DuplicateRPPSError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @users_router.patch("/{user_id}", response_model=UserResponse)
 def update_user(
-        user_id: int,
-        data: UserUpdate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Met à jour un utilisateur."""
     # Seul l'admin ou l'utilisateur lui-même peut modifier
     if not current_user.is_admin and current_user.id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez modifier que votre propre profil"
+            detail="Vous ne pouvez modifier que votre propre profil",
         )
 
     # Seul l'admin peut modifier is_admin ou is_active
@@ -352,47 +381,48 @@ def update_user(
         if data.is_admin is not None or data.is_active is not None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Seul un administrateur peut modifier ces champs"
+                detail="Seul un administrateur peut modifier ces champs",
             )
 
     try:
         service = UserService(db, tenant_id)
         return service.update(user_id, data)
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DuplicateEmailError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except DuplicateRPPSError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @users_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
-        user_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    user_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Désactive un utilisateur (admin uniquement)."""
     try:
         service = UserService(db, tenant_id)
         service.delete(user_id)
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # USER ROLES ENDPOINTS
 # =============================================================================
 
-@users_router.get("/{user_id}/roles", response_model=List[UserRoleResponse])
+
+@users_router.get("/{user_id}/roles", response_model=list[UserRoleResponse])
 def get_user_roles(
-        user_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les rôles d'un utilisateur."""
     try:
@@ -400,55 +430,58 @@ def get_user_roles(
         user = service.get_by_id(user_id)
         return user.role_associations
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@users_router.post("/{user_id}/roles", response_model=UserRoleResponse, status_code=status.HTTP_201_CREATED)
+@users_router.post(
+    "/{user_id}/roles", response_model=UserRoleResponse, status_code=status.HTTP_201_CREATED
+)
 def add_user_role(
-        user_id: int,
-        data: UserRoleCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    user_id: int,
+    data: UserRoleCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Attribue un rôle à un utilisateur (admin uniquement)."""
     try:
         service = UserService(db, tenant_id)
         return service.add_role(user_id, data.role_id, assigned_by=current_user.id)
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except RoleNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserAlreadyHasRoleError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @users_router.delete("/{user_id}/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_user_role(
-        user_id: int,
-        role_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    user_id: int,
+    role_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Retire un rôle à un utilisateur (admin uniquement)."""
     try:
         service = UserService(db, tenant_id)
         service.remove_role(user_id, role_id)
     except RoleNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # USER ENTITIES ENDPOINTS
 # =============================================================================
 
-@users_router.get("/{user_id}/entities", response_model=List[UserEntityResponse])
+
+@users_router.get("/{user_id}/entities", response_model=list[UserEntityResponse])
 def get_user_entities(
-        user_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les entités rattachées à un utilisateur."""
     try:
@@ -456,75 +489,78 @@ def get_user_entities(
         user = service.get_by_id(user_id)
         return user.entity_associations
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@users_router.post("/{user_id}/entities", response_model=UserEntityResponse, status_code=status.HTTP_201_CREATED)
+@users_router.post(
+    "/{user_id}/entities", response_model=UserEntityResponse, status_code=status.HTTP_201_CREATED
+)
 def add_user_entity(
-        user_id: int,
-        data: UserEntityCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    user_id: int,
+    data: UserEntityCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Rattache un utilisateur à une entité (admin uniquement)."""
     try:
         service = UserService(db, tenant_id)
         return service.add_entity(user_id, data)
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserEntityAlreadyExistsError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @users_router.patch("/{user_id}/entities/{entity_id}", response_model=UserEntityResponse)
 def update_user_entity(
-        user_id: int,
-        entity_id: int,
-        data: UserEntityUpdate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    user_id: int,
+    entity_id: int,
+    data: UserEntityUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Met à jour le rattachement à une entité (admin uniquement)."""
     try:
         service = UserService(db, tenant_id)
         return service.update_entity(user_id, entity_id, data)
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @users_router.delete("/{user_id}/entities/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_user_entity(
-        user_id: int,
-        entity_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    user_id: int,
+    entity_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Détache un utilisateur d'une entité (admin uniquement)."""
     try:
         service = UserService(db, tenant_id)
         service.remove_entity(user_id, entity_id)
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # USER AVAILABILITIES ENDPOINTS
 # =============================================================================
 
+
 @users_router.get("/{user_id}/availabilities", response_model=UserAvailabilityList)
 def get_user_availabilities(
-        user_id: int,
-        entity_id: Optional[int] = Query(None, description="Filtrer par entité"),
-        day_of_week: Optional[int] = Query(None, ge=1, le=7, description="Filtrer par jour"),
-        is_active: Optional[bool] = Query(None, description="Filtrer par statut actif"),
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    entity_id: int | None = Query(None, description="Filtrer par entité"),
+    day_of_week: int | None = Query(None, ge=1, le=7, description="Filtrer par jour"),
+    is_active: bool | None = Query(None, description="Filtrer par statut actif"),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les disponibilités d'un utilisateur."""
     service = UserAvailabilityService(db, tenant_id)
@@ -534,39 +570,44 @@ def get_user_availabilities(
     return UserAvailabilityList(items=items, total=len(items))
 
 
-@users_router.post("/{user_id}/availabilities", response_model=UserAvailabilityResponse,
-                   status_code=status.HTTP_201_CREATED)
+@users_router.post(
+    "/{user_id}/availabilities",
+    response_model=UserAvailabilityResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_user_availability(
-        user_id: int,
-        data: UserAvailabilityCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    data: UserAvailabilityCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Crée une disponibilité pour un utilisateur."""
     # L'utilisateur peut créer ses propres disponibilités ou l'admin peut le faire
     if not current_user.is_admin and current_user.id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez gérer que vos propres disponibilités"
+            detail="Vous ne pouvez gérer que vos propres disponibilités",
         )
 
     try:
         service = UserAvailabilityService(db, tenant_id)
         return service.create(user_id, data)
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@users_router.get("/{user_id}/availabilities/{availability_id}", response_model=UserAvailabilityResponse)
+@users_router.get(
+    "/{user_id}/availabilities/{availability_id}", response_model=UserAvailabilityResponse
+)
 def get_user_availability(
-        user_id: int,
-        availability_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    availability_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère une disponibilité par son ID."""
     try:
@@ -574,62 +615,66 @@ def get_user_availability(
         availability = service.get_by_id(availability_id, user_id)
         return availability
     except AvailabilityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@users_router.patch("/{user_id}/availabilities/{availability_id}", response_model=UserAvailabilityResponse)
+@users_router.patch(
+    "/{user_id}/availabilities/{availability_id}", response_model=UserAvailabilityResponse
+)
 def update_user_availability(
-        user_id: int,
-        availability_id: int,
-        data: UserAvailabilityUpdate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    availability_id: int,
+    data: UserAvailabilityUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Met à jour une disponibilité."""
     # Vérifier les droits
     if not current_user.is_admin and current_user.id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez gérer que vos propres disponibilités"
+            detail="Vous ne pouvez gérer que vos propres disponibilités",
         )
 
     try:
         service = UserAvailabilityService(db, tenant_id)
         return service.update(availability_id, user_id, data)
     except AvailabilityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@users_router.delete("/{user_id}/availabilities/{availability_id}", status_code=status.HTTP_204_NO_CONTENT)
+@users_router.delete(
+    "/{user_id}/availabilities/{availability_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def delete_user_availability(
-        user_id: int,
-        availability_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    user_id: int,
+    availability_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """Supprime une disponibilité."""
     # Vérifier les droits
     if not current_user.is_admin and current_user.id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez gérer que vos propres disponibilités"
+            detail="Vous ne pouvez gérer que vos propres disponibilités",
         )
 
     try:
         service = UserAvailabilityService(db, tenant_id)
         service.delete(availability_id, user_id)
     except AvailabilityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================

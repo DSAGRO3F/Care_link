@@ -33,12 +33,13 @@ Usage:
 import base64
 import hashlib
 import secrets
-from typing import Optional, Tuple, Dict, Any
+from typing import Any
 from urllib.parse import urlencode
 
 import httpx
 
 from app.core.config import settings
+
 
 # =============================================================================
 # EXPORTS
@@ -61,29 +62,27 @@ __all__ = [
 # EXCEPTIONS
 # =============================================================================
 
+
 class ProSanteConnectError(Exception):
     """Exception de base pour les erreurs PSC."""
-    pass
 
 
 class PSCAuthenticationError(ProSanteConnectError):
     """Erreur lors de l'authentification PSC."""
-    pass
 
 
 class PSCTokenError(ProSanteConnectError):
     """Erreur lors de l'échange de tokens."""
-    pass
 
 
 class PSCUserInfoError(ProSanteConnectError):
     """Erreur lors de la récupération des infos utilisateur."""
-    pass
 
 
 # =============================================================================
 # CLIENT PRO SANTÉ CONNECT
 # =============================================================================
+
 
 class ProSanteConnectClient:
     """
@@ -198,17 +197,15 @@ class ProSanteConnectClient:
             Code challenge (hash SHA256 encodé en base64url)
         """
         digest = hashlib.sha256(code_verifier.encode()).digest()
-        return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+        return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
 
     # =========================================================================
     # FLUX OAUTH2 / OPENID CONNECT
     # =========================================================================
 
     def get_authorization_url(
-        self,
-        scopes: Optional[list[str]] = None,
-        extra_params: Optional[Dict[str, str]] = None
-    ) -> Tuple[str, str, str, str]:
+        self, scopes: list[str] | None = None, extra_params: dict[str, str] | None = None
+    ) -> tuple[str, str, str, str]:
         """
         Génère l'URL d'autorisation PSC pour rediriger l'utilisateur.
 
@@ -271,11 +268,7 @@ class ProSanteConnectClient:
 
         return url, state, nonce, code_verifier
 
-    async def exchange_code_for_tokens(
-        self,
-        code: str,
-        code_verifier: str
-    ) -> Dict[str, Any]:
+    async def exchange_code_for_tokens(self, code: str, code_verifier: str) -> dict[str, Any]:
         """
         Échange le code d'autorisation contre des tokens.
 
@@ -333,8 +326,7 @@ class ProSanteConnectClient:
                     try:
                         error_json = response.json()
                         error_detail = error_json.get(
-                            "error_description",
-                            error_json.get("error", response.text)
+                            "error_description", error_json.get("error", response.text)
                         )
                     except Exception:
                         pass
@@ -346,9 +338,9 @@ class ProSanteConnectClient:
                 return response.json()
 
         except httpx.RequestError as e:
-            raise PSCTokenError(f"Erreur de connexion à PSC: {str(e)}")
+            raise PSCTokenError(f"Erreur de connexion à PSC: {e!s}") from e
 
-    async def get_user_info(self, access_token: str) -> Dict[str, Any]:
+    async def get_user_info(self, access_token: str) -> dict[str, Any]:
         """
         Récupère les informations du professionnel de santé.
 
@@ -390,8 +382,7 @@ class ProSanteConnectClient:
                     try:
                         error_json = response.json()
                         error_detail = error_json.get(
-                            "error_description",
-                            error_json.get("error", response.text)
+                            "error_description", error_json.get("error", response.text)
                         )
                     except Exception:
                         pass
@@ -403,9 +394,9 @@ class ProSanteConnectClient:
                 return response.json()
 
         except httpx.RequestError as e:
-            raise PSCUserInfoError(f"Erreur de connexion à PSC: {str(e)}")
+            raise PSCUserInfoError(f"Erreur de connexion à PSC: {e!s}") from e
 
-    async def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
+    async def refresh_access_token(self, refresh_token: str) -> dict[str, Any]:
         """
         Renouvelle un access token expiré avec le refresh token.
 
@@ -444,13 +435,9 @@ class ProSanteConnectClient:
                 return response.json()
 
         except httpx.RequestError as e:
-            raise PSCTokenError(f"Erreur de connexion: {str(e)}")
+            raise PSCTokenError(f"Erreur de connexion: {e!s}") from e
 
-    async def revoke_token(
-        self,
-        token: str,
-        token_type_hint: str = "access_token"
-    ) -> bool:
+    async def revoke_token(self, token: str, token_type_hint: str = "access_token") -> bool:
         """
         Révoque un token PSC (déconnexion).
 
@@ -486,7 +473,7 @@ class ProSanteConnectClient:
     # PARSING DES DONNÉES UTILISATEUR
     # =========================================================================
 
-    def parse_user_info(self, user_info: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_user_info(self, user_info: dict[str, Any]) -> dict[str, Any]:
         """
         Parse les informations utilisateur PSC en format simplifié.
 
@@ -570,7 +557,7 @@ class ProSanteConnectClient:
 # =============================================================================
 
 # Instance singleton du client PSC
-_psc_client: Optional[ProSanteConnectClient] = None
+_psc_client: ProSanteConnectClient | None = None
 
 
 def get_psc_client() -> ProSanteConnectClient:

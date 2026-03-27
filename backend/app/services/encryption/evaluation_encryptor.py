@@ -25,9 +25,10 @@ Usage:
 """
 
 import copy
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from app.core.security.cipher import encrypt_field, decrypt_field
+from app.core.security.cipher import decrypt_field, encrypt_field
+
 
 # =============================================================================
 # CONFIGURATION DES CHEMINS À CHIFFRER
@@ -39,7 +40,7 @@ from app.core.security.cipher import encrypt_field, decrypt_field
 #   - "section[*].champ" pour un champ dans chaque élément d'un tableau
 #   - "section[*].sous[*].champ" pour des tableaux imbriqués
 
-ENCRYPTED_PATHS: List[str] = [
+ENCRYPTED_PATHS: list[str] = [
     # =========================================================================
     # SECTION USAGER (PII direct du patient)
     # =========================================================================
@@ -54,7 +55,6 @@ ENCRYPTED_PATHS: List[str] = [
     "usager.contactInfosPersonnels.domicile",
     "usager.contactInfosPersonnels.mobile",
     "usager.contactInfosPersonnels.mail",
-
     # =========================================================================
     # SECTION CONTACTS (PII des tiers - tableau)
     # =========================================================================
@@ -68,30 +68,25 @@ ENCRYPTED_PATHS: List[str] = [
     "contacts[*].contactInfosPersonnels.mailMSSANTE",
     "contacts[*].contactInfosPersonnels.mailPro",
     "contacts[*].natureLien",
-
     # =========================================================================
     # SECTION AGGIR (Commentaires texte libre)
     # =========================================================================
     "aggir.AggirVariable[*].Commentaires",
     "aggir.AggirVariable[*].AggirSousVariable[*].Commentaires",
-
     # =========================================================================
     # SECTION SOCIAL (Texte libre dans questionReponse)
     # =========================================================================
     "social.blocs[*].questionReponse[*].reponse",
-
     # =========================================================================
     # SECTION SANTÉ (Texte libre + résultats tests)
     # =========================================================================
     "sante.blocs[*].questionReponse[*].reponse",
     "sante.blocs[*].test[*].resultat",
     "sante.blocs[*].comorbidites[*].Commentaires",
-
     # =========================================================================
     # SECTION DISPOSITIFS (Notes)
     # =========================================================================
     "dispositifs[*].notes",
-
     # =========================================================================
     # SECTION POA SOCIAL (Plans d'actions)
     # =========================================================================
@@ -101,7 +96,6 @@ ENCRYPTED_PATHS: List[str] = [
     "poaSocial.problemes[*].critereEvaluation",
     "poaSocial.problemes[*].resultatActions",
     "poaSocial.problemes[*].message",
-
     # =========================================================================
     # SECTION POA SANTÉ (même structure que POA Social)
     # =========================================================================
@@ -111,7 +105,6 @@ ENCRYPTED_PATHS: List[str] = [
     "poaSante.problemes[*].critereEvaluation",
     "poaSante.problemes[*].resultatActions",
     "poaSante.problemes[*].message",
-
     # =========================================================================
     # SECTION POA AUTONOMIE
     # =========================================================================
@@ -152,7 +145,7 @@ class EvaluationEncryptor:
     }
     """
 
-    def __init__(self, encrypted_paths: Optional[List[str]] = None):
+    def __init__(self, encrypted_paths: list[str] | None = None):
         """
         Initialise l'encryptor avec la liste des chemins à chiffrer.
 
@@ -168,10 +161,7 @@ class EvaluationEncryptor:
     # MÉTHODES PUBLIQUES
     # =========================================================================
 
-    def encrypt_evaluation_data(
-            self,
-            data: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+    def encrypt_evaluation_data(self, data: dict[str, Any] | None) -> dict[str, Any] | None:
         """
         Chiffre les champs sensibles dans les données d'évaluation.
 
@@ -198,10 +188,7 @@ class EvaluationEncryptor:
 
         return result
 
-    def decrypt_evaluation_data(
-            self,
-            data: Optional[Dict[str, Any]]
-    ) -> Optional[Dict[str, Any]]:
+    def decrypt_evaluation_data(self, data: dict[str, Any] | None) -> dict[str, Any] | None:
         """
         Déchiffre les champs sensibles dans les données d'évaluation.
 
@@ -224,10 +211,8 @@ class EvaluationEncryptor:
         return result
 
     def encrypt_partial_update(
-            self,
-            update_data: Dict[str, Any],
-            paths_to_encrypt: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+        self, update_data: dict[str, Any], paths_to_encrypt: list[str] | None = None
+    ) -> dict[str, Any]:
         """
         Chiffre une mise à jour partielle des données d'évaluation.
 
@@ -254,7 +239,7 @@ class EvaluationEncryptor:
 
         return result
 
-    def get_encrypted_paths(self) -> List[str]:
+    def get_encrypted_paths(self) -> list[str]:
         """Retourne la liste des chemins configurés pour le chiffrement."""
         return self.encrypted_paths.copy()
 
@@ -291,7 +276,7 @@ class EvaluationEncryptor:
     # =========================================================================
 
     @staticmethod
-    def _parse_path(path: str) -> List[Dict[str, Any]]:
+    def _parse_path(path: str) -> list[dict[str, Any]]:
         """
         Parse un chemin en segments.
 
@@ -322,11 +307,7 @@ class EvaluationEncryptor:
     # =========================================================================
 
     def _process_path(
-            self,
-            data: Dict[str, Any],
-            segments: List[Dict[str, Any]],
-            encrypt: bool,
-            depth: int = 0
+        self, data: dict[str, Any], segments: list[dict[str, Any]], encrypt: bool, depth: int = 0
     ) -> None:
         """
         Traite récursivement un chemin (chiffrement ou déchiffrement).
@@ -343,7 +324,7 @@ class EvaluationEncryptor:
         segment = segments[depth]
         key = segment["key"]
         is_array = segment["is_array"]
-        is_last = (depth == len(segments) - 1)
+        is_last = depth == len(segments) - 1
 
         # Vérifier que la clé existe
         if not isinstance(data, dict) or key not in data:
@@ -454,7 +435,8 @@ evaluation_encryptor = EvaluationEncryptor()
 # FONCTIONS HELPER (pour imports simplifiés)
 # =============================================================================
 
-def encrypt_evaluation_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+
+def encrypt_evaluation_data(data: dict[str, Any] | None) -> dict[str, Any] | None:
     """
     Helper pour chiffrer des données d'évaluation.
 
@@ -465,7 +447,7 @@ def encrypt_evaluation_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str
     return evaluation_encryptor.encrypt_evaluation_data(data)
 
 
-def decrypt_evaluation_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def decrypt_evaluation_data(data: dict[str, Any] | None) -> dict[str, Any] | None:
     """
     Helper pour déchiffrer des données d'évaluation.
 
@@ -476,7 +458,7 @@ def decrypt_evaluation_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str
     return evaluation_encryptor.decrypt_evaluation_data(data)
 
 
-def get_evaluation_encrypted_paths() -> List[str]:
+def get_evaluation_encrypted_paths() -> list[str]:
     """
     Retourne la liste des chemins configurés pour le chiffrement.
 

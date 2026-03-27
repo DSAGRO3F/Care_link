@@ -7,14 +7,17 @@ Contient la logique CRUD pour :
 
 Version multi-tenant : toutes les requêtes filtrent par tenant_id.
 """
-from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.careplan.schemas import (
-    CarePlanCreate, CarePlanUpdate, CarePlanFilters,
-    CarePlanServiceCreate, CarePlanServiceUpdate, ServiceAssignment,
+    CarePlanCreate,
+    CarePlanFilters,
+    CarePlanServiceCreate,
+    CarePlanServiceUpdate,
+    CarePlanUpdate,
+    ServiceAssignment,
 )
 from app.models.careplan.care_plan import CarePlan
 from app.models.careplan.care_plan_service import CarePlanService
@@ -29,59 +32,51 @@ from app.models.user.user import User
 # EXCEPTIONS
 # =============================================================================
 
+
 class CarePlanNotFoundError(Exception):
     """Plan d'aide non trouvé."""
-    pass
 
 
 class CarePlanServiceNotFoundError(Exception):
     """Service de plan non trouvé."""
-    pass
 
 
 class PatientNotFoundError(Exception):
     """Patient non trouvé."""
-    pass
 
 
 class EntityNotFoundError(Exception):
     """Entité non trouvée."""
-    pass
 
 
 class ServiceTemplateNotFoundError(Exception):
     """Service template non trouvé."""
-    pass
 
 
 class UserNotFoundError(Exception):
     """Utilisateur non trouvé."""
-    pass
 
 
 class CarePlanNotEditableError(Exception):
     """Le plan n'est pas modifiable."""
-    pass
 
 
 class CarePlanStatusError(Exception):
     """Erreur de statut du plan."""
-    pass
 
 
 class AssignmentStatusError(Exception):
     """Erreur de statut d'affectation."""
-    pass
 
 
 class DuplicateReferenceError(Exception):
     """Numéro de référence déjà existant."""
-    pass
 
 
 # =============================================================================
 # CARE PLAN SERVICE (le service métier)
 # =============================================================================
+
 
 class CarePlanCRUDService:
     """
@@ -106,17 +101,15 @@ class CarePlanCRUDService:
         return select(CarePlan).where(CarePlan.tenant_id == self.tenant_id)
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            sort_by: str = "created_at",
-            sort_order: str = "desc",
-            filters: Optional[CarePlanFilters] = None,
-    ) -> Tuple[List[CarePlan], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        filters: CarePlanFilters | None = None,
+    ) -> tuple[list[CarePlan], int]:
         """Liste les plans d'aide avec pagination et filtres."""
-        query = self._base_query().options(
-            selectinload(CarePlan.services)
-        )
+        query = self._base_query().options(selectinload(CarePlan.services))
 
         if filters:
             if filters.patient_id:
@@ -158,34 +151,36 @@ class CarePlanCRUDService:
 
     def get_by_id(self, plan_id: int) -> CarePlan:
         """Récupère un plan d'aide par son ID."""
-        query = self._base_query().where(CarePlan.id == plan_id).options(
-            selectinload(CarePlan.services).selectinload(CarePlanService.service_template)
+        query = (
+            self._base_query()
+            .where(CarePlan.id == plan_id)
+            .options(selectinload(CarePlan.services).selectinload(CarePlanService.service_template))
         )
         plan = self.db.execute(query).scalar_one_or_none()
         if not plan:
             raise CarePlanNotFoundError(f"Plan d'aide {plan_id} non trouvé")
         return plan
 
-    def get_by_patient(self, patient_id: int) -> List[CarePlan]:
+    def get_by_patient(self, patient_id: int) -> list[CarePlan]:
         """Récupère tous les plans d'un patient."""
-        query = self._base_query().where(
-            CarePlan.patient_id == patient_id
-        ).options(
-            selectinload(CarePlan.services)
-        ).order_by(CarePlan.created_at.desc())
+        query = (
+            self._base_query()
+            .where(CarePlan.patient_id == patient_id)
+            .options(selectinload(CarePlan.services))
+            .order_by(CarePlan.created_at.desc())
+        )
 
         return list(self.db.execute(query).scalars().unique().all())
 
     def create(
-            self,
-            data: CarePlanCreate,
-            created_by: int,
+        self,
+        data: CarePlanCreate,
+        created_by: int,
     ) -> CarePlan:
         """Crée un nouveau plan d'aide."""
         # Vérifier que le patient existe et appartient au tenant
         patient_query = select(Patient).where(
-            Patient.id == data.patient_id,
-            Patient.tenant_id == self.tenant_id
+            Patient.id == data.patient_id, Patient.tenant_id == self.tenant_id
         )
         patient = self.db.execute(patient_query).scalar_one_or_none()
         if not patient:
@@ -193,8 +188,7 @@ class CarePlanCRUDService:
 
         # Vérifier que l'entité existe et appartient au tenant
         entity_query = select(Entity).where(
-            Entity.id == data.entity_id,
-            Entity.tenant_id == self.tenant_id
+            Entity.id == data.entity_id, Entity.tenant_id == self.tenant_id
         )
         entity = self.db.execute(entity_query).scalar_one_or_none()
         if not entity:
@@ -271,7 +265,7 @@ class CarePlanCRUDService:
         update_data = data.model_dump(exclude_unset=True)
 
         # Vérifier unicité du numéro de référence si modifié (dans le tenant)
-        if "reference_number" in update_data and update_data["reference_number"]:
+        if update_data.get("reference_number"):
             existing = self.db.execute(
                 self._base_query().where(
                     CarePlan.reference_number == update_data["reference_number"],
@@ -295,9 +289,7 @@ class CarePlanCRUDService:
         plan = self.get_by_id(plan_id)
 
         if plan.status != CarePlanStatus.DRAFT:
-            raise CarePlanStatusError(
-                "Seul un plan en brouillon peut être supprimé"
-            )
+            raise CarePlanStatusError("Seul un plan en brouillon peut être supprimé")
 
         self.db.delete(plan)
         self.db.commit()
@@ -311,7 +303,7 @@ class CarePlanCRUDService:
         try:
             plan.submit_for_validation()
         except ValueError as e:
-            raise CarePlanStatusError(str(e))
+            raise CarePlanStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(plan)
@@ -322,10 +314,7 @@ class CarePlanCRUDService:
         plan = self.get_by_id(plan_id)
 
         # Vérifier que l'utilisateur existe et appartient au tenant
-        user_query = select(User).where(
-            User.id == validated_by,
-            User.tenant_id == self.tenant_id
-        )
+        user_query = select(User).where(User.id == validated_by, User.tenant_id == self.tenant_id)
         user = self.db.execute(user_query).scalar_one_or_none()
 
         if not user:
@@ -341,7 +330,7 @@ class CarePlanCRUDService:
         self.db.refresh(plan)
         return plan
 
-    def suspend(self, plan_id: int, reason: Optional[str] = None) -> CarePlan:
+    def suspend(self, plan_id: int, reason: str | None = None) -> CarePlan:
         """Suspend le plan d'aide."""
         plan = self.get_by_id(plan_id)
 
@@ -360,7 +349,7 @@ class CarePlanCRUDService:
         try:
             plan.reactivate()
         except ValueError as e:
-            raise CarePlanStatusError(str(e))
+            raise CarePlanStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(plan)
@@ -374,7 +363,7 @@ class CarePlanCRUDService:
         self.db.refresh(plan)
         return plan
 
-    def cancel(self, plan_id: int, reason: Optional[str] = None) -> CarePlan:
+    def cancel(self, plan_id: int, reason: str | None = None) -> CarePlan:
         """Annule le plan d'aide."""
         plan = self.get_by_id(plan_id)
         plan.cancel(reason)
@@ -386,6 +375,7 @@ class CarePlanCRUDService:
 # =============================================================================
 # CARE PLAN SERVICE SERVICE (services du plan)
 # =============================================================================
+
 
 class CarePlanServiceCRUDService:
     """
@@ -409,22 +399,23 @@ class CarePlanServiceCRUDService:
         """Retourne une requête de base filtrée par tenant_id."""
         return select(CarePlanService).where(CarePlanService.tenant_id == self.tenant_id)
 
-    def get_all_for_plan(self, plan_id: int) -> List[CarePlanService]:
+    def get_all_for_plan(self, plan_id: int) -> list[CarePlanService]:
         """Liste les services d'un plan."""
-        query = self._base_query().where(
-            CarePlanService.care_plan_id == plan_id
-        ).options(
-            selectinload(CarePlanService.service_template)
-        ).order_by(CarePlanService.id)
+        query = (
+            self._base_query()
+            .where(CarePlanService.care_plan_id == plan_id)
+            .options(selectinload(CarePlanService.service_template))
+            .order_by(CarePlanService.id)
+        )
 
         return list(self.db.execute(query).scalars().all())
 
     def get_by_id(self, service_id: int) -> CarePlanService:
         """Récupère un service par son ID."""
-        query = self._base_query().where(
-            CarePlanService.id == service_id
-        ).options(
-            selectinload(CarePlanService.service_template)
+        query = (
+            self._base_query()
+            .where(CarePlanService.id == service_id)
+            .options(selectinload(CarePlanService.service_template))
         )
         service = self.db.execute(query).scalar_one_or_none()
         if not service:
@@ -432,15 +423,14 @@ class CarePlanServiceCRUDService:
         return service
 
     def create(
-            self,
-            plan_id: int,
-            data: CarePlanServiceCreate,
+        self,
+        plan_id: int,
+        data: CarePlanServiceCreate,
     ) -> CarePlanService:
         """Ajoute un service à un plan."""
         # Vérifier que le plan existe, appartient au tenant et est éditable
         plan_query = select(CarePlan).where(
-            CarePlan.id == plan_id,
-            CarePlan.tenant_id == self.tenant_id
+            CarePlan.id == plan_id, CarePlan.tenant_id == self.tenant_id
         )
         plan = self.db.execute(plan_query).scalar_one_or_none()
         if not plan:
@@ -478,17 +468,16 @@ class CarePlanServiceCRUDService:
         return service
 
     def update(
-            self,
-            service_id: int,
-            data: CarePlanServiceUpdate,
+        self,
+        service_id: int,
+        data: CarePlanServiceUpdate,
     ) -> CarePlanService:
         """Met à jour un service de plan."""
         service = self.get_by_id(service_id)
 
         # Vérifier que le plan est éditable
         plan_query = select(CarePlan).where(
-            CarePlan.id == service.care_plan_id,
-            CarePlan.tenant_id == self.tenant_id
+            CarePlan.id == service.care_plan_id, CarePlan.tenant_id == self.tenant_id
         )
         plan = self.db.execute(plan_query).scalar_one_or_none()
         if plan and not plan.is_editable:
@@ -510,8 +499,7 @@ class CarePlanServiceCRUDService:
 
         # Vérifier que le plan est éditable
         plan_query = select(CarePlan).where(
-            CarePlan.id == service.care_plan_id,
-            CarePlan.tenant_id == self.tenant_id
+            CarePlan.id == service.care_plan_id, CarePlan.tenant_id == self.tenant_id
         )
         plan = self.db.execute(plan_query).scalar_one_or_none()
         if plan and not plan.is_editable:
@@ -525,27 +513,23 @@ class CarePlanServiceCRUDService:
     # === Affectation ===
 
     def assign(
-            self,
-            service_id: int,
-            data: ServiceAssignment,
-            assigned_by: int,
+        self,
+        service_id: int,
+        data: ServiceAssignment,
+        assigned_by: int,
     ) -> CarePlanService:
         """Affecte un service à un professionnel."""
         service = self.get_by_id(service_id)
 
         # Vérifier que l'utilisateur à affecter appartient au tenant
-        user_query = select(User).where(
-            User.id == data.user_id,
-            User.tenant_id == self.tenant_id
-        )
+        user_query = select(User).where(User.id == data.user_id, User.tenant_id == self.tenant_id)
         user = self.db.execute(user_query).scalar_one_or_none()
         if not user:
             raise UserNotFoundError(f"Utilisateur {data.user_id} non trouvé")
 
         # Vérifier que l'assigneur appartient au tenant
         assigner_query = select(User).where(
-            User.id == assigned_by,
-            User.tenant_id == self.tenant_id
+            User.id == assigned_by, User.tenant_id == self.tenant_id
         )
         assigner = self.db.execute(assigner_query).scalar_one_or_none()
         if not assigner:
@@ -575,7 +559,7 @@ class CarePlanServiceCRUDService:
         try:
             service.confirm_assignment()
         except ValueError as e:
-            raise AssignmentStatusError(str(e))
+            raise AssignmentStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(service)
@@ -588,7 +572,7 @@ class CarePlanServiceCRUDService:
         try:
             service.reject_assignment()
         except ValueError as e:
-            raise AssignmentStatusError(str(e))
+            raise AssignmentStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(service)

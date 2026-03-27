@@ -1,3 +1,4 @@
-from app.core.config.config import settings, get_settings, Settings
+from app.core.config.config import Settings, get_settings, settings
 
-__all__ = ["settings", "get_settings", "Settings"]
+
+__all__ = ["Settings", "get_settings", "settings"]

@@ -16,15 +16,15 @@ Changement v4.8 :
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any
 
-from app.core.security.cipher import encrypt_field, decrypt_field
+from app.core.security.cipher import decrypt_field, encrypt_field
 from app.core.security.encryption import (
     create_blind_index,
-    encrypt_date,
     decrypt_date,
-    encrypt_datetime,
     decrypt_datetime,
+    encrypt_date,
+    encrypt_datetime,
 )
 
 
@@ -52,7 +52,7 @@ class BaseEncryptor(ABC):
 
     @property
     @abstractmethod
-    def encrypted_fields(self) -> Dict[str, str]:
+    def encrypted_fields(self) -> dict[str, str]:
         """
         Dictionnaire des champs à chiffrer.
 
@@ -65,11 +65,10 @@ class BaseEncryptor(ABC):
                 "birth_date": "date",
             }
         """
-        pass
 
     @property
     @abstractmethod
-    def blind_index_fields(self) -> Set[str]:
+    def blind_index_fields(self) -> set[str]:
         """
         Ensemble des champs nécessitant un blind index.
 
@@ -78,17 +77,12 @@ class BaseEncryptor(ABC):
         Example:
             {"first_name", "last_name", "nir"}
         """
-        pass
 
     # =========================================================================
     # MÉTHODES DE CHIFFREMENT
     # =========================================================================
 
-    def encrypt_for_db(
-            self,
-            data: Dict[str, Any],
-            tenant_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+    def encrypt_for_db(self, data: dict[str, Any], tenant_id: int | None = None) -> dict[str, Any]:
         """
         Transforme des données API en données DB (chiffrées).
 
@@ -147,19 +141,14 @@ class BaseEncryptor(ABC):
                             )
                         blind_column = f"{key}_blind"
                         string_value = self._value_to_string(value, field_type)
-                        result[blind_column] = create_blind_index(
-                            string_value, key, tenant_id
-                        )
+                        result[blind_column] = create_blind_index(string_value, key, tenant_id)
             else:
                 # Champ non chiffré : copier tel quel
                 result[key] = value
 
         return result
 
-    def decrypt_from_db(
-            self,
-            data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def decrypt_from_db(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Transforme des données DB en données API (déchiffrées).
 
@@ -174,11 +163,13 @@ class BaseEncryptor(ABC):
             Données déchiffrées (format API)
 
         Example:
-            >>> encryptor.decrypt_from_db({
-            ...     "first_name_encrypted": "encrypted...",
-            ...     "first_name_blind": "8f3a2b...",
-            ...     "age": 65
-            ... })
+            >>> encryptor.decrypt_from_db(
+            ...     {
+            ...         "first_name_encrypted": "encrypted...",
+            ...         "first_name_blind": "8f3a2b...",
+            ...         "age": 65,
+            ...     }
+            ... )
             {"first_name": "Jean", "age": 65}
         """
         result = {}
@@ -186,11 +177,11 @@ class BaseEncryptor(ABC):
 
         for key, value in data.items():
             # Ignorer les blind indexes
-            if key.endswith('_blind'):
+            if key.endswith("_blind"):
                 continue
 
             # Vérifier si c'est un champ chiffré
-            if key.endswith('_encrypted'):
+            if key.endswith("_encrypted"):
                 # Extraire le nom API
                 api_name = key[:-10]  # Enlever "_encrypted"
 
@@ -210,7 +201,7 @@ class BaseEncryptor(ABC):
 
         return result
 
-    def decrypt_model(self, model: Any) -> Dict[str, Any]:
+    def decrypt_model(self, model: Any) -> dict[str, Any]:
         """
         Extrait et déchiffre les champs d'un modèle SQLAlchemy.
 
@@ -246,11 +237,8 @@ class BaseEncryptor(ABC):
     # =========================================================================
 
     def get_blind_index(
-            self,
-            value: Any,
-            field_name: str,
-            tenant_id: Optional[int] = None
-    ) -> Optional[str]:
+        self, value: Any, field_name: str, tenant_id: int | None = None
+    ) -> str | None:
         """
         Génère un blind index pour une recherche.
 
@@ -296,28 +284,27 @@ class BaseEncryptor(ABC):
         """
         if column_type == "encrypted":
             return f"{api_field}_encrypted"
-        elif column_type == "blind":
+        if column_type == "blind":
             return f"{api_field}_blind"
-        else:
-            raise ValueError(f"Type de colonne inconnu: {column_type}")
+        raise ValueError(f"Type de colonne inconnu: {column_type}")
 
     # =========================================================================
     # MÉTHODES UTILITAIRES
     # =========================================================================
 
-    def get_encrypted_field_names(self) -> List[str]:
+    def get_encrypted_field_names(self) -> list[str]:
         """Liste des noms de champs chiffrés (format API)."""
         return list(self.encrypted_fields.keys())
 
-    def get_blind_index_field_names(self) -> List[str]:
+    def get_blind_index_field_names(self) -> list[str]:
         """Liste des noms de champs avec blind index."""
         return list(self.blind_index_fields)
 
-    def get_db_encrypted_columns(self) -> List[str]:
+    def get_db_encrypted_columns(self) -> list[str]:
         """Liste des noms de colonnes DB chiffrées."""
         return [f"{f}_encrypted" for f in self.encrypted_fields.keys()]
 
-    def get_db_blind_columns(self) -> List[str]:
+    def get_db_blind_columns(self) -> list[str]:
         """Liste des noms de colonnes DB blind index."""
         return [f"{f}_blind" for f in self.blind_index_fields]
 
@@ -326,25 +313,26 @@ class BaseEncryptor(ABC):
     # =========================================================================
 
     @staticmethod
-    def _encrypt_value(value: Any, field_type: str) -> Optional[str]:
+    def _encrypt_value(value: Any, field_type: str) -> str | None:
         """Chiffre une valeur selon son type."""
         if value is None:
             return None
 
         if field_type == "string":
             return encrypt_field(str(value))
-        elif field_type == "date":
+        if field_type == "date":
             from datetime import date
+
             if isinstance(value, str):
                 value = date.fromisoformat(value)
             return encrypt_date(value)
-        elif field_type == "datetime":
+        if field_type == "datetime":
             from datetime import datetime
+
             if isinstance(value, str):
                 value = datetime.fromisoformat(value)
             return encrypt_datetime(value)
-        else:
-            return encrypt_field(str(value))
+        return encrypt_field(str(value))
 
     @staticmethod
     def _decrypt_value(encrypted_value: str, field_type: str) -> Any:
@@ -354,12 +342,11 @@ class BaseEncryptor(ABC):
 
         if field_type == "string":
             return decrypt_field(encrypted_value)
-        elif field_type == "date":
+        if field_type == "date":
             return decrypt_date(encrypted_value)
-        elif field_type == "datetime":
+        if field_type == "datetime":
             return decrypt_datetime(encrypted_value)
-        else:
-            return decrypt_field(encrypted_value)
+        return decrypt_field(encrypted_value)
 
     @staticmethod
     def _value_to_string(value: Any, field_type: str) -> str:
@@ -369,10 +356,12 @@ class BaseEncryptor(ABC):
 
         if field_type == "date":
             from datetime import date
+
             if isinstance(value, date):
                 return value.isoformat()
         elif field_type == "datetime":
             from datetime import datetime
+
             if isinstance(value, datetime):
                 return value.isoformat()
 

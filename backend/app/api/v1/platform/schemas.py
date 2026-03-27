@@ -12,29 +12,31 @@ Compatible avec les modèles existants :
 - app.models.platform.platform_audit_log.PlatformAuditLog
 - app.models.user.user_tenant_assignment.UserTenantAssignment
 """
-from datetime import datetime, date
-from enum import Enum
-from typing import Optional, List, Dict, Any
 
-from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
-from app.models.enums import EntityType
+from datetime import date, datetime
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+
 from app.api.v1.organization.schemas import (
     EntityBase,
-    EntityResponse,
-    EntitySummary,
-    EntityWithChildren,
-    EntityList,
-    EntityFilters,
-    EntityUpdate,
+    EntityFilters,  # noqa: F401 — re-export pour platform/routes.py
+    EntityResponse,  # noqa: F401 — re-export pour platform/routes.py
+    EntitySummary,  # noqa: F401 — re-export pour platform/routes.py
+    EntityUpdate,  # noqa: F401 — re-export pour platform/routes.py
 )
+from app.models.enums import EntityType
 
 
 # =============================================================================
 # ENUMS - Réexportés pour usage dans l'API (doivent matcher les modèles)
 # =============================================================================
 
+
 class TenantStatusAPI(str, Enum):
     """Statuts de tenant - doit matcher TenantStatus du modèle."""
+
     ACTIVE = "ACTIVE"
     SUSPENDED = "SUSPENDED"
     TERMINATED = "TERMINATED"
@@ -42,6 +44,7 @@ class TenantStatusAPI(str, Enum):
 
 class TenantTypeAPI(str, Enum):
     """Types de tenant - doit matcher TenantType du modèle."""
+
     GCSMS = "GCSMS"
     SSIAD = "SSIAD"
     SAAD = "SAAD"
@@ -54,6 +57,7 @@ class TenantTypeAPI(str, Enum):
 
 class AssignmentTypeAPI(str, Enum):
     """Types d'affectation cross-tenant."""
+
     PERMANENT = "PERMANENT"
     TEMPORARY = "TEMPORARY"
     EMERGENCY = "EMERGENCY"
@@ -61,6 +65,7 @@ class AssignmentTypeAPI(str, Enum):
 
 class SuperAdminRoleAPI(str, Enum):
     """Rôles des super-admins - doit matcher SuperAdminRole du modèle."""
+
     PLATFORM_OWNER = "PLATFORM_OWNER"
     PLATFORM_ADMIN = "PLATFORM_ADMIN"
     PLATFORM_SUPPORT = "PLATFORM_SUPPORT"
@@ -71,50 +76,52 @@ class SuperAdminRoleAPI(str, Enum):
 # TENANT SCHEMAS
 # =============================================================================
 
+
 class TenantCreate(BaseModel):
     """Création d'un nouveau tenant."""
+
     code: str = Field(..., min_length=3, max_length=50, description="Code unique du tenant")
     name: str = Field(..., min_length=2, max_length=255, description="Nom commercial")
-    legal_name: Optional[str] = Field(None, max_length=255, description="Raison sociale")
-    siret: Optional[str] = Field(None, max_length=14, description="Numéro SIRET")
+    legal_name: str | None = Field(None, max_length=255, description="Raison sociale")
+    siret: str | None = Field(None, max_length=14, description="Numéro SIRET")
     tenant_type: TenantTypeAPI = Field(..., description="Type de structure")
 
     # Contact
     contact_email: EmailStr = Field(..., description="Email du contact principal")
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    billing_email: Optional[EmailStr] = Field(None, description="Email facturation")
+    contact_phone: str | None = Field(None, max_length=20)
+    billing_email: EmailStr | None = Field(None, description="Email facturation")
 
     # Adresse
-    address_line1: Optional[str] = Field(None, max_length=255)
-    address_line2: Optional[str] = Field(None, max_length=255)
-    postal_code: Optional[str] = Field(None, max_length=20)
-    city: Optional[str] = Field(None, max_length=100)
-    country_id: Optional[int] = Field(None, description="ID du pays")
+    address_line1: str | None = Field(None, max_length=255)
+    address_line2: str | None = Field(None, max_length=255)
+    postal_code: str | None = Field(None, max_length=20)
+    city: str | None = Field(None, max_length=100)
+    country_id: int | None = Field(None, description="ID du pays")
 
     # Configuration
     timezone: str = Field(default="Europe/Paris", max_length=50)
     locale: str = Field(default="fr_FR", max_length=10)
 
     # Limites
-    max_patients: Optional[int] = Field(None, ge=0, description="Limite patients (null=illimité)")
-    max_users: Optional[int] = Field(None, ge=0, description="Limite utilisateurs (null=illimité)")
+    max_patients: int | None = Field(None, ge=0, description="Limite patients (null=illimité)")
+    max_users: int | None = Field(None, ge=0, description="Limite utilisateurs (null=illimité)")
     max_storage_gb: int = Field(default=50, ge=1, description="Quota stockage en Go")
 
     # Paramètres personnalisés
-    settings: Dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator('code')
+    @field_validator("code")
     @classmethod
     def validate_code(cls, v: str) -> str:
         """Le code doit être en majuscules, alphanumérique avec tirets."""
         v = v.upper().strip()
-        if not all(c.isalnum() or c == '-' for c in v):
+        if not all(c.isalnum() or c == "-" for c in v):
             raise ValueError("Le code ne doit contenir que des lettres, chiffres et tirets")
         return v
 
-    @field_validator('siret')
+    @field_validator("siret")
     @classmethod
-    def validate_siret(cls, v: Optional[str]) -> Optional[str]:
+    def validate_siret(cls, v: str | None) -> str | None:
         """Valide le format SIRET (14 chiffres)."""
         if v is None:
             return None
@@ -126,39 +133,40 @@ class TenantCreate(BaseModel):
 
 class TenantUpdate(BaseModel):
     """Mise à jour partielle d'un tenant."""
-    name: Optional[str] = Field(None, min_length=2, max_length=255)
-    legal_name: Optional[str] = Field(None, max_length=255)
-    siret: Optional[str] = Field(None, max_length=14)
-    tenant_type: Optional[TenantTypeAPI] = None
-    status: Optional[TenantStatusAPI] = None
+
+    name: str | None = Field(None, min_length=2, max_length=255)
+    legal_name: str | None = Field(None, max_length=255)
+    siret: str | None = Field(None, max_length=14)
+    tenant_type: TenantTypeAPI | None = None
+    status: TenantStatusAPI | None = None
 
     # Contact
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    billing_email: Optional[EmailStr] = None
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = Field(None, max_length=20)
+    billing_email: EmailStr | None = None
 
     # Adresse
-    address_line1: Optional[str] = Field(None, max_length=255)
-    address_line2: Optional[str] = Field(None, max_length=255)
-    postal_code: Optional[str] = Field(None, max_length=20)
-    city: Optional[str] = Field(None, max_length=100)
-    country_id: Optional[int] = None
+    address_line1: str | None = Field(None, max_length=255)
+    address_line2: str | None = Field(None, max_length=255)
+    postal_code: str | None = Field(None, max_length=20)
+    city: str | None = Field(None, max_length=100)
+    country_id: int | None = None
 
     # Configuration
-    timezone: Optional[str] = Field(None, max_length=50)
-    locale: Optional[str] = Field(None, max_length=10)
+    timezone: str | None = Field(None, max_length=50)
+    locale: str | None = Field(None, max_length=10)
 
     # Limites
-    max_patients: Optional[int] = Field(None, ge=0)
-    max_users: Optional[int] = Field(None, ge=0)
-    max_storage_gb: Optional[int] = Field(None, ge=1)
+    max_patients: int | None = Field(None, ge=0)
+    max_users: int | None = Field(None, ge=0)
+    max_storage_gb: int | None = Field(None, ge=1)
 
     # Paramètres
-    settings: Optional[Dict[str, Any]] = None
+    settings: dict[str, Any] | None = None
 
-    @field_validator('siret')
+    @field_validator("siret")
     @classmethod
-    def validate_siret(cls, v: Optional[str]) -> Optional[str]:
+    def validate_siret(cls, v: str | None) -> str | None:
         if v is None:
             return None
         v = v.replace(" ", "")
@@ -169,58 +177,61 @@ class TenantUpdate(BaseModel):
 
 class TenantResponse(BaseModel):
     """Réponse complète d'un tenant."""
+
     id: int
     code: str
     name: str
-    legal_name: Optional[str] = None
-    siret: Optional[str] = None
+    legal_name: str | None = None
+    siret: str | None = None
     tenant_type: TenantTypeAPI
     status: TenantStatusAPI
 
     # Contact
     contact_email: str
-    contact_phone: Optional[str] = None
-    billing_email: Optional[str] = None
+    contact_phone: str | None = None
+    billing_email: str | None = None
 
     # Adresse
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
-    postal_code: Optional[str] = None
-    city: Optional[str] = None
-    country_id: Optional[int] = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    country_id: int | None = None
 
     # Configuration
     timezone: str
     locale: str
 
     # Limites
-    max_patients: Optional[int] = None
-    max_users: Optional[int] = None
+    max_patients: int | None = None
+    max_users: int | None = None
     max_storage_gb: int
 
     # Paramètres
-    settings: Dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict)
 
     # Dates
-    activated_at: Optional[datetime] = None
-    terminated_at: Optional[datetime] = None
+    activated_at: datetime | None = None
+    terminated_at: datetime | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
 
 class TenantFilters(BaseModel):
     """Filtres pour la liste des tenants."""
-    status: Optional[TenantStatusAPI] = None
-    tenant_type: Optional[TenantTypeAPI] = None
-    search: Optional[str] = Field(None, description="Recherche dans code, name, legal_name")
-    city: Optional[str] = None
-    country_id: Optional[int] = None
+
+    status: TenantStatusAPI | None = None
+    tenant_type: TenantTypeAPI | None = None
+    search: str | None = Field(None, description="Recherche dans code, name, legal_name")
+    city: str | None = None
+    country_id: int | None = None
 
 
 class TenantStats(BaseModel):
     """Statistiques d'un tenant."""
+
     tenant_id: int
     tenant_code: str
     tenant_name: str
@@ -231,37 +242,40 @@ class TenantStats(BaseModel):
     patients_count: int = 0
 
     # Utilisation vs limites
-    users_limit: Optional[int] = None
-    patients_limit: Optional[int] = None
-    users_usage_percent: Optional[float] = None
-    patients_usage_percent: Optional[float] = None
+    users_limit: int | None = None
+    patients_limit: int | None = None
+    users_usage_percent: float | None = None
+    patients_usage_percent: float | None = None
 
     # Activité
-    last_activity_at: Optional[datetime] = None
+    last_activity_at: datetime | None = None
 
 
 # =============================================================================
 # SUPER ADMIN SCHEMAS
 # =============================================================================
 
+
 class SuperAdminLoginRequest(BaseModel):
     """Requête de connexion super admin."""
+
     email: EmailStr
     password: str
 
+
 class SuperAdminCreate(BaseModel):
     """Création d'un super admin."""
+
     email: EmailStr
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     password: str = Field(..., min_length=12, description="Mot de passe (min 12 caractères)")
     role: SuperAdminRoleAPI = Field(
-        default=SuperAdminRoleAPI.PLATFORM_SUPPORT,
-        description="Rôle du super admin"
+        default=SuperAdminRoleAPI.PLATFORM_SUPPORT, description="Rôle du super admin"
     )
     is_active: bool = Field(default=True)
 
-    @field_validator('password')
+    @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
         """Valide la complexité du mot de passe."""
@@ -278,19 +292,21 @@ class SuperAdminCreate(BaseModel):
 
 class SuperAdminUpdate(BaseModel):
     """Mise à jour d'un super admin."""
-    email: Optional[EmailStr] = None
-    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    role: Optional[SuperAdminRoleAPI] = None
-    is_active: Optional[bool] = None
+
+    email: EmailStr | None = None
+    first_name: str | None = Field(None, min_length=1, max_length=100)
+    last_name: str | None = Field(None, min_length=1, max_length=100)
+    role: SuperAdminRoleAPI | None = None
+    is_active: bool | None = None
 
 
 class SuperAdminPasswordChange(BaseModel):
     """Changement de mot de passe."""
+
     current_password: str
     new_password: str = Field(..., min_length=12)
 
-    @field_validator('new_password')
+    @field_validator("new_password")
     @classmethod
     def validate_new_password(cls, v: str) -> str:
         if len(v) < 12:
@@ -306,6 +322,7 @@ class SuperAdminPasswordChange(BaseModel):
 
 class SuperAdminResponse(BaseModel):
     """Réponse d'un super admin."""
+
     id: int
     email: str
     first_name: str
@@ -313,9 +330,9 @@ class SuperAdminResponse(BaseModel):
     role: SuperAdminRoleAPI
     is_active: bool
     mfa_enabled: bool = False
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -328,19 +345,21 @@ class SuperAdminResponse(BaseModel):
 # AUDIT LOG SCHEMAS
 # =============================================================================
 
+
 class AuditLogResponse(BaseModel):
     """Réponse d'un log d'audit."""
+
     id: int
     super_admin_id: int
-    super_admin_email: Optional[str] = None
+    super_admin_email: str | None = None
     action: str
     resource_type: str
-    resource_id: Optional[str] = None
-    tenant_id: Optional[int] = None
-    tenant_code: Optional[str] = None
-    details: Dict[str, Any] = Field(default_factory=dict)
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    resource_id: str | None = None
+    tenant_id: int | None = None
+    tenant_code: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    ip_address: str | None = None
+    user_agent: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -348,76 +367,82 @@ class AuditLogResponse(BaseModel):
 
 class AuditLogFilters(BaseModel):
     """Filtres pour les logs d'audit."""
-    super_admin_id: Optional[int] = None
-    action: Optional[str] = None
-    resource_type: Optional[str] = None
-    tenant_id: Optional[int] = None
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+
+    super_admin_id: int | None = None
+    action: str | None = None
+    resource_type: str | None = None
+    tenant_id: int | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
 
 
 # =============================================================================
 # USER TENANT ASSIGNMENT SCHEMAS
 # =============================================================================
 
+
 class UserTenantAssignmentCreate(BaseModel):
     """Création d'une affectation cross-tenant."""
+
     user_id: int = Field(..., description="ID de l'utilisateur à affecter")
     tenant_id: int = Field(..., description="Tenant de destination")
     assignment_type: AssignmentTypeAPI = Field(default=AssignmentTypeAPI.TEMPORARY)
     start_date: date = Field(..., description="Date de début")
-    end_date: Optional[date] = Field(None, description="Date de fin (null=indéterminé)")
-    reason: Optional[str] = Field(None, max_length=1000, description="Justification du rattachement")
-    permissions: Optional[List[str]] = Field(None, description="Permissions spécifiques (null=hérite)")
+    end_date: date | None = Field(None, description="Date de fin (null=indéterminé)")
+    reason: str | None = Field(None, max_length=1000, description="Justification du rattachement")
+    permissions: list[str] | None = Field(None, description="Permissions spécifiques (null=hérite)")
 
-    @field_validator('end_date')
+    @field_validator("end_date")
     @classmethod
-    def validate_end_date(cls, v: Optional[date], info) -> Optional[date]:
-        if v is not None and 'start_date' in info.data:
-            if v < info.data['start_date']:
+    def validate_end_date(cls, v: date | None, info) -> date | None:
+        if v is not None and "start_date" in info.data:
+            if v < info.data["start_date"]:
                 raise ValueError("La date de fin doit être postérieure à la date de début")
         return v
 
 
 class UserTenantAssignmentUpdate(BaseModel):
     """Mise à jour d'une affectation."""
-    assignment_type: Optional[AssignmentTypeAPI] = None
-    end_date: Optional[date] = None
-    reason: Optional[str] = Field(None, max_length=1000)
-    permissions: Optional[List[str]] = None
-    is_active: Optional[bool] = None
+
+    assignment_type: AssignmentTypeAPI | None = None
+    end_date: date | None = None
+    reason: str | None = Field(None, max_length=1000)
+    permissions: list[str] | None = None
+    is_active: bool | None = None
 
 
 class UserTenantAssignmentResponse(BaseModel):
     """Réponse d'une affectation cross-tenant."""
+
     id: int
     user_id: int
-    user_email: Optional[str] = None
-    user_full_name: Optional[str] = None
+    user_email: str | None = None
+    user_full_name: str | None = None
     tenant_id: int
-    tenant_code: Optional[str] = None
-    tenant_name: Optional[str] = None
+    tenant_code: str | None = None
+    tenant_name: str | None = None
     assignment_type: AssignmentTypeAPI
     start_date: date
-    end_date: Optional[date] = None
-    reason: Optional[str] = None
-    permissions: Optional[List[str]] = None
+    end_date: date | None = None
+    reason: str | None = None
+    permissions: list[str] | None = None
     is_active: bool
     is_valid: bool = False
-    days_remaining: Optional[int] = None
-    granted_by_super_admin_id: Optional[int] = None
+    days_remaining: int | None = None
+    granted_by_super_admin_id: int | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
 
 class UserTenantAssignmentFilters(BaseModel):
     """Filtres pour les affectations."""
-    user_id: Optional[int] = None
-    tenant_id: Optional[int] = None
-    assignment_type: Optional[AssignmentTypeAPI] = None
-    is_active: Optional[bool] = None
+
+    user_id: int | None = None
+    tenant_id: int | None = None
+    assignment_type: AssignmentTypeAPI | None = None
+    is_active: bool | None = None
     include_expired: bool = Field(default=False, description="Inclure les affectations expirées")
 
 
@@ -425,8 +450,10 @@ class UserTenantAssignmentFilters(BaseModel):
 # PLATFORM STATS SCHEMAS
 # =============================================================================
 
+
 class PlatformStats(BaseModel):
     """Statistiques globales de la plateforme."""
+
     # Tenants
     total_tenants: int = 0
     active_tenants: int = 0
@@ -461,6 +488,7 @@ ROOT_ENTITY_TYPES = {EntityType.GCSMS, EntityType.GTSMS}
 # =============================================================================
 # PLATFORM ENTITY SCHEMAS
 # =============================================================================
+
 
 class PlatformEntityCreate(EntityBase):
     """
@@ -500,6 +528,7 @@ class PlatformEntityCreate(EntityBase):
 # TENANT ADMIN USER SCHEMAS
 # =============================================================================
 
+
 class TenantAdminUserCreate(BaseModel):
     """
     Création d'un admin client par le SuperAdmin.
@@ -509,29 +538,16 @@ class TenantAdminUserCreate(BaseModel):
     - Pas de role_ids (ADMIN_FULL est assigné automatiquement)
     - entity_id optionnel (rattaché à l'entité racine si non fourni)
     """
+
     first_name: str = Field(
-        ..., min_length=1, max_length=100,
-        description="Prénom de l'administrateur"
+        ..., min_length=1, max_length=100, description="Prénom de l'administrateur"
     )
-    last_name: str = Field(
-        ..., min_length=1, max_length=100,
-        description="Nom de l'administrateur"
-    )
-    email: EmailStr = Field(
-        ...,
-        description="Email de connexion (sera chiffré AES-256-GCM)"
-    )
-    phone: Optional[str] = Field(
-        None, max_length=20,
-        description="Téléphone (optionnel)"
-    )
-    password: str = Field(
-        ..., min_length=12,
-        description="Mot de passe initial"
-    )
-    entity_id: Optional[int] = Field(
-        None,
-        description="Entité de rattachement. Si null → rattaché à l'entité racine"
+    last_name: str = Field(..., min_length=1, max_length=100, description="Nom de l'administrateur")
+    email: EmailStr = Field(..., description="Email de connexion (sera chiffré AES-256-GCM)")
+    phone: str | None = Field(None, max_length=20, description="Téléphone (optionnel)")
+    password: str = Field(..., min_length=12, description="Mot de passe initial")
+    entity_id: int | None = Field(
+        None, description="Entité de rattachement. Si null → rattaché à l'entité racine"
     )
 
     @field_validator("password")
@@ -552,21 +568,23 @@ class TenantAdminUserCreate(BaseModel):
     def start_date_value(self):
         """Date de début par défaut pour le rattachement entité."""
         from datetime import date
+
         return date.today()
 
 
 class TenantAdminUserResponse(BaseModel):
     """Réponse après création d'un admin client."""
+
     id: int
     tenant_id: int
     first_name: str
     last_name: str
     email: str
-    phone: Optional[str] = None
+    phone: str | None = None
     is_admin: bool
     is_active: bool
-    entity_id: Optional[int] = None
-    entity_name: Optional[str] = None
+    entity_id: int | None = None
+    entity_name: str | None = None
     role: str
     must_change_password: bool
     created_at: datetime

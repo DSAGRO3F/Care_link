@@ -6,19 +6,20 @@ Ce module définit :
 - UserEntity : Association User ↔ Entity
 """
 
-from datetime import date, datetime, timezone, time
+from datetime import UTC, date, datetime, time
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, ForeignKey, Date, UniqueConstraint, Integer, Time
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import ContractType
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
-    from app.models.user.role import Role
     from app.models.organization.entity import Entity
+    from app.models.user.role import Role
+    from app.models.user.user import User
 
 
 class UserRole(Base):
@@ -36,9 +37,7 @@ class UserRole(Base):
     """
 
     __tablename__ = "user_roles"
-    __table_args__ = (
-        {"comment": "Table de jonction User ↔ Role (many-to-many)"},
-    )
+    __table_args__ = ({"comment": "Table de jonction User ↔ Role (many-to-many)"},)
 
     # === Clés primaires composites ===
 
@@ -46,7 +45,7 @@ class UserRole(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
         doc="ID de l'utilisateur",
-        info={"description": "Référence vers l'utilisateur"}
+        info={"description": "Référence vers l'utilisateur"},
     )
 
     # === Multi-tenant ===
@@ -55,29 +54,29 @@ class UserRole(Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     role_id: Mapped[int] = mapped_column(
         ForeignKey("roles.id", ondelete="CASCADE"),
         primary_key=True,
         doc="ID du rôle",
-        info={"description": "Référence vers le rôle"}
+        info={"description": "Référence vers le rôle"},
     )
 
     # === Colonnes additionnelles ===
 
     assigned_at: Mapped[datetime] = mapped_column(
-        default=datetime.now(timezone.utc),
+        default=datetime.now(UTC),
         doc="Date et heure d'attribution du rôle",
-        info={"description": "Timestamp de l'attribution", "auto_generated": True}
+        info={"description": "Timestamp de l'attribution", "auto_generated": True},
     )
 
     assigned_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID de l'utilisateur ayant attribué ce rôle",
-        info={"description": "Référence vers l'administrateur"}
+        info={"description": "Référence vers l'administrateur"},
     )
 
     # === Relations ===
@@ -87,19 +86,15 @@ class UserRole(Base):
         "User",
         back_populates="role_associations",
         foreign_keys="[UserRole.user_id]",
-        doc="Utilisateur concerné"
+        doc="Utilisateur concerné",
     )
 
     role: Mapped["Role"] = relationship(
-        "Role",
-        back_populates="user_associations",
-        doc="Rôle attribué"
+        "Role", back_populates="user_associations", doc="Rôle attribué"
     )
 
     assigner: Mapped["User | None"] = relationship(
-        "User",
-        foreign_keys="[UserRole.assigned_by]",
-        doc="Utilisateur ayant attribué ce rôle"
+        "User", foreign_keys="[UserRole.assigned_by]", doc="Utilisateur ayant attribué ce rôle"
     )
 
     # === Méthodes ===
@@ -129,7 +124,7 @@ class UserEntity(Base):
     __tablename__ = "user_entities"
     __table_args__ = (
         UniqueConstraint("user_id", "entity_id", name="uq_user_entity"),
-        {"comment": "Table de jonction User ↔ Entity (many-to-many)"}
+        {"comment": "Table de jonction User ↔ Entity (many-to-many)"},
     )
 
     # === Colonnes ===
@@ -137,7 +132,7 @@ class UserEntity(Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'association",
-        info={"description": "Clé primaire auto-incrémentée"}
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Multi-tenant ===
@@ -146,7 +141,7 @@ class UserEntity(Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     user_id: Mapped[int] = mapped_column(
@@ -154,7 +149,7 @@ class UserEntity(Base):
         nullable=False,
         index=True,
         doc="ID de l'utilisateur",
-        info={"description": "Référence vers l'utilisateur"}
+        info={"description": "Référence vers l'utilisateur"},
     )
 
     entity_id: Mapped[int] = mapped_column(
@@ -162,14 +157,14 @@ class UserEntity(Base):
         nullable=False,
         index=True,
         doc="ID de l'entité",
-        info={"description": "Référence vers l'entité"}
+        info={"description": "Référence vers l'entité"},
     )
 
     is_primary: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         doc="Est-ce l'entité principale de rattachement ?",
-        info={"description": "True = entité principale pour cet utilisateur", "default": False}
+        info={"description": "True = entité principale pour cet utilisateur", "default": False},
     )
 
     contract_type: Mapped[str | None] = mapped_column(
@@ -179,74 +174,62 @@ class UserEntity(Base):
         info={
             "description": "Nature du rattachement",
             "enum": [e.value for e in ContractType],
-            "example": "SALARIE"
-        }
+            "example": "SALARIE",
+        },
     )
 
     start_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
         doc="Date de début du rattachement",
-        info={"description": "Date de début de la relation avec l'entité"}
+        info={"description": "Date de début de la relation avec l'entité"},
     )
 
     end_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
         doc="Date de fin du rattachement (None = actif)",
-        info={"description": "Date de fin, NULL si toujours actif"}
+        info={"description": "Date de fin, NULL si toujours actif"},
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        default=datetime.now(timezone.utc),
+        default=datetime.now(UTC),
         doc="Date de création de l'enregistrement",
-        info={"description": "Timestamp de création"}
+        info={"description": "Timestamp de création"},
     )
 
     # === Capacités et zone d'intervention ===
     intervention_radius_km: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
-        comment="Rayon d'intervention personnalisé en km (NULL = défaut entité)"
+        comment="Rayon d'intervention personnalisé en km (NULL = défaut entité)",
     )
 
     max_daily_patients: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        comment="Nombre max de patients par jour"
+        Integer, nullable=True, comment="Nombre max de patients par jour"
     )
 
     max_weekly_hours: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        comment="Heures max par semaine"
+        Integer, nullable=True, comment="Heures max par semaine"
     )
 
     # === Disponibilité par défaut ===
     default_start_time: Mapped[time | None] = mapped_column(
-        Time,
-        nullable=True,
-        comment="Heure de début par défaut"
+        Time, nullable=True, comment="Heure de début par défaut"
     )
 
     default_end_time: Mapped[time | None] = mapped_column(
-        Time,
-        nullable=True,
-        comment="Heure de fin par défaut"
+        Time, nullable=True, comment="Heure de fin par défaut"
     )
 
     # === Relations ===
 
     user: Mapped["User"] = relationship(
-        "User",
-        back_populates="entity_associations",
-        doc="Utilisateur concerné"
+        "User", back_populates="entity_associations", doc="Utilisateur concerné"
     )
 
     entity: Mapped["Entity"] = relationship(
-        "Entity",
-        back_populates="user_associations",
-        doc="Entité de rattachement"
+        "Entity", back_populates="user_associations", doc="Entité de rattachement"
     )
 
     # === Propriétés ===

@@ -1,94 +1,104 @@
 <script setup lang="ts">
-/**
- * Page de connexion SuperAdmin — Espace Platform
- * Route: /platform/login
- *
- * Thème : clair élégant — fond gris clair, card blanche, accent violet
- *
- * Destination : src/pages/platform/LoginPage.vue
- */
-import { ref, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { usePlatformStore } from '@/stores'
-import InputText from 'primevue/inputtext'
-import Password from 'primevue/password'
-import Button from 'primevue/button'
-import Message from 'primevue/message'
+  /**
+   * Page de connexion SuperAdmin — Espace Platform
+   * Route: /platform/login
+   *
+   * Thème : clair élégant — fond gris clair, card blanche, accent violet
+   *
+   * Destination : src/pages/platform/LoginPage.vue
+   */
+  import { ref, computed } from 'vue';
+  import { useRouter, useRoute } from 'vue-router';
+  import { usePlatformStore } from '@/stores';
+  import InputText from 'primevue/inputtext';
+  import Password from 'primevue/password';
+  import Button from 'primevue/button';
+  import Message from 'primevue/message';
+  import axios from 'axios';
 
-const router = useRouter()
-const route = useRoute()
-const platformStore = usePlatformStore()
+  const router = useRouter();
+  const route = useRoute();
+  const platformStore = usePlatformStore();
 
-// =============================================================================
-// STATE
-// =============================================================================
+  // =============================================================================
+  // STATE
+  // =============================================================================
 
-const email = ref('')
-const password = ref('')
-const isLoading = ref(false)
-const errorMessage = ref('')
+  const email = ref('');
+  const password = ref('');
+  const isLoading = ref(false);
+  const errorMessage = ref('');
 
-// =============================================================================
-// COMPUTED
-// =============================================================================
+  // =============================================================================
+  // COMPUTED
+  // =============================================================================
 
-const isFormValid = computed(() => {
-  return email.value.includes('@') && password.value.length >= 6
-})
+  const isFormValid = computed(() => {
+    return email.value.includes('@') && password.value.length >= 6;
+  });
 
-// =============================================================================
-// METHODS
-// =============================================================================
+  // =============================================================================
+  // METHODS
+  // =============================================================================
 
-async function handleLogin() {
-  if (!isFormValid.value || isLoading.value) return
+  async function handleLogin() {
+    if (!isFormValid.value || isLoading.value) return;
 
-  isLoading.value = true
-  errorMessage.value = ''
+    isLoading.value = true;
+    errorMessage.value = '';
 
-  try {
-    await platformStore.loginSuperAdmin(email.value, password.value)
+    try {
+      await platformStore.loginSuperAdmin(email.value, password.value);
 
-    const redirectUrl = route.query.redirect as string || '/platform'
-    router.push(redirectUrl)
+      const redirectUrl = (route.query.redirect as string) || '/platform';
+      router.push(redirectUrl);
+    } catch (error: unknown) {
+      if (import.meta.env.DEV) {
+        console.error('[Platform Login] Error:', error);
+      }
 
-  } catch (error: any) {
-    if (import.meta.env.DEV) {
-      console.error('[Platform Login] Error:', error)
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          errorMessage.value = 'Email ou mot de passe incorrect';
+        } else if (error.response?.status === 403) {
+          errorMessage.value = 'Compte désactivé ou verrouillé';
+        } else {
+          errorMessage.value = error.response?.data?.detail || 'Erreur de connexion';
+        }
+      } else {
+        errorMessage.value = 'Erreur de connexion';
+      }
+    } finally {
+      isLoading.value = false;
     }
+  }
 
-    if (error.response?.status === 401) {
-      errorMessage.value = 'Email ou mot de passe incorrect'
-    } else if (error.response?.status === 403) {
-      errorMessage.value = 'Compte désactivé ou verrouillé'
-    } else {
-      errorMessage.value = error.response?.data?.detail || 'Erreur de connexion'
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && isFormValid.value) {
+      handleLogin();
     }
-  } finally {
-    isLoading.value = false
   }
-}
-
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' && isFormValid.value) {
-    handleLogin()
-  }
-}
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50 flex items-center justify-center p-4 relative">
     <!-- Gradient décoratif subtil -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
-      <div class="absolute -top-40 -right-40 w-96 h-96 bg-violet-200/40 rounded-full blur-3xl"></div>
-      <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl"></div>
+      <div
+        class="absolute -top-40 -right-40 w-96 h-96 bg-violet-200/40 rounded-full blur-3xl"
+      ></div>
+      <div
+        class="absolute -bottom-40 -left-40 w-96 h-96 bg-purple-200/30 rounded-full blur-3xl"
+      ></div>
     </div>
 
     <!-- Login Card -->
     <div class="relative w-full max-w-md">
       <!-- Logo et titre -->
       <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white mb-4 shadow-lg shadow-violet-500/20">
+        <div
+          class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 text-white mb-4 shadow-lg shadow-violet-500/20"
+        >
           <i class="pi pi-bolt text-3xl"></i>
         </div>
         <h1 class="text-2xl font-bold text-zinc-800">CareLink Platform</h1>
@@ -100,29 +110,22 @@ function handleKeydown(event: KeyboardEvent) {
         <h2 class="text-xl font-semibold text-zinc-800 mb-6">Connexion SuperAdmin</h2>
 
         <!-- Message d'erreur -->
-        <Message
-          v-if="errorMessage"
-          severity="error"
-          :closable="false"
-          class="mb-6"
-        >
+        <Message v-if="errorMessage" :closable="false" severity="error" class="mb-6">
           {{ errorMessage }}
         </Message>
 
         <form @submit.prevent="handleLogin" @keydown="handleKeydown">
           <!-- Email -->
           <div class="mb-5">
-            <label class="block text-sm font-medium text-zinc-600 mb-2">
-              Email
-            </label>
+            <label class="block text-sm font-medium text-zinc-600 mb-2"> Email </label>
             <span class="p-input-icon-left w-full">
               <i class="pi pi-envelope" />
               <InputText
                 v-model="email"
+                :disabled="isLoading"
                 type="email"
                 placeholder="admin@carelink.fr"
                 class="w-full"
-                :disabled="isLoading"
                 autocomplete="email"
               />
             </span>
@@ -130,16 +133,14 @@ function handleKeydown(event: KeyboardEvent) {
 
           <!-- Mot de passe -->
           <div class="mb-6">
-            <label class="block text-sm font-medium text-zinc-600 mb-2">
-              Mot de passe
-            </label>
+            <label class="block text-sm font-medium text-zinc-600 mb-2"> Mot de passe </label>
             <Password
               v-model="password"
-              placeholder="••••••••"
-              class="w-full"
               :feedback="false"
               :toggleMask="true"
               :disabled="isLoading"
+              placeholder="••••••••"
+              class="w-full"
               inputClass="w-full"
               autocomplete="current-password"
             />
@@ -147,12 +148,12 @@ function handleKeydown(event: KeyboardEvent) {
 
           <!-- Bouton connexion -->
           <Button
+            :loading="isLoading"
+            :disabled="!isFormValid"
             type="submit"
             label="Se connecter"
             icon="pi pi-sign-in"
             class="w-full login-btn"
-            :loading="isLoading"
-            :disabled="!isFormValid"
           />
         </form>
 
@@ -185,20 +186,20 @@ function handleKeydown(event: KeyboardEvent) {
 </template>
 
 <style scoped>
-/* Bouton gradient violet — seul override nécessaire */
-:deep(.login-btn.p-button) {
-  @apply bg-gradient-to-r from-violet-600 to-purple-600 border-0;
+  /* Bouton gradient violet — seul override nécessaire */
+  :deep(.login-btn.p-button) {
+    @apply bg-gradient-to-r from-violet-600 to-purple-600 border-0;
 
-  &:hover:not(:disabled) {
-    @apply from-violet-500 to-purple-500;
+    &:hover:not(:disabled) {
+      @apply from-violet-500 to-purple-500;
+    }
+
+    &:focus {
+      @apply ring-2 ring-violet-500/30 ring-offset-2;
+    }
   }
 
-  &:focus {
-    @apply ring-2 ring-violet-500/30 ring-offset-2;
+  :deep(.p-password) {
+    @apply w-full;
   }
-}
-
-:deep(.p-password) {
-  @apply w-full;
-}
 </style>

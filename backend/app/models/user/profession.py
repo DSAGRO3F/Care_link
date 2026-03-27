@@ -14,18 +14,19 @@ Changelog :
          (6 MEDICAL, 12 PARAMEDICAL, 6 SOCIAL, 3 ADMINISTRATIVE).
 """
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, Integer
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import ProfessionCategory
 from app.models.mixins import TimestampMixin
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
     from app.models.catalog.service_template import ServiceTemplate
+    from app.models.user.user import User
 
 
 class Profession(TimestampMixin, Base):
@@ -57,18 +58,14 @@ class Profession(TimestampMixin, Base):
     """
 
     __tablename__ = "professions"
-    __table_args__ = {
-        "comment": "Table des professions de santé réglementées"
-    }
+    __table_args__ = {"comment": "Table des professions de santé réglementées"}
 
     # === Colonnes ===
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de la profession",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     name: Mapped[str] = mapped_column(
@@ -78,8 +75,8 @@ class Profession(TimestampMixin, Base):
         doc="Nom de la profession",
         info={
             "description": "Nom officiel de la profession de santé",
-            "example": "Infirmier diplômé d'État"
-        }
+            "example": "Infirmier diplômé d'État",
+        },
     )
 
     code: Mapped[str | None] = mapped_column(
@@ -87,10 +84,7 @@ class Profession(TimestampMixin, Base):
         unique=True,
         nullable=True,
         doc="Code officiel RPPS/ADELI de la profession",
-        info={
-            "description": "Code profession dans le référentiel national",
-            "example": "60"
-        }
+        info={"description": "Code profession dans le référentiel national", "example": "60"},
     )
 
     category: Mapped[str | None] = mapped_column(
@@ -100,18 +94,15 @@ class Profession(TimestampMixin, Base):
         info={
             "description": "Classification de la profession",
             "enum": [e.value for e in ProfessionCategory],
-            "example": "PARAMEDICAL"
-        }
+            "example": "PARAMEDICAL",
+        },
     )
 
     requires_rpps: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
         doc="La profession nécessite-t-elle un numéro RPPS ?",
-        info={
-            "description": "True si un RPPS est obligatoire pour exercer",
-            "default": True
-        }
+        info={"description": "True si un RPPS est obligatoire pour exercer", "default": True},
     )
 
     # --- Ajouts S2 ---
@@ -122,7 +113,7 @@ class Profession(TimestampMixin, Base):
         doc="Ordre d'affichage dans les listes",
         info={
             "description": "Tri métier : MEDICAL 10-49, PARAMEDICAL 100-200, SOCIAL 300-350, ADMINISTRATIVE 400-420"
-        }
+        },
     )
 
     status: Mapped[str] = mapped_column(
@@ -131,23 +122,21 @@ class Profession(TimestampMixin, Base):
         doc="Statut de la profession : active ou inactive",
         info={
             "description": "Permet de déprécier une profession sans la supprimer",
-            "enum": ["active", "inactive"]
-        }
+            "enum": ["active", "inactive"],
+        },
     )
 
     # === Relations ===
 
-    users: Mapped[List["User"]] = relationship(
-        "User",
-        back_populates="profession",
-        doc="Utilisateurs ayant cette profession"
+    users: Mapped[list["User"]] = relationship(
+        "User", back_populates="profession", doc="Utilisateurs ayant cette profession"
     )
 
     # === relation service_templates dans profession.py ===
-    service_templates: Mapped[List["ServiceTemplate"]] = relationship(
+    service_templates: Mapped[list["ServiceTemplate"]] = relationship(
         "ServiceTemplate",
         back_populates="required_profession",
-        doc="Services nécessitant cette profession"
+        doc="Services nécessitant cette profession",
     )
 
     # === Méthodes ===
@@ -194,37 +183,196 @@ class Profession(TimestampMixin, Base):
 
 INITIAL_PROFESSIONS = [
     # ── MEDICAL (display_order 10-49) ────────────────────────────────
-    {"name": "Médecin généraliste",          "code": "10",  "category": "MEDICAL",       "requires_rpps": True,  "display_order": 10},
-    {"name": "Médecin gériatre",             "code": None,  "category": "MEDICAL",       "requires_rpps": True,  "display_order": 11},
-    {"name": "Médecin spécialiste (autre)",  "code": None,  "category": "MEDICAL",       "requires_rpps": True,  "display_order": 12},
-    {"name": "Pharmacien",                   "code": "21",  "category": "MEDICAL",       "requires_rpps": True,  "display_order": 20},
-    {"name": "Chirurgien-dentiste",          "code": "40",  "category": "MEDICAL",       "requires_rpps": True,  "display_order": 30},
-    {"name": "Sage-femme",                   "code": "50",  "category": "MEDICAL",       "requires_rpps": True,  "display_order": 40},
-
+    {
+        "name": "Médecin généraliste",
+        "code": "10",
+        "category": "MEDICAL",
+        "requires_rpps": True,
+        "display_order": 10,
+    },
+    {
+        "name": "Médecin gériatre",
+        "code": None,
+        "category": "MEDICAL",
+        "requires_rpps": True,
+        "display_order": 11,
+    },
+    {
+        "name": "Médecin spécialiste (autre)",
+        "code": None,
+        "category": "MEDICAL",
+        "requires_rpps": True,
+        "display_order": 12,
+    },
+    {
+        "name": "Pharmacien",
+        "code": "21",
+        "category": "MEDICAL",
+        "requires_rpps": True,
+        "display_order": 20,
+    },
+    {
+        "name": "Chirurgien-dentiste",
+        "code": "40",
+        "category": "MEDICAL",
+        "requires_rpps": True,
+        "display_order": 30,
+    },
+    {
+        "name": "Sage-femme",
+        "code": "50",
+        "category": "MEDICAL",
+        "requires_rpps": True,
+        "display_order": 40,
+    },
     # ── PARAMEDICAL (display_order 100-200) ──────────────────────────
-    {"name": "Infirmier diplômé d'État",     "code": "60",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 100},
-    {"name": "Infirmier en pratique avancée","code": None,  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 101},
-    {"name": "Aide-soignant",                "code": "93",  "category": "PARAMEDICAL",   "requires_rpps": False, "display_order": 110},
-    {"name": "Masseur-kinésithérapeute",     "code": "70",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 120},
-    {"name": "Ergothérapeute",               "code": "91",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 130},
-    {"name": "Psychomotricien",              "code": "92",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 140},
-    {"name": "Orthophoniste",                "code": "94",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 150},
-    {"name": "Orthoptiste",                  "code": "95",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 160},
-    {"name": "Pédicure-podologue",           "code": "80",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 170},
-    {"name": "Diététicien",                  "code": "97",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 180},
-    {"name": "Auxiliaire de puériculture",   "code": "96",  "category": "PARAMEDICAL",   "requires_rpps": False, "display_order": 190},
-    {"name": "Psychologue",                  "code": "98",  "category": "PARAMEDICAL",   "requires_rpps": True,  "display_order": 200},
-
+    {
+        "name": "Infirmier diplômé d'État",
+        "code": "60",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 100,
+    },
+    {
+        "name": "Infirmier en pratique avancée",
+        "code": None,
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 101,
+    },
+    {
+        "name": "Aide-soignant",
+        "code": "93",
+        "category": "PARAMEDICAL",
+        "requires_rpps": False,
+        "display_order": 110,
+    },
+    {
+        "name": "Masseur-kinésithérapeute",
+        "code": "70",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 120,
+    },
+    {
+        "name": "Ergothérapeute",
+        "code": "91",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 130,
+    },
+    {
+        "name": "Psychomotricien",
+        "code": "92",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 140,
+    },
+    {
+        "name": "Orthophoniste",
+        "code": "94",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 150,
+    },
+    {
+        "name": "Orthoptiste",
+        "code": "95",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 160,
+    },
+    {
+        "name": "Pédicure-podologue",
+        "code": "80",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 170,
+    },
+    {
+        "name": "Diététicien",
+        "code": "97",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 180,
+    },
+    {
+        "name": "Auxiliaire de puériculture",
+        "code": "96",
+        "category": "PARAMEDICAL",
+        "requires_rpps": False,
+        "display_order": 190,
+    },
+    {
+        "name": "Psychologue",
+        "code": "98",
+        "category": "PARAMEDICAL",
+        "requires_rpps": True,
+        "display_order": 200,
+    },
     # ── SOCIAL (display_order 300-350) ───────────────────────────────
-    {"name": "Assistant de service social",      "code": None, "category": "SOCIAL", "requires_rpps": False, "display_order": 300},
-    {"name": "Éducateur spécialisé",             "code": None, "category": "SOCIAL", "requires_rpps": False, "display_order": 310},
-    {"name": "Conseiller en économie sociale",   "code": None, "category": "SOCIAL", "requires_rpps": False, "display_order": 320},
-    {"name": "Auxiliaire de vie sociale",        "code": None, "category": "SOCIAL", "requires_rpps": False, "display_order": 330},
-    {"name": "Accompagnant éducatif et social",  "code": None, "category": "SOCIAL", "requires_rpps": False, "display_order": 340},
-    {"name": "Technicien intervention sociale",  "code": None, "category": "SOCIAL", "requires_rpps": False, "display_order": 350},
-
+    {
+        "name": "Assistant de service social",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 300,
+    },
+    {
+        "name": "Éducateur spécialisé",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 310,
+    },
+    {
+        "name": "Conseiller en économie sociale",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 320,
+    },
+    {
+        "name": "Auxiliaire de vie sociale",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 330,
+    },
+    {
+        "name": "Accompagnant éducatif et social",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 340,
+    },
+    {
+        "name": "Technicien intervention sociale",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 350,
+    },
     # ── ADMINISTRATIVE (display_order 400-420) ───────────────────────
-    {"name": "Secrétaire médical",           "code": None, "category": "ADMINISTRATIVE", "requires_rpps": False, "display_order": 400},
-    {"name": "Responsable administratif",    "code": None, "category": "ADMINISTRATIVE", "requires_rpps": False, "display_order": 410},
-    {"name": "Agent d'accueil",              "code": None, "category": "ADMINISTRATIVE", "requires_rpps": False, "display_order": 420},
+    {
+        "name": "Secrétaire médical",
+        "code": None,
+        "category": "ADMINISTRATIVE",
+        "requires_rpps": False,
+        "display_order": 400,
+    },
+    {
+        "name": "Responsable administratif",
+        "code": None,
+        "category": "ADMINISTRATIVE",
+        "requires_rpps": False,
+        "display_order": 410,
+    },
+    {
+        "name": "Agent d'accueil",
+        "code": None,
+        "category": "ADMINISTRATIVE",
+        "requires_rpps": False,
+        "display_order": 420,
+    },
 ]

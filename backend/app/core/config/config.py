@@ -7,9 +7,9 @@ MODIFICATIONS:
 - URLs PSC dynamiques selon l'environnement (properties)
 - Correction URL callback PSC: /api/v1/auth/psc/callback
 """
+
 import json
 from functools import lru_cache
-from typing import List, Optional
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = None
+    REDIS_PASSWORD: str | None = None
     REDIS_SSL: bool = False
     REDIS_MAX_CONNECTIONS: int = 50
 
@@ -56,12 +56,12 @@ class Settings(BaseSettings):
     JWT_PUBLIC_KEY_PATH: str = "keys/jwt_public_key.pem"
 
     # === Chiffrement AES-256 (Données patients) ===
-    ENCRYPTION_KEY: Optional[str] = None
+    ENCRYPTION_KEY: str | None = None
 
     # === Pro Santé Connect (OAuth2/OIDC) ===
     # Identifiants client (fournis par Datapass après validation)
-    PSC_CLIENT_ID: Optional[str] = None
-    PSC_CLIENT_SECRET: Optional[str] = None
+    PSC_CLIENT_ID: str | None = None
+    PSC_CLIENT_SECRET: str | None = None
 
     # URL de callback (doit correspondre à celle déclarée dans Datapass)
     PSC_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/psc/callback"
@@ -73,13 +73,13 @@ class Settings(BaseSettings):
 
     # URLs PSC (optionnel - calculées automatiquement selon PSC_ENVIRONMENT)
     # Ne définir dans .env que si vous avez besoin d'URLs personnalisées
-    PSC_AUTHORIZATION_URL_OVERRIDE: Optional[str] = None
-    PSC_TOKEN_URL_OVERRIDE: Optional[str] = None
-    PSC_USERINFO_URL_OVERRIDE: Optional[str] = None
-    PSC_JWKS_URL_OVERRIDE: Optional[str] = None
+    PSC_AUTHORIZATION_URL_OVERRIDE: str | None = None
+    PSC_TOKEN_URL_OVERRIDE: str | None = None
+    PSC_USERINFO_URL_OVERRIDE: str | None = None
+    PSC_JWKS_URL_OVERRIDE: str | None = None
 
     # === CORS ===
-    CORS_ORIGINS: List[str] = ["http://localhost:8000", "http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:8000", "http://localhost:3000"]
 
     # === Logging ===
     LOG_LEVEL: str = "INFO"
@@ -94,7 +94,7 @@ class Settings(BaseSettings):
 
     # === Validators ===
 
-    @field_validator('CORS_ORIGINS', mode='before')
+    @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
         """Parse CORS_ORIGINS depuis une string JSON ou une liste"""
@@ -106,22 +106,22 @@ class Settings(BaseSettings):
                 return [v]
         return v
 
-    @field_validator('ENVIRONMENT')
+    @field_validator("ENVIRONMENT")
     @classmethod
     def validate_environment(cls, v):
         """Valide que l'environnement est valide"""
-        allowed = ['development', 'staging', 'production', 'test']
+        allowed = ["development", "staging", "production", "test"]
         if v.lower() not in allowed:
             raise ValueError(f"ENVIRONMENT doit être parmi : {allowed}")
         return v.lower()
 
-    @field_validator('PSC_ENVIRONMENT')
+    @field_validator("PSC_ENVIRONMENT")
     @classmethod
     def validate_psc_environment(cls, v):
         """Valide que l'environnement PSC est valide"""
-        allowed = ['bas', 'prod']
+        allowed = ["bas", "prod"]
         if v.lower() not in allowed:
-            raise ValueError(f"PSC_ENVIRONMENT doit être 'bas' ou 'prod'")
+            raise ValueError("PSC_ENVIRONMENT doit être 'bas' ou 'prod'")
         return v.lower()
 
     # === Properties générales ===
@@ -226,7 +226,7 @@ class Settings(BaseSettings):
         return "https://auth.esw.esante.gouv.fr/auth/realms/esante-wallet/protocol/openid-connect/certs"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """
     Retourne l'instance des settings (mise en cache).

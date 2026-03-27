@@ -10,15 +10,16 @@ IMPORTANT :
 - Rétention configurable (par défaut 2 ans)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import String, Integer, ForeignKey, DateTime
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.types import JSONBCompatible
+
 
 if TYPE_CHECKING:
     from app.models.platform.super_admin import SuperAdmin
@@ -36,6 +37,7 @@ class AuditAction(str, Enum):
     - DATA : Accès aux données
     - CONFIG : Configuration plateforme
     """
+
     # Authentification
     LOGIN_SUCCESS = "LOGIN_SUCCESS"
     LOGIN_FAILURE = "LOGIN_FAILURE"
@@ -103,16 +105,11 @@ class PlatformAuditLog(Base):
     """
 
     __tablename__ = "platform_audit_logs"
-    __table_args__ = {
-        "comment": "Logs d'audit des actions super-admin (immuables)"
-    }
+    __table_args__ = {"comment": "Logs d'audit des actions super-admin (immuables)"}
 
     # === Colonnes ===
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique du log"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique du log")
 
     # --- Qui ---
 
@@ -120,16 +117,13 @@ class PlatformAuditLog(Base):
         ForeignKey("super_admins.id", ondelete="SET NULL"),
         nullable=True,  # Peut être NULL si super-admin supprimé
         index=True,
-        doc="Super-admin ayant effectué l'action"
+        doc="Super-admin ayant effectué l'action",
     )
 
     # --- Quoi ---
 
     action: Mapped[str] = mapped_column(
-        String(50),
-        nullable=False,
-        index=True,
-        doc="Type d'action effectuée"
+        String(50), nullable=False, index=True, doc="Type d'action effectuée"
     )
 
     # --- Sur quoi ---
@@ -138,27 +132,23 @@ class PlatformAuditLog(Base):
         ForeignKey("tenants.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
-        doc="Tenant concerné par l'action (si applicable)"
+        doc="Tenant concerné par l'action (si applicable)",
     )
 
     target_table: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-        doc="Table concernée (si accès données)"
+        String(100), nullable=True, doc="Table concernée (si accès données)"
     )
 
     target_id: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        doc="ID de l'enregistrement concerné"
+        Integer, nullable=True, doc="ID de l'enregistrement concerné"
     )
 
     # --- Détails ---
 
-    details: Mapped[Dict[str, Any] | None] = mapped_column(
+    details: Mapped[dict[str, Any] | None] = mapped_column(
         JSONBCompatible,
         nullable=True,
-        doc="Détails JSON de l'action (ancien/nouveau valeurs, etc.)"
+        doc="Détails JSON de l'action (ancien/nouveau valeurs, etc.)",
     )
 
     # --- Contexte technique ---
@@ -166,43 +156,38 @@ class PlatformAuditLog(Base):
     ip_address: Mapped[str | None] = mapped_column(
         String(45),  # IPv6 max length
         nullable=True,
-        doc="Adresse IP source de la requête"
+        doc="Adresse IP source de la requête",
     )
 
     user_agent: Mapped[str | None] = mapped_column(
-        String(500),
-        nullable=True,
-        doc="User-Agent du navigateur"
+        String(500), nullable=True, doc="User-Agent du navigateur"
     )
 
     request_id: Mapped[str | None] = mapped_column(
         String(36),  # UUID
         nullable=True,
         index=True,
-        doc="ID de corrélation de la requête"
+        doc="ID de corrélation de la requête",
     )
 
     # --- Horodatage ---
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
         index=True,
-        doc="Horodatage de l'action"
+        doc="Horodatage de l'action",
     )
 
     # === Relations ===
 
     super_admin: Mapped[Optional["SuperAdmin"]] = relationship(
-        "SuperAdmin",
-        back_populates="audit_logs",
-        doc="Super-admin ayant effectué l'action"
+        "SuperAdmin", back_populates="audit_logs", doc="Super-admin ayant effectué l'action"
     )
 
     target_tenant: Mapped[Optional["Tenant"]] = relationship(
-        "Tenant",
-        doc="Tenant concerné par l'action"
+        "Tenant", doc="Tenant concerné par l'action"
     )
 
     # === Méthodes ===
@@ -216,16 +201,16 @@ class PlatformAuditLog(Base):
 
     @classmethod
     def create_log(
-            cls,
-            super_admin_id: int,
-            action: AuditAction,
-            target_tenant_id: int | None = None,
-            target_table: str | None = None,
-            target_id: int | None = None,
-            details: Dict[str, Any] | None = None,
-            ip_address: str | None = None,
-            user_agent: str | None = None,
-            request_id: str | None = None,
+        cls,
+        super_admin_id: int,
+        action: AuditAction,
+        target_tenant_id: int | None = None,
+        target_table: str | None = None,
+        target_id: int | None = None,
+        details: dict[str, Any] | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+        request_id: str | None = None,
     ) -> "PlatformAuditLog":
         """
         Factory method pour créer un log d'audit.
@@ -259,14 +244,15 @@ class PlatformAuditLog(Base):
 
 # === Fonctions utilitaires ===
 
+
 def log_tenant_action(
-        db_session,
-        super_admin_id: int,
-        action: AuditAction,
-        tenant_id: int,
-        details: Dict[str, Any] | None = None,
-        ip_address: str | None = None,
-        user_agent: str | None = None,
+    db_session,
+    super_admin_id: int,
+    action: AuditAction,
+    tenant_id: int,
+    details: dict[str, Any] | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
 ) -> PlatformAuditLog:
     """
     Crée et enregistre un log d'action sur un tenant.
@@ -293,13 +279,13 @@ def log_tenant_action(
 
 
 def log_data_access(
-        db_session,
-        super_admin_id: int,
-        tenant_id: int,
-        table_name: str,
-        record_id: int | None = None,
-        reason: str | None = None,
-        ip_address: str | None = None,
+    db_session,
+    super_admin_id: int,
+    tenant_id: int,
+    table_name: str,
+    record_id: int | None = None,
+    reason: str | None = None,
+    ip_address: str | None = None,
 ) -> PlatformAuditLog:
     """
     Crée et enregistre un log d'accès aux données d'un tenant.

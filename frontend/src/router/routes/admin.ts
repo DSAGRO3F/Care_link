@@ -10,7 +10,7 @@
  *
  * Destination : src/router/routes/admin.ts
  */
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router';
 
 const adminRoutes: RouteRecordRaw[] = [
   {
@@ -62,7 +62,7 @@ const adminRoutes: RouteRecordRaw[] = [
       {
         path: 'patients/:id',
         name: 'admin-patient-detail',
-        component: () => import('@/pages/admin/patients/PatientDetailPage.vue'),
+        component: () => import('@/pages/admin/patients/PatientDetailPage_admin.vue'),
         props: true,
         meta: { title: 'Patient' },
       },
@@ -92,6 +92,6 @@ const adminRoutes: RouteRecordRaw[] = [
       // },
     ],
   },
-]
+];
 
-export default adminRoutes
+export default adminRoutes;

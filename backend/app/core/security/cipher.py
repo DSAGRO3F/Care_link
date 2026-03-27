@@ -7,7 +7,6 @@ Renommé en cipher.py pour éviter le conflit avec le sous-module encryption/
 
 import base64
 import os
-from typing import Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -40,7 +39,7 @@ class FieldEncryption:
 
         self.aesgcm = AESGCM(self.key)
 
-    def encrypt(self, plaintext: Optional[str]) -> Optional[str]:
+    def encrypt(self, plaintext: str | None) -> str | None:
         """
         Chiffre une valeur avec AES-256-GCM.
 
@@ -64,17 +63,17 @@ class FieldEncryption:
         # Chiffrer avec authentification
         ciphertext = self.aesgcm.encrypt(
             nonce,
-            plaintext.encode('utf-8'),
-            None  # Associated data (optionnel)
+            plaintext.encode("utf-8"),
+            None,  # Associated data (optionnel)
         )
 
         # Format: nonce (12 bytes) || ciphertext+tag
         encrypted_data = nonce + ciphertext
 
         # Encoder en base64 pour stockage en DB
-        return base64.b64encode(encrypted_data).decode('utf-8')
+        return base64.b64encode(encrypted_data).decode("utf-8")
 
-    def decrypt(self, ciphertext: Optional[str]) -> Optional[str]:
+    def decrypt(self, ciphertext: str | None) -> str | None:
         """
         Déchiffre une valeur chiffrée avec AES-256-GCM.
 
@@ -99,21 +98,18 @@ class FieldEncryption:
             ciphertext_with_tag = encrypted_data[12:]
 
             # Déchiffrer et vérifier l'authentification
-            plaintext_bytes = self.aesgcm.decrypt(
-                nonce,
-                ciphertext_with_tag,
-                None
-            )
+            plaintext_bytes = self.aesgcm.decrypt(nonce, ciphertext_with_tag, None)
 
-            return plaintext_bytes.decode('utf-8')
+            return plaintext_bytes.decode("utf-8")
 
         except Exception as e:
             # En production, logger cette erreur (possible tentative d'altération)
-            raise ValueError(f"Échec du déchiffrement (données altérées?) : {str(e)}")
+            raise ValueError(f"Échec du déchiffrement (données altérées?) : {e!s}") from e
 
 
 # Instance singleton
 _encryptor = None
+
 
 def get_encryptor() -> FieldEncryption:
     """Retourne l'instance singleton du chiffreur."""
@@ -123,7 +119,7 @@ def get_encryptor() -> FieldEncryption:
     return _encryptor
 
 
-def encrypt_field(value: Optional[str]) -> Optional[str]:
+def encrypt_field(value: str | None) -> str | None:
     """
     Fonction helper pour chiffrer un champ.
 
@@ -136,7 +132,7 @@ def encrypt_field(value: Optional[str]) -> Optional[str]:
     return get_encryptor().encrypt(value)
 
 
-def decrypt_field(value: Optional[str]) -> Optional[str]:
+def decrypt_field(value: str | None) -> str | None:
     """
     Fonction helper pour déchiffrer un champ.
 

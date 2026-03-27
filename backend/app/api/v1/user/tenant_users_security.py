@@ -12,11 +12,11 @@ Note: Pour la sécurité SuperAdmin (équipe CareLink),
 voir app/api/v1/platform/super_admin_security.py
 """
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.auth.user_auth import get_current_user
 from app.database import get_db
@@ -27,9 +27,9 @@ from app.models.user.user import User
 # TENANT DEPENDENCIES (MULTI-TENANT SUPPORT)
 # =============================================================================
 
+
 def get_current_tenant_id(
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> int:
     """
     Extrait le tenant_id principal de l'utilisateur courant et configure RLS.
@@ -39,8 +39,7 @@ def get_current_tenant_id(
     """
     if not current_user.tenant_id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Utilisateur non rattaché à un tenant"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Utilisateur non rattaché à un tenant"
         )
 
     # Configure RLS PostgreSQL pour cette session
@@ -51,9 +50,8 @@ def get_current_tenant_id(
 
 
 def get_optional_tenant_id(
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
-) -> Optional[int]:
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> int | None:
     """
     Extrait le tenant_id de l'utilisateur courant (optionnel).
 
@@ -87,9 +85,9 @@ class TenantContext:
     """
 
     def __init__(
-            self,
-            current_user: User = Depends(get_current_user),
-            tenant_id: int = Depends(get_current_tenant_id)
+        self,
+        current_user: User = Depends(get_current_user),
+        tenant_id: int = Depends(get_current_tenant_id),
     ):
         self.user = current_user
         self.tenant_id = tenant_id
@@ -142,8 +140,7 @@ def verify_write_permission():
     def checker(ctx: TenantContext = Depends()):
         if not ctx.can_write():
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès en lecture seule sur ce tenant"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Accès en lecture seule sur ce tenant"
             )
 
     return checker
@@ -154,5 +151,5 @@ def verify_write_permission():
 # =============================================================================
 
 CurrentTenantId = Annotated[int, Depends(get_current_tenant_id)]
-OptionalTenantId = Annotated[Optional[int], Depends(get_optional_tenant_id)]
+OptionalTenantId = Annotated[int | None, Depends(get_optional_tenant_id)]
 TenantCtx = Annotated[TenantContext, Depends()]

@@ -7,31 +7,40 @@ Endpoints pour :
 
 Version multi-tenant : EntityServices filtrent par tenant_id.
 """
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.catalog.schemas import (
-    # Service Template
-    ServiceTemplateCreate, ServiceTemplateUpdate,
-    ServiceTemplateResponse, ServiceTemplateList, ServiceTemplateFilters,
     # Entity Service
-    EntityServiceCreate, EntityServiceUpdate,
-    EntityServiceResponse, EntityServiceList,
+    EntityServiceCreate,
+    EntityServiceList,
+    EntityServiceResponse,
+    EntityServiceUpdate,
+    # Service Template
+    ServiceTemplateCreate,
+    ServiceTemplateFilters,
+    ServiceTemplateList,
+    ServiceTemplateResponse,
+    ServiceTemplateUpdate,
 )
 from app.api.v1.catalog.services import (
-    ServiceTemplateService, EntityServiceService,
+    DuplicateEntityServiceError,
+    DuplicateServiceCodeError,
+    EntityNotFoundError,
+    EntityServiceNotFoundError,
+    EntityServiceService,
+    ProfessionNotFoundError,
     # Exceptions
-    ServiceTemplateNotFoundError, EntityServiceNotFoundError,
-    EntityNotFoundError, ProfessionNotFoundError,
-    DuplicateServiceCodeError, DuplicateEntityServiceError,
+    ServiceTemplateNotFoundError,
+    ServiceTemplateService,
 )
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
 from app.core.auth.user_auth import get_current_user, require_role
 from app.database.session_rls import get_db
 from app.models.user.user import User
+
 
 # =============================================================================
 # ROUTERS
@@ -46,17 +55,18 @@ entity_services_router = APIRouter(prefix="/entities", tags=["Entity Services"])
 # SERVICE TEMPLATE ENDPOINTS (Catalogue national - pas de tenant)
 # =============================================================================
 
+
 @templates_router.get("", response_model=ServiceTemplateList)
 def list_service_templates(
-        pagination: PaginationParams = Depends(),
-        category: Optional[str] = Query(None, description="Filtrer par catégorie"),
-        is_medical_act: Optional[bool] = Query(None, description="Filtrer actes médicaux"),
-        requires_prescription: Optional[bool] = Query(None, description="Filtrer sur prescription"),
-        apa_eligible: Optional[bool] = Query(None, description="Filtrer éligibilité APA"),
-        status: Optional[str] = Query(None, description="Filtrer par statut"),
-        search: Optional[str] = Query(None, description="Recherche sur code ou nom"),
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    pagination: PaginationParams = Depends(),
+    category: str | None = Query(None, description="Filtrer par catégorie"),
+    is_medical_act: bool | None = Query(None, description="Filtrer actes médicaux"),
+    requires_prescription: bool | None = Query(None, description="Filtrer sur prescription"),
+    apa_eligible: bool | None = Query(None, description="Filtrer éligibilité APA"),
+    status: str | None = Query(None, description="Filtrer par statut"),
+    search: str | None = Query(None, description="Recherche sur code ou nom"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les services du catalogue national."""
     filters = ServiceTemplateFilters(
@@ -81,8 +91,8 @@ def list_service_templates(
 
 @templates_router.get("/categories")
 def list_service_categories(
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les catégories de services disponibles."""
     return {
@@ -102,9 +112,9 @@ def list_service_categories(
 
 @templates_router.get("/by-category/{category}")
 def get_templates_by_category(
-        category: str,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    category: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste les services d'une catégorie."""
     items = ServiceTemplateService.get_by_category(db, category)
@@ -113,88 +123,91 @@ def get_templates_by_category(
 
 @templates_router.get("/{template_id}", response_model=ServiceTemplateResponse)
 def get_service_template(
-        template_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère un service template par son ID."""
     try:
         return ServiceTemplateService.get_by_id(db, template_id)
     except ServiceTemplateNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @templates_router.get("/code/{code}", response_model=ServiceTemplateResponse)
 def get_service_template_by_code(
-        code: str,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère un service template par son code."""
     template = ServiceTemplateService.get_by_code(db, code)
     if not template:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Service template avec code '{code}' non trouvé"
+            detail=f"Service template avec code '{code}' non trouvé",
         )
     return template
 
 
-@templates_router.post("", response_model=ServiceTemplateResponse, status_code=status.HTTP_201_CREATED)
+@templates_router.post(
+    "", response_model=ServiceTemplateResponse, status_code=status.HTTP_201_CREATED
+)
 def create_service_template(
-        data: ServiceTemplateCreate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    data: ServiceTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Crée un nouveau service template (admin uniquement)."""
     try:
         return ServiceTemplateService.create(db, data)
     except DuplicateServiceCodeError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @templates_router.patch("/{template_id}", response_model=ServiceTemplateResponse)
 def update_service_template(
-        template_id: int,
-        data: ServiceTemplateUpdate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    template_id: int,
+    data: ServiceTemplateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Met à jour un service template (admin uniquement)."""
     try:
         return ServiceTemplateService.update(db, template_id, data)
     except ServiceTemplateNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ProfessionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @templates_router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_service_template(
-        template_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """Désactive un service template (admin uniquement)."""
     try:
         ServiceTemplateService.delete(db, template_id)
     except ServiceTemplateNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # ENTITY SERVICE ENDPOINTS (Multi-tenant)
 # =============================================================================
 
+
 @entity_services_router.get("/{entity_id}/services", response_model=EntityServiceList)
 def list_entity_services(
-        entity_id: int,
-        active_only: bool = Query(True, description="Uniquement les services actifs"),
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        tenant_id: int = Depends(get_current_tenant_id),
+    entity_id: int,
+    active_only: bool = Query(True, description="Uniquement les services actifs"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Liste les services activés pour une entité."""
     service = EntityServiceService(db, tenant_id)
@@ -219,20 +232,24 @@ def list_entity_services(
             updated_at=item.updated_at,
             service_code=item.service_template.code if item.service_template else None,
             service_name=item.service_template.name if item.service_template else None,
-            service_category=str(item.service_template.category.value) if item.service_template else None,
+            service_category=str(item.service_template.category.value)
+            if item.service_template
+            else None,
         )
         enriched_items.append(response)
 
     return EntityServiceList(items=enriched_items, total=len(enriched_items))
 
 
-@entity_services_router.get("/{entity_id}/services/{service_id}", response_model=EntityServiceResponse)
+@entity_services_router.get(
+    "/{entity_id}/services/{service_id}", response_model=EntityServiceResponse
+)
 def get_entity_service(
-        entity_id: int,
-        service_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        tenant_id: int = Depends(get_current_tenant_id),
+    entity_id: int,
+    service_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Récupère un service d'entité par son ID."""
     try:
@@ -240,8 +257,7 @@ def get_entity_service(
         entity_service = service.get_by_id(service_id)
         if entity_service.entity_id != entity_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Service non trouvé pour cette entité"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour cette entité"
             )
 
         return EntityServiceResponse(
@@ -258,23 +274,31 @@ def get_entity_service(
             has_custom_price=entity_service.has_custom_price,
             created_at=entity_service.created_at,
             updated_at=entity_service.updated_at,
-            service_code=entity_service.service_template.code if entity_service.service_template else None,
-            service_name=entity_service.service_template.name if entity_service.service_template else None,
-            service_category=str(
-                entity_service.service_template.category.value) if entity_service.service_template else None,
+            service_code=entity_service.service_template.code
+            if entity_service.service_template
+            else None,
+            service_name=entity_service.service_template.name
+            if entity_service.service_template
+            else None,
+            service_category=str(entity_service.service_template.category.value)
+            if entity_service.service_template
+            else None,
         )
     except EntityServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@entity_services_router.post("/{entity_id}/services", response_model=EntityServiceResponse,
-                             status_code=status.HTTP_201_CREATED)
+@entity_services_router.post(
+    "/{entity_id}/services",
+    response_model=EntityServiceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_entity_service(
-        entity_id: int,
-        data: EntityServiceCreate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        tenant_id: int = Depends(get_current_tenant_id),
+    entity_id: int,
+    data: EntityServiceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Active un service pour une entité."""
     try:
@@ -297,21 +321,23 @@ def create_entity_service(
             updated_at=entity_service.updated_at,
         )
     except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ServiceTemplateNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except DuplicateEntityServiceError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@entity_services_router.patch("/{entity_id}/services/{service_id}", response_model=EntityServiceResponse)
+@entity_services_router.patch(
+    "/{entity_id}/services/{service_id}", response_model=EntityServiceResponse
+)
 def update_entity_service(
-        entity_id: int,
-        service_id: int,
-        data: EntityServiceUpdate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        tenant_id: int = Depends(get_current_tenant_id),
+    entity_id: int,
+    service_id: int,
+    data: EntityServiceUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Met à jour un service d'entité."""
     try:
@@ -319,8 +345,7 @@ def update_entity_service(
         entity_service = service.get_by_id(service_id)
         if entity_service.entity_id != entity_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Service non trouvé pour cette entité"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour cette entité"
             )
 
         entity_service = service.update(service_id, data)
@@ -341,16 +366,18 @@ def update_entity_service(
             updated_at=entity_service.updated_at,
         )
     except EntityServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@entity_services_router.delete("/{entity_id}/services/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
+@entity_services_router.delete(
+    "/{entity_id}/services/{service_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def delete_entity_service(
-        entity_id: int,
-        service_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        tenant_id: int = Depends(get_current_tenant_id),
+    entity_id: int,
+    service_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Désactive un service d'entité."""
     try:
@@ -358,12 +385,11 @@ def delete_entity_service(
         entity_service = service.get_by_id(service_id)
         if entity_service.entity_id != entity_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Service non trouvé pour cette entité"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour cette entité"
             )
         service.delete(service_id)
     except EntityServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================

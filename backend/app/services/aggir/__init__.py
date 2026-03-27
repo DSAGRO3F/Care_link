@@ -23,13 +23,13 @@ Usage:
 """
 
 from app.services.aggir.calculator import (
-    Variable,
     Adverbes,
     AggiralgorithmTable,
     AggirCalculator,
+    Variable,
 )
-
 from app.services.aggir.parser import AggirParser
+
 
 __all__ = [
     # Calculator

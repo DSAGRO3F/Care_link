@@ -4,13 +4,13 @@
  */
 
 // Evaluation — formatage (visualisation)
-export { useEvaluationFormatter } from './useEvaluationFormatter'
+export { useEvaluationFormatter } from './useEvaluationFormatter';
 
 // Evaluation — wizard (saisie)
-export { useEvaluationWizard } from './useEvaluationWizard'
+export { useEvaluationWizard } from './useEvaluationWizard';
 export type {
   WizardSectionConfig,
   SectionState,
   SectionStatus,
   WizardState,
-} from './useEvaluationWizard'
+} from './useEvaluationWizard';

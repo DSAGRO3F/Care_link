@@ -17,15 +17,16 @@ from app.models.patient.patient import Patient
 from app.models.patient.patient_access import PatientAccess
 from app.models.patient.patient_document import PatientDocument
 from app.models.patient.patient_evaluation import PatientEvaluation
-from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
+from app.models.patient.patient_vitals import PatientDevice, PatientThreshold, PatientVitals
+
 
 __all__ = [
+    "EvaluationSession",  # NOUVEAU
     "Patient",
     "PatientAccess",
-    "PatientEvaluation",
-    "EvaluationSession",  # NOUVEAU
-    "PatientThreshold",
-    "PatientVitals",
     "PatientDevice",
     "PatientDocument",
+    "PatientEvaluation",
+    "PatientThreshold",
+    "PatientVitals",
 ]

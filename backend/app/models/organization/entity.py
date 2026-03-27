@@ -13,24 +13,24 @@ Une entité peut être :
 
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import String, ForeignKey, Text, Integer, Date, Numeric
+from sqlalchemy import Date, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import EntityType, IntegrationType
-from app.models.mixins import TimestampMixin, StatusMixin
+from app.models.mixins import StatusMixin, TimestampMixin
+
 
 if TYPE_CHECKING:
+    from app.models.careplan.care_plan import CarePlan
+    from app.models.catalog.entity_service import EntityService
+    from app.models.patient.patient import Patient
     from app.models.reference.country import Country
     from app.models.tenants.tenant import Tenant
     from app.models.user.user import User
-    from app.models.patient.patient import Patient
     from app.models.user.user_associations import UserEntity
-    from app.models.catalog.entity_service import EntityService
-    from app.models.careplan.care_plan import CarePlan
     from app.models.user.user_availability import UserAvailability
 
 
@@ -76,9 +76,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
     """
 
     __tablename__ = "entities"
-    __table_args__ = {
-        "comment": "Table des entités de soins (SSIAD, EHPAD, SAAD...)"
-    }
+    __table_args__ = {"comment": "Table des entités de soins (SSIAD, EHPAD, SAAD...)"}
 
     # =========================================================================
     # COLONNES D'IDENTIFICATION
@@ -87,29 +85,21 @@ class Entity(TimestampMixin, StatusMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'entité",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
         doc="Nom de la structure de soins",
-        info={
-            "description": "Nom complet de l'entité",
-            "example": "SSIAD Bien Vieillir Paris 12"
-        }
+        info={"description": "Nom complet de l'entité", "example": "SSIAD Bien Vieillir Paris 12"},
     )
 
-    short_name: Mapped[Optional[str]] = mapped_column(
+    short_name: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
         doc="Nom court ou acronyme",
-        info={
-            "description": "Nom abrégé pour affichage",
-            "example": "SSIAD P12"
-        }
+        info={"description": "Nom abrégé pour affichage", "example": "SSIAD P12"},
     )
 
     # =========================================================================
@@ -120,40 +110,35 @@ class Entity(TimestampMixin, StatusMixin, Base):
         SQLEnum(EntityType, name="entity_type_enum", create_constraint=True),
         nullable=False,
         doc="Type de structure",
-        info={
-            "description": "Type d'entité selon classification française",
-            "example": "SSIAD"
-        }
+        info={"description": "Type d'entité selon classification française", "example": "SSIAD"},
     )
 
-    integration_type: Mapped[Optional[IntegrationType]] = mapped_column(
+    integration_type: Mapped[IntegrationType | None] = mapped_column(
         SQLEnum(IntegrationType, name="integration_type_enum", create_constraint=True),
         nullable=True,
         doc="Type de rattachement à l'organisation",
         info={
             "description": "MANAGED (intégré), FEDERATED (adhérent), CONVENTION (partenaire)",
-            "example": "MANAGED"
-        }
+            "example": "MANAGED",
+        },
     )
 
     # =========================================================================
     # HIÉRARCHIE (auto-référence pour les agences)
     # =========================================================================
 
-    parent_entity_id: Mapped[Optional[int]] = mapped_column(
+    parent_entity_id: Mapped[int | None] = mapped_column(
         ForeignKey("entities.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID de l'entité parente (pour les agences)",
-        info={
-            "description": "Référence vers l'entité mère si c'est une agence"
-        }
+        info={"description": "Référence vers l'entité mère si c'est une agence"},
     )
 
     # =========================================================================
     # IDENTIFIANTS LÉGAUX
     # =========================================================================
 
-    siret: Mapped[Optional[str]] = mapped_column(
+    siret: Mapped[str | None] = mapped_column(
         String(14),
         unique=True,
         nullable=True,
@@ -161,33 +146,33 @@ class Entity(TimestampMixin, StatusMixin, Base):
         info={
             "description": "Numéro SIRET à 14 chiffres",
             "pattern": "^[0-9]{14}$",
-            "example": "12345678901234"
-        }
+            "example": "12345678901234",
+        },
     )
 
-    siren: Mapped[Optional[str]] = mapped_column(
+    siren: Mapped[str | None] = mapped_column(
         String(9),
         nullable=True,
         doc="Numéro SIREN de l'entité juridique",
         info={
             "description": "Numéro SIREN à 9 chiffres (extrait du SIRET)",
             "pattern": "^[0-9]{9}$",
-            "example": "123456789"
-        }
+            "example": "123456789",
+        },
     )
 
-    finess_ej: Mapped[Optional[str]] = mapped_column(
+    finess_ej: Mapped[str | None] = mapped_column(
         String(9),
         nullable=True,
         doc="Numéro FINESS Entité Juridique",
         info={
             "description": "FINESS de l'entité juridique gestionnaire",
             "pattern": "^[0-9A-Z]{9}$",
-            "example": "750000001"
-        }
+            "example": "750000001",
+        },
     )
 
-    finess_et: Mapped[Optional[str]] = mapped_column(
+    finess_et: Mapped[str | None] = mapped_column(
         String(9),
         unique=True,
         nullable=True,
@@ -195,123 +180,93 @@ class Entity(TimestampMixin, StatusMixin, Base):
         info={
             "description": "FINESS de l'établissement (anciennement 'finess')",
             "pattern": "^[0-9A-Z]{9}$",
-            "example": "750012345"
-        }
+            "example": "750012345",
+        },
     )
 
     # =========================================================================
     # AUTORISATION ET CAPACITÉ
     # =========================================================================
 
-    authorized_capacity: Mapped[Optional[int]] = mapped_column(
+    authorized_capacity: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         doc="Nombre de places autorisées",
-        info={
-            "description": "Capacité autorisée (places SSIAD, lits EHPAD...)",
-            "example": 30
-        }
+        info={"description": "Capacité autorisée (places SSIAD, lits EHPAD...)", "example": 30},
     )
 
-    authorization_date: Mapped[Optional[date]] = mapped_column(
+    authorization_date: Mapped[date | None] = mapped_column(
         Date,
         nullable=True,
         doc="Date de l'autorisation",
-        info={
-            "description": "Date de délivrance de l'autorisation ARS/CD"
-        }
+        info={"description": "Date de délivrance de l'autorisation ARS/CD"},
     )
 
-    authorization_reference: Mapped[Optional[str]] = mapped_column(
+    authorization_reference: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
         doc="Référence de l'autorisation",
-        info={
-            "description": "Numéro ou référence de l'arrêté d'autorisation"
-        }
+        info={"description": "Numéro ou référence de l'arrêté d'autorisation"},
     )
 
     # =========================================================================
     # COORDONNÉES
     # =========================================================================
 
-    address: Mapped[Optional[str]] = mapped_column(
+    address: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         doc="Adresse postale complète",
-        info={
-            "description": "Adresse du siège ou de l'établissement"
-        }
+        info={"description": "Adresse du siège ou de l'établissement"},
     )
 
-    postal_code: Mapped[Optional[str]] = mapped_column(
+    postal_code: Mapped[str | None] = mapped_column(
         String(10),
         nullable=True,
         doc="Code postal",
-        info={
-            "description": "Code postal",
-            "example": "75012"
-        }
+        info={"description": "Code postal", "example": "75012"},
     )
 
-    city: Mapped[Optional[str]] = mapped_column(
+    city: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
         doc="Ville",
-        info={
-            "description": "Nom de la commune",
-            "example": "Paris"
-        }
+        info={"description": "Nom de la commune", "example": "Paris"},
     )
 
-    phone: Mapped[Optional[str]] = mapped_column(
+    phone: Mapped[str | None] = mapped_column(
         String(20),
         nullable=True,
         doc="Numéro de téléphone principal",
-        info={
-            "description": "Téléphone de contact",
-            "example": "0148123456"
-        }
+        info={"description": "Téléphone de contact", "example": "0148123456"},
     )
 
-    email: Mapped[Optional[str]] = mapped_column(
+    email: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         doc="Adresse email de contact",
-        info={
-            "description": "Email principal de l'entité",
-            "format": "email"
-        }
+        info={"description": "Email principal de l'entité", "format": "email"},
     )
 
-    website: Mapped[Optional[str]] = mapped_column(
+    website: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         doc="Site web",
-        info={
-            "description": "URL du site web de l'entité"
-        }
+        info={"description": "URL du site web de l'entité"},
     )
 
     # === Géolocalisation du siège ===
     latitude: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 7),
-        nullable=True,
-        comment="Latitude du siège"
+        Numeric(10, 7), nullable=True, comment="Latitude du siège"
     )
 
     longitude: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 7),
-        nullable=True,
-        comment="Longitude du siège"
+        Numeric(10, 7), nullable=True, comment="Longitude du siège"
     )
 
     # === Zone de couverture par défaut ===
     default_intervention_radius_km: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        default=30,
-        comment="Rayon d'intervention par défaut en km"
+        Integer, nullable=True, default=30, comment="Rayon d'intervention par défaut en km"
     )
 
     # =========================================================================
@@ -322,9 +277,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
         ForeignKey("countries.id", ondelete="RESTRICT"),
         nullable=False,
         doc="ID du pays de rattachement",
-        info={
-            "description": "Référence vers le pays"
-        }
+        info={"description": "Référence vers le pays"},
     )
 
     tenant_id: Mapped[int] = mapped_column(
@@ -332,26 +285,19 @@ class Entity(TimestampMixin, StatusMixin, Base):
         nullable=False,
         index=True,
         doc="ID du tenant propriétaire",
-        info={
-            "description": "Référence vers le tenant (client) propriétaire de cette entité"
-        }
+        info={"description": "Référence vers le tenant (client) propriétaire de cette entité"},
     )
-
 
     # =========================================================================
     # RELATIONS
     # =========================================================================
 
     tenant: Mapped["Tenant"] = relationship(
-        "Tenant",
-        back_populates="entities",
-        doc="Tenant propriétaire de cette entité"
+        "Tenant", back_populates="entities", doc="Tenant propriétaire de cette entité"
     )
 
     country: Mapped["Country"] = relationship(
-        "Country",
-        back_populates="entities",
-        doc="Pays de rattachement de l'entité"
+        "Country", back_populates="entities", doc="Pays de rattachement de l'entité"
     )
 
     # Auto-référence pour la hiérarchie parent/enfants
@@ -360,47 +306,43 @@ class Entity(TimestampMixin, StatusMixin, Base):
         remote_side="Entity.id",
         back_populates="child_entities",
         foreign_keys=[parent_entity_id],
-        doc="Entité parente (si c'est une agence)"
+        doc="Entité parente (si c'est une agence)",
     )
 
-    child_entities: Mapped[List["Entity"]] = relationship(
+    child_entities: Mapped[list["Entity"]] = relationship(
         "Entity",
         back_populates="parent_entity",
         foreign_keys=[parent_entity_id],
-        doc="Sous-entités (agences) de cette entité"
+        doc="Sous-entités (agences) de cette entité",
     )
 
-    user_associations: Mapped[List["UserEntity"]] = relationship(
+    user_associations: Mapped[list["UserEntity"]] = relationship(
         "UserEntity",
         back_populates="entity",
         cascade="all, delete-orphan",
-        doc="Associations avec les utilisateurs (via table de jonction)"
+        doc="Associations avec les utilisateurs (via table de jonction)",
     )
 
-    patients: Mapped[List["Patient"]] = relationship(
-        "Patient",
-        back_populates="entity",
-        doc="Patients suivis par cette entité"
+    patients: Mapped[list["Patient"]] = relationship(
+        "Patient", back_populates="entity", doc="Patients suivis par cette entité"
     )
 
-    entity_services: Mapped[List["EntityService"]] = relationship(
+    entity_services: Mapped[list["EntityService"]] = relationship(
         "EntityService",
         back_populates="entity",
         cascade="all, delete-orphan",
-        doc="Services proposés par cette entité"
+        doc="Services proposés par cette entité",
     )
 
-    care_plans: Mapped[List["CarePlan"]] = relationship(
-        "CarePlan",
-        back_populates="entity",
-        doc="Plans d'aide coordonnés par cette entité"
+    care_plans: Mapped[list["CarePlan"]] = relationship(
+        "CarePlan", back_populates="entity", doc="Plans d'aide coordonnés par cette entité"
     )
 
-    user_availabilities: Mapped[List["UserAvailability"]] = relationship(
+    user_availabilities: Mapped[list["UserAvailability"]] = relationship(
         "UserAvailability",
         back_populates="entity",
         cascade="all, delete-orphan",
-        doc="Disponibilités des professionnels pour cette entité"
+        doc="Disponibilités des professionnels pour cette entité",
     )
 
     # =========================================================================
@@ -408,7 +350,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
     # =========================================================================
 
     @property
-    def users(self) -> List["User"]:
+    def users(self) -> list["User"]:
         """Liste des utilisateurs actifs rattachés à cette entité."""
         return [ua.user for ua in self.user_associations if ua.end_date is None]
 
@@ -433,7 +375,7 @@ class Entity(TimestampMixin, StatusMixin, Base):
         return self.parent_entity_id is not None
 
     @property
-    def capacity_usage(self) -> Optional[float]:
+    def capacity_usage(self) -> float | None:
         """
         Taux d'occupation de la capacité autorisée.
 

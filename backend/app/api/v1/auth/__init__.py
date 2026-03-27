@@ -24,24 +24,25 @@ Usage dans router.py:
 
 from app.api.v1.auth.routes import router
 from app.api.v1.auth.schemas import (
+    AccessType,
+    AuthenticatedUser,
+    AuthMethod,
+    AuthStatusResponse,
     LoginRequest,
     LoginResponse,
-    TokenResponse,
-    AuthenticatedUser,
-    AuthStatusResponse,
     PSCAuthorizationResponse,
-    AccessType,
-    AuthMethod,
+    TokenResponse,
 )
 from app.api.v1.auth.services import (
-    AuthService,
-    get_auth_service,
     AuthenticationError,
-    InvalidCredentialsError,
+    AuthService,
     InactiveUserError,
-    PSCSessionError,
+    InvalidCredentialsError,
     PatientAccessError,
+    PSCSessionError,
+    get_auth_service,
 )
+
 
 __all__ = [
     # Router

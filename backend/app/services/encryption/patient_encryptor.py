@@ -33,7 +33,7 @@ Usage:
     patient = db.query(Patient).filter(Patient.nir_blind == blind).first()
 """
 
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from app.services.encryption.base_encryptor import BaseEncryptor
 
@@ -60,7 +60,7 @@ class PatientEncryptor(BaseEncryptor):
     """
 
     @property
-    def encrypted_fields(self) -> Dict[str, str]:
+    def encrypted_fields(self) -> dict[str, str]:
         """
         Définition des champs à chiffrer pour Patient.
 
@@ -70,22 +70,21 @@ class PatientEncryptor(BaseEncryptor):
             # Identifiants nationaux (Article 9 RGPD - données sensibles)
             "nir": "string",  # N° Sécurité Sociale
             "ins": "string",  # Identifiant National de Santé
-
             # Identification directe
             "first_name": "string",
             "last_name": "string",
-
             # Date de naissance (permet identification avec le nom)
             "birth_date": "date",
-
             # Coordonnées
             "address": "string",
+            "postal_code": "string",
+            "city": "string",
             "phone": "string",
             "email": "string",
         }
 
     @property
-    def blind_index_fields(self) -> Set[str]:
+    def blind_index_fields(self) -> set[str]:
         """
         Champs nécessitant un blind index pour la recherche.
 
@@ -111,10 +110,8 @@ class PatientEncryptor(BaseEncryptor):
     # =========================================================================
 
     def encrypt_patient_data(
-            self,
-            data: Dict[str, Any],
-            tenant_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], tenant_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Alias sémantique pour encrypt_for_db.
 
@@ -129,10 +126,7 @@ class PatientEncryptor(BaseEncryptor):
         """
         return self.encrypt_for_db(data, tenant_id)
 
-    def decrypt_patient_data(
-            self,
-            data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def decrypt_patient_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Alias sémantique pour decrypt_from_db.
 
@@ -146,11 +140,7 @@ class PatientEncryptor(BaseEncryptor):
         """
         return self.decrypt_from_db(data)
 
-    def search_by_nir(
-            self,
-            nir: str,
-            tenant_id: Optional[int] = None
-    ) -> str:
+    def search_by_nir(self, nir: str, tenant_id: int | None = None) -> str:
         """
         Génère le blind index pour recherche par NIR.
 
@@ -169,11 +159,7 @@ class PatientEncryptor(BaseEncryptor):
         """
         return self.get_blind_index(nir, "nir", tenant_id)
 
-    def search_by_ins(
-            self,
-            ins: str,
-            tenant_id: Optional[int] = None
-    ) -> str:
+    def search_by_ins(self, ins: str, tenant_id: int | None = None) -> str:
         """
         Génère le blind index pour recherche par INS.
 
@@ -187,11 +173,11 @@ class PatientEncryptor(BaseEncryptor):
         return self.get_blind_index(ins, "ins", tenant_id)
 
     def search_by_name(
-            self,
-            last_name: Optional[str] = None,
-            first_name: Optional[str] = None,
-            tenant_id: Optional[int] = None
-    ) -> Dict[str, Optional[str]]:
+        self,
+        last_name: str | None = None,
+        first_name: str | None = None,
+        tenant_id: int | None = None,
+    ) -> dict[str, str | None]:
         """
         Génère les blind indexes pour recherche par nom.
 
@@ -218,10 +204,8 @@ class PatientEncryptor(BaseEncryptor):
         return result
 
     def prepare_for_update(
-            self,
-            update_data: Dict[str, Any],
-            tenant_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+        self, update_data: dict[str, Any], tenant_id: int | None = None
+    ) -> dict[str, Any]:
         """
         Prépare des données partielles pour une mise à jour.
 
@@ -243,12 +227,7 @@ class PatientEncryptor(BaseEncryptor):
         # encrypt_for_db gère déjà les champs partiels
         return self.encrypt_for_db(update_data, tenant_id)
 
-    def is_duplicate_nir(
-            self,
-            nir: str,
-            existing_blind: str,
-            tenant_id: Optional[int] = None
-    ) -> bool:
+    def is_duplicate_nir(self, nir: str, existing_blind: str, tenant_id: int | None = None) -> bool:
         """
         Vérifie si un NIR correspond à un blind index existant.
 
@@ -278,10 +257,8 @@ patient_encryptor = PatientEncryptor()
 # FONCTIONS HELPER (pour imports simplifiés)
 # =============================================================================
 
-def encrypt_patient_data(
-        data: Dict[str, Any],
-        tenant_id: Optional[int] = None
-) -> Dict[str, Any]:
+
+def encrypt_patient_data(data: dict[str, Any], tenant_id: int | None = None) -> dict[str, Any]:
     """
     Helper pour chiffrer des données patient.
 
@@ -292,7 +269,7 @@ def encrypt_patient_data(
     return patient_encryptor.encrypt_for_db(data, tenant_id)
 
 
-def decrypt_patient_data(data: Dict[str, Any]) -> Dict[str, Any]:
+def decrypt_patient_data(data: dict[str, Any]) -> dict[str, Any]:
     """
     Helper pour déchiffrer des données patient.
 
@@ -303,11 +280,7 @@ def decrypt_patient_data(data: Dict[str, Any]) -> Dict[str, Any]:
     return patient_encryptor.decrypt_from_db(data)
 
 
-def get_patient_search_blind(
-        value: str,
-        field: str,
-        tenant_id: Optional[int] = None
-) -> str:
+def get_patient_search_blind(value: str, field: str, tenant_id: int | None = None) -> str:
     """
     Helper pour générer un blind index de recherche.
 

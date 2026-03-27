@@ -5,10 +5,10 @@ Ce module définit la table `patient_evaluations` qui stocke les évaluations
 des patients au format JSON (validées par JSON Schema).
 """
 
-from datetime import date, datetime, timezone, timedelta
-from typing import TYPE_CHECKING, Any, Dict, List
+from datetime import UTC, date, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import String, Integer, Date, ForeignKey, DateTime
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -16,11 +16,12 @@ from app.models.enums import EvaluationSchemaType, EvaluationStatus
 from app.models.mixins import TimestampMixin, VersionedMixin
 from app.models.types import JSONBCompatible
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
-    from app.models.patient.patient import Patient
-    from app.models.patient.evaluation_session import EvaluationSession
     from app.models.careplan.care_plan import CarePlan
+    from app.models.patient.evaluation_session import EvaluationSession
+    from app.models.patient.patient import Patient
+    from app.models.user.user import User
 
 
 class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
@@ -44,16 +45,14 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
     """
 
     __tablename__ = "patient_evaluations"
-    __table_args__ = {
-        "comment": "Table des évaluations patients (JSON Schema)"
-    }
+    __table_args__ = {"comment": "Table des évaluations patients (JSON Schema)"}
 
     # === Colonnes ===
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'évaluation",
-        info={"description": "Clé primaire auto-incrémentée"}
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Multi-tenant ===
@@ -62,7 +61,7 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # --- Références ---
@@ -72,14 +71,14 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="ID du patient évalué",
-        info={"description": "Référence vers le patient"}
+        info={"description": "Référence vers le patient"},
     )
 
     evaluator_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=False,
         doc="ID du professionnel ayant réalisé l'évaluation",
-        info={"description": "Référence vers l'évaluateur"}
+        info={"description": "Référence vers l'évaluateur"},
     )
 
     # --- Type et version du schéma ---
@@ -91,28 +90,28 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         info={
             "description": "Identifiant du type d'évaluation",
             "enum": [e.value for e in EvaluationSchemaType],
-            "example": "evaluation_complete"
-        }
+            "example": "evaluation_complete",
+        },
     )
 
     schema_version: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         doc="Version du schéma JSON",
-        info={"description": "Version sémantique du schéma", "example": "v1"}
+        info={"description": "Version sémantique du schéma", "example": "v1"},
     )
 
     # --- Données d'évaluation (JSON) ---
     # Utilise JSONBCompatible pour compatibilité SQLite (tests) et PostgreSQL (prod)
 
-    evaluation_data: Mapped[Dict[str, Any]] = mapped_column(
+    evaluation_data: Mapped[dict[str, Any]] = mapped_column(
         JSONBCompatible,
         nullable=False,
         doc="Document JSON contenant les données d'évaluation",
         info={
             "description": "Données complètes de l'évaluation validées par JSON Schema",
-            "example": {"aggir": {"GIR": 4}, "usager": {...}}
-        }
+            "example": {"aggir": {"GIR": 4}, "usager": {...}},
+        },
     )
 
     # --- Métadonnées extraites ---
@@ -121,14 +120,14 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         Integer,
         nullable=True,
         doc="Score GIR extrait du JSON (1-6)",
-        info={"description": "Score GIR pour requêtes SQL rapides", "min": 1, "max": 6}
+        info={"description": "Score GIR pour requêtes SQL rapides", "min": 1, "max": 6},
     )
 
     evaluation_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
         doc="Date de réalisation de l'évaluation",
-        info={"description": "Date à laquelle l'évaluation a été effectuée"}
+        info={"description": "Date à laquelle l'évaluation a été effectuée"},
     )
 
     # --- Gestion multi-session (NOUVEAU) ---
@@ -140,8 +139,8 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         doc="Statut de l'évaluation",
         info={
             "description": "Statut courant de l'évaluation",
-            "enum": [e.value for e in EvaluationStatus]
-        }
+            "enum": [e.value for e in EvaluationStatus],
+        },
     )
 
     completion_percent: Mapped[int] = mapped_column(
@@ -149,14 +148,14 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         nullable=False,
         default=0,
         doc="Pourcentage de complétion (0-100)",
-        info={"description": "Progression de la saisie"}
+        info={"description": "Progression de la saisie"},
     )
 
     expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         doc="Date d'expiration du brouillon",
-        info={"description": "J+7 après création si non validée"}
+        info={"description": "J+7 après création si non validée"},
     )
 
     # --- Validation double (médecin coord. + CD) ---
@@ -164,81 +163,71 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
     medical_validated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        doc="Date de validation par le médecin coordonnateur"
+        doc="Date de validation par le médecin coordonnateur",
     )
 
     medical_validated_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
-        doc="ID du médecin coordonnateur valideur"
+        doc="ID du médecin coordonnateur valideur",
     )
 
     department_validated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
-        doc="Date de validation par le Conseil Départemental"
+        doc="Date de validation par le Conseil Départemental",
     )
 
     department_validator_name: Mapped[str | None] = mapped_column(
-        String(200),
-        nullable=True,
-        doc="Nom du valideur CD (externe au système)"
+        String(200), nullable=True, doc="Nom du valideur CD (externe au système)"
     )
 
     department_validator_reference: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-        doc="Référence/matricule du valideur CD"
+        String(100), nullable=True, doc="Référence/matricule du valideur CD"
     )
 
     # --- Validation ---
 
     validated_at: Mapped[datetime | None] = mapped_column(
-        nullable=True,
-        doc="Date et heure de validation",
-        info={"description": "NULL = non validée"}
+        nullable=True, doc="Date et heure de validation", info={"description": "NULL = non validée"}
     )
 
     validated_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID du professionnel ayant validé l'évaluation",
-        info={"description": "Référence vers le validateur"}
+        info={"description": "Référence vers le validateur"},
     )
 
     # === Relations ===
 
     patient: Mapped["Patient"] = relationship(
-        "Patient",
-        back_populates="evaluations",
-        doc="Patient évalué"
+        "Patient", back_populates="evaluations", doc="Patient évalué"
     )
 
     evaluator: Mapped["User"] = relationship(
         "User",
         foreign_keys="[PatientEvaluation.evaluator_id]",
-        doc="Professionnel ayant réalisé l'évaluation"
+        doc="Professionnel ayant réalisé l'évaluation",
     )
 
     validator: Mapped["User | None"] = relationship(
         "User",
         foreign_keys="[PatientEvaluation.validated_by]",
-        doc="Professionnel ayant validé l'évaluation"
+        doc="Professionnel ayant validé l'évaluation",
     )
 
-    care_plans: Mapped[List["CarePlan"]] = relationship(
-        "CarePlan",
-        back_populates="source_evaluation",
-        doc="Plans d'aide issus de cette évaluation"
+    care_plans: Mapped[list["CarePlan"]] = relationship(
+        "CarePlan", back_populates="source_evaluation", doc="Plans d'aide issus de cette évaluation"
     )
 
     # Relation vers les sessions de saisie (NOUVEAU)
-    sessions: Mapped[List["EvaluationSession"]] = relationship(
+    sessions: Mapped[list["EvaluationSession"]] = relationship(
         "EvaluationSession",
         back_populates="evaluation",
         cascade="all, delete-orphan",
         order_by="EvaluationSession.started_at",
-        doc="Sessions de saisie de l'évaluation"
+        doc="Sessions de saisie de l'évaluation",
     )
 
     # === Propriétés ===
@@ -249,21 +238,21 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         return self.validated_at is not None
 
     @property
-    def aggir_data(self) -> Dict[str, Any] | None:
+    def aggir_data(self) -> dict[str, Any] | None:
         """Retourne les données AGGIR extraites du JSON."""
         if self.evaluation_data and "aggir" in self.evaluation_data:
             return self.evaluation_data["aggir"]
         return None
 
     @property
-    def usager_data(self) -> Dict[str, Any] | None:
+    def usager_data(self) -> dict[str, Any] | None:
         """Retourne les données usager extraites du JSON."""
         if self.evaluation_data and "usager" in self.evaluation_data:
             return self.evaluation_data["usager"]
         return None
 
     @property
-    def sante_data(self) -> Dict[str, Any] | None:
+    def sante_data(self) -> dict[str, Any] | None:
         """Retourne les données santé extraites du JSON."""
         if self.evaluation_data and "sante" in self.evaluation_data:
             return self.evaluation_data["sante"]
@@ -275,8 +264,8 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         if self.expires_at and self.status == "DRAFT":
             expires = self.expires_at
             if expires.tzinfo is None:
-                expires = expires.replace(tzinfo=timezone.utc)
-            return datetime.now(timezone.utc) > expires
+                expires = expires.replace(tzinfo=UTC)
+            return datetime.now(UTC) > expires
         return False
 
     @property
@@ -287,10 +276,7 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
     @property
     def is_fully_validated(self) -> bool:
         """Retourne True si validée par médecin ET conseil départemental."""
-        return (
-                self.medical_validated_at is not None
-                and self.department_validated_at is not None
-        )
+        return self.medical_validated_at is not None and self.department_validated_at is not None
 
     @property
     def days_until_expiration(self) -> int | None:
@@ -299,8 +285,8 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
             expires = self.expires_at
             # S'assurer que expires_at a un timezone (protection SQLite/tests)
             if expires.tzinfo is None:
-                expires = expires.replace(tzinfo=timezone.utc)
-            delta = expires - datetime.now(timezone.utc)
+                expires = expires.replace(tzinfo=UTC)
+            delta = expires - datetime.now(UTC)
             return max(0, delta.days)
         return None
 
@@ -315,11 +301,13 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
     # === Méthodes ===
 
     def __repr__(self) -> str:
-        return f"<PatientEvaluation(id={self.id}, patient_id={self.patient_id}, gir={self.gir_score})>"
+        return (
+            f"<PatientEvaluation(id={self.id}, patient_id={self.patient_id}, gir={self.gir_score})>"
+        )
 
     def validate(self, user_id: int) -> None:
         """Valide l'évaluation."""
-        self.validated_at = datetime.now(timezone.utc)
+        self.validated_at = datetime.now(UTC)
         self.validated_by = user_id
 
     def extract_gir_score(self) -> int | None:
@@ -334,7 +322,7 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
 
     def set_expiration(self, days: int = 7) -> None:
         """Définit la date d'expiration (J+X)."""
-        self.expires_at = datetime.now(timezone.utc) + timedelta(days=days)
+        self.expires_at = datetime.now(UTC) + timedelta(days=days)
 
     def check_expiration(self) -> bool:
         """Vérifie et met à jour le statut si expiré."""
@@ -350,23 +338,23 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         Note: La validation JSON Schema est effectuée dans le service.
         Cette méthode ne fait que changer le statut.
         """
-        if self.status not in ["DRAFT", "PENDING_COMPLETION", "COMPLETE"]:
+        if self.status not in ["DRAFT", "IN_PROGRESS", "PENDING_COMPLETION", "COMPLETE"]:
             raise ValueError(f"Impossible de soumettre depuis le statut {self.status}")
 
         self.status = "PENDING_MEDICAL"
 
     def validate_medical(self, user_id: int) -> None:
         """Validation par le médecin coordonnateur."""
-        self.medical_validated_at = datetime.now(timezone.utc)
+        self.medical_validated_at = datetime.now(UTC)
         self.medical_validated_by = user_id
         self.status = "PENDING_DEPARTMENT"
 
     def validate_department(self, validator_name: str, reference: str) -> None:
         """Validation par le Conseil Départemental."""
-        self.department_validated_at = datetime.now(timezone.utc)
+        self.department_validated_at = datetime.now(UTC)
         self.department_validator_name = validator_name
         self.department_validator_reference = reference
-        self.validated_at = datetime.now(timezone.utc)
+        self.validated_at = datetime.now(UTC)
         self.status = "VALIDATED"
 
     def update_completion(self) -> None:

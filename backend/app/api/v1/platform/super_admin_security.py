@@ -4,15 +4,17 @@ Dépendances FastAPI pour le module Platform.
 Gestion de l'authentification et des permissions SuperAdmin.
 Compatible avec le modèle SuperAdmin utilisant SuperAdminRole (enum).
 """
-from typing import Optional, Callable
+
+from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.security.jwt import verify_token
 from app.database.session_rls import get_db_no_rls as get_db
 from app.models.platform.super_admin import SuperAdmin, SuperAdminRole
+
 
 # =============================================================================
 # SECURITY SCHEME
@@ -29,9 +31,10 @@ super_admin_bearer = HTTPBearer(
 # DEPENDENCIES
 # =============================================================================
 
+
 async def get_current_super_admin(
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(super_admin_bearer),
-        db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(super_admin_bearer),
+    db: Session = Depends(get_db),
 ) -> SuperAdmin:
     """
     Récupère le SuperAdmin actuellement authentifié.
@@ -58,9 +61,9 @@ async def get_current_super_admin(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token invalide: {str(e)}",
+            detail=f"Token invalide: {e!s}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     # Vérifier que c'est un token SuperAdmin
     # Défense en profondeur délibérée (car vérification déja faite ligne 57)
@@ -124,8 +127,9 @@ def require_super_admin_permission(permission: str) -> Callable:
     Returns:
         Dépendance FastAPI qui vérifie la permission
     """
+
     async def check_permission(
-            admin: SuperAdmin = Depends(get_current_super_admin),
+        admin: SuperAdmin = Depends(get_current_super_admin),
     ) -> SuperAdmin:
         # PLATFORM_OWNER a tous les droits
         if admin.role == SuperAdminRole.PLATFORM_OWNER:
@@ -189,9 +193,9 @@ def _check_permission_for_role(admin: SuperAdmin, permission: str) -> bool:
 
 
 async def get_optional_super_admin(
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(super_admin_bearer),
-        db: Session = Depends(get_db),
-) -> Optional[SuperAdmin]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(super_admin_bearer),
+    db: Session = Depends(get_db),
+) -> SuperAdmin | None:
     """
     Récupère le SuperAdmin si authentifié, sinon retourne None.
 
@@ -236,8 +240,9 @@ def require_role(minimum_role: SuperAdminRole) -> Callable:
     Returns:
         Dépendance FastAPI qui vérifie le rôle
     """
+
     async def check_role(
-            admin: SuperAdmin = Depends(get_current_super_admin),
+        admin: SuperAdmin = Depends(get_current_super_admin),
     ) -> SuperAdmin:
         if not admin.has_role(minimum_role):
             raise HTTPException(
@@ -252,6 +257,7 @@ def require_role(minimum_role: SuperAdminRole) -> Callable:
 # =============================================================================
 # PERMISSION CONSTANTS
 # =============================================================================
+
 
 class SuperAdminPermissions:
     """
@@ -287,13 +293,20 @@ class SuperAdminPermissions:
     def all_permissions(cls) -> list[str]:
         """Retourne la liste de toutes les permissions."""
         return [
-            cls.TENANTS_VIEW, cls.TENANTS_CREATE, cls.TENANTS_UPDATE,
-            cls.TENANTS_DELETE, cls.TENANTS_SUSPEND,
-            cls.SUPERADMINS_VIEW, cls.SUPERADMINS_CREATE,
-            cls.SUPERADMINS_UPDATE, cls.SUPERADMINS_DELETE,
+            cls.TENANTS_VIEW,
+            cls.TENANTS_CREATE,
+            cls.TENANTS_UPDATE,
+            cls.TENANTS_DELETE,
+            cls.TENANTS_SUSPEND,
+            cls.SUPERADMINS_VIEW,
+            cls.SUPERADMINS_CREATE,
+            cls.SUPERADMINS_UPDATE,
+            cls.SUPERADMINS_DELETE,
             cls.AUDIT_VIEW,
-            cls.ASSIGNMENTS_VIEW, cls.ASSIGNMENTS_CREATE,
-            cls.ASSIGNMENTS_UPDATE, cls.ASSIGNMENTS_DELETE,
+            cls.ASSIGNMENTS_VIEW,
+            cls.ASSIGNMENTS_CREATE,
+            cls.ASSIGNMENTS_UPDATE,
+            cls.ASSIGNMENTS_DELETE,
         ]
 
 

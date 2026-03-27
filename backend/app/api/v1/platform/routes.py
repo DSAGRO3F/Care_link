@@ -10,90 +10,94 @@ Gestion au niveau plateforme (SuperAdmin) :
 
 IMPORTANT: Toutes ces routes nécessitent une authentification SuperAdmin.
 """
+
 import math
 from datetime import datetime
-from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.v1.platform.schemas import (
-    # Tenant
-    TenantCreate, TenantUpdate, TenantResponse, TenantFilters,
-    TenantStatusAPI, TenantTypeAPI, TenantStats,
-    # SuperAdmin
-    SuperAdminCreate, SuperAdminUpdate, SuperAdminResponse,
-    SuperAdminPasswordChange,
-    # AuditLog
-    AuditLogResponse, AuditLogFilters,
-    # Assignment
-    UserTenantAssignmentCreate, UserTenantAssignmentUpdate,
-    UserTenantAssignmentResponse, UserTenantAssignmentFilters, AssignmentTypeAPI,
-    # Stats
-    PlatformStats,
-    SuperAdminLoginRequest,
-    PlatformEntityCreate,
-    EntityResponse,  # réimporté depuis organization.schemas
-    EntitySummary,  # réimporté depuis organization.schemas
-    EntityList,  # réimporté depuis organization.schemas
-    EntityFilters,  # réimporté depuis organization.schemas
-    EntityUpdate,  # réimporté depuis organization.schemas
-    # Tenant Admin User
-    TenantAdminUserCreate, TenantAdminUserResponse,
-)
-
-from app.api.v1.platform.services import (
-    TenantService,
-    SuperAdminService,
-    PlatformAuditLogService,
-    UserTenantAssignmentService,
-    PlatformStatsService,
-    # Exceptions
-    TenantNotFoundError,
-    TenantCodeExistsError,
-    SuperAdminNotFoundError,
-    SuperAdminEmailExistsError,
-    InvalidPasswordError,
-    UserTenantAssignmentNotFoundError,
-    UserNotFoundError,
-    DuplicateAssignmentError,
-    InvalidAssignmentError,
-)
-
-from app.api.v1.platform.tenant_admin_service import (
-    TenantAdminService,
-    TenantNotActiveError,
-    AdminEmailExistsError,
-    NoRootEntityError,
-    EntityNotInTenantError,
-)
-
-from app.api.v1.platform.super_admin_security import (
-    get_current_super_admin,
-    require_super_admin_permission,
-    SuperAdminPermissions,
-)
-
+from app.api.v1.auth.schemas import TokenResponse
 from app.api.v1.platform.entity_service import (
-    PlatformEntityService,
-    TenantNotFoundForEntityError,
-    EntityNotFoundError as PlatformEntityNotFoundError,
-    RootAlreadyExistsError,
     CannotDeleteRootWithChildrenError,
+    CircularHierarchyError,
+    CountryNotFoundError as EntityCountryNotFoundError,
     DuplicateFINESSError,
     DuplicateSIRETError,
-    CountryNotFoundError as EntityCountryNotFoundError,
-    CircularHierarchyError,
+    EntityNotFoundError as PlatformEntityNotFoundError,
+    PlatformEntityService,
+    RootAlreadyExistsError,
+    TenantNotFoundForEntityError,
 )
-
-from app.database.session_rls import get_db_no_rls as get_db
-from app.models.platform.super_admin import SuperAdmin
-
-from app.api.v1.auth.schemas import TokenResponse
-from app.core.security.jwt import create_access_token, create_refresh_token
+from app.api.v1.platform.schemas import (
+    AssignmentTypeAPI,
+    AuditLogFilters,
+    # AuditLog
+    AuditLogResponse,
+    EntityFilters,  # réimporté depuis organization.schemas
+    EntityResponse,  # réimporté depuis organization.schemas
+    EntitySummary,  # réimporté depuis organization.schemas
+    EntityUpdate,  # réimporté depuis organization.schemas
+    PlatformEntityCreate,
+    # Stats
+    PlatformStats,
+    # SuperAdmin
+    SuperAdminCreate,
+    SuperAdminLoginRequest,
+    SuperAdminPasswordChange,
+    SuperAdminResponse,
+    SuperAdminUpdate,
+    # Tenant Admin User
+    TenantAdminUserCreate,
+    TenantAdminUserResponse,
+    # Tenant
+    TenantCreate,
+    TenantFilters,
+    TenantResponse,
+    TenantStats,
+    TenantStatusAPI,
+    TenantTypeAPI,
+    TenantUpdate,
+    # Assignment
+    UserTenantAssignmentCreate,
+    UserTenantAssignmentFilters,
+    UserTenantAssignmentResponse,
+    UserTenantAssignmentUpdate,
+)
+from app.api.v1.platform.services import (
+    DuplicateAssignmentError,
+    InvalidAssignmentError,
+    InvalidPasswordError,
+    PlatformAuditLogService,
+    PlatformStatsService,
+    SuperAdminEmailExistsError,
+    SuperAdminNotFoundError,
+    SuperAdminService,
+    TenantCodeExistsError,
+    # Exceptions
+    TenantNotFoundError,
+    TenantService,
+    UserNotFoundError,
+    UserTenantAssignmentNotFoundError,
+    UserTenantAssignmentService,
+)
+from app.api.v1.platform.super_admin_security import (
+    SuperAdminPermissions,
+    get_current_super_admin,
+    require_super_admin_permission,
+)
+from app.api.v1.platform.tenant_admin_service import (
+    AdminEmailExistsError,
+    EntityNotInTenantError,
+    NoRootEntityError,
+    TenantAdminService,
+    TenantNotActiveError,
+)
 from app.core.config import settings
-
+from app.core.security.jwt import create_access_token, create_refresh_token
+from app.database.session_rls import get_db_no_rls as get_db
 from app.models.enums import EntityType, IntegrationType
+from app.models.platform.super_admin import SuperAdmin
 
 
 # =============================================================================
@@ -106,6 +110,7 @@ router = APIRouter(prefix="/platform", tags=["Platform Administration"])
 # =============================================================================
 # RESPONSE HELPERS
 # =============================================================================
+
 
 def paginated_response(items: list, total: int, page: int, size: int) -> dict:
     """Construit une réponse paginée standardisée."""
@@ -122,25 +127,26 @@ def paginated_response(items: list, total: int, page: int, size: int) -> dict:
 # TENANTS
 # =============================================================================
 
+
 @router.get(
     "/tenants",
     summary="Liste des tenants",
     description="Liste tous les tenants avec pagination et filtres.",
 )
 def list_tenants(
-        page: int = Query(1, ge=1, description="Numéro de page"),
-        size: int = Query(20, ge=1, le=100, description="Nombre d'éléments par page"),
-        sort_by: str = Query("created_at", description="Champ de tri"),
-        sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Ordre de tri"),
-        status: Optional[TenantStatusAPI] = Query(None, description="Filtrer par statut"),
-        tenant_type: Optional[TenantTypeAPI] = Query(None, description="Filtrer par type"),
-        search: Optional[str] = Query(None, description="Recherche textuelle"),
-        city: Optional[str] = Query(None, description="Filtrer par ville"),
-        country_id: Optional[int] = Query(None, description="Filtrer par pays"),
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    page: int = Query(1, ge=1, description="Numéro de page"),
+    size: int = Query(20, ge=1, le=100, description="Nombre d'éléments par page"),
+    sort_by: str = Query("created_at", description="Champ de tri"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Ordre de tri"),
+    status: TenantStatusAPI | None = Query(None, description="Filtrer par statut"),
+    tenant_type: TenantTypeAPI | None = Query(None, description="Filtrer par type"),
+    search: str | None = Query(None, description="Recherche textuelle"),
+    city: str | None = Query(None, description="Filtrer par ville"),
+    country_id: int | None = Query(None, description="Filtrer par pays"),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """Liste les tenants avec pagination et filtres."""
     filters = TenantFilters(
@@ -175,11 +181,11 @@ def list_tenants(
     summary="Créer un tenant",
 )
 def create_tenant(
-        data: TenantCreate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_CREATE)
-        ),
+    data: TenantCreate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_CREATE)
+    ),
 ):
     """Crée un nouveau tenant."""
     service = TenantService(db)
@@ -187,7 +193,7 @@ def create_tenant(
         tenant = service.create(data, created_by_id=current_admin.id)
         return TenantResponse.model_validate(tenant)
     except TenantCodeExistsError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get(
@@ -196,11 +202,11 @@ def create_tenant(
     summary="Détails d'un tenant",
 )
 def get_tenant(
-        tenant_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """Récupère les détails d'un tenant."""
     service = TenantService(db)
@@ -208,7 +214,7 @@ def get_tenant(
         tenant = service.get_by_id(tenant_id)
         return TenantResponse.model_validate(tenant)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.patch(
@@ -217,12 +223,12 @@ def get_tenant(
     summary="Modifier un tenant",
 )
 def update_tenant(
-        tenant_id: int,
-        data: TenantUpdate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    data: TenantUpdate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """Met à jour un tenant."""
     service = TenantService(db)
@@ -230,7 +236,7 @@ def update_tenant(
         tenant = service.update(tenant_id, data, updated_by_id=current_admin.id)
         return TenantResponse.model_validate(tenant)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete(
@@ -239,18 +245,18 @@ def update_tenant(
     summary="Supprimer un tenant",
 )
 def delete_tenant(
-        tenant_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_DELETE)
-        ),
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_DELETE)
+    ),
 ):
     """Supprime un tenant (soft delete via status TERMINATED)."""
     service = TenantService(db)
     try:
         service.delete(tenant_id, deleted_by_id=current_admin.id)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.post(
@@ -259,12 +265,12 @@ def delete_tenant(
     summary="Suspendre un tenant",
 )
 def suspend_tenant(
-        tenant_id: int,
-        reason: str = Query(..., min_length=10, description="Raison de la suspension"),
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    reason: str = Query(..., min_length=10, description="Raison de la suspension"),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """Suspend un tenant."""
     service = TenantService(db)
@@ -272,9 +278,9 @@ def suspend_tenant(
         tenant = service.suspend(tenant_id, reason, suspended_by_id=current_admin.id)
         return TenantResponse.model_validate(tenant)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except InvalidAssignmentError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.post(
@@ -283,11 +289,11 @@ def suspend_tenant(
     summary="Réactiver un tenant",
 )
 def reactivate_tenant(
-        tenant_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """Réactive un tenant suspendu."""
     service = TenantService(db)
@@ -295,9 +301,9 @@ def reactivate_tenant(
         tenant = service.reactivate(tenant_id, reactivated_by_id=current_admin.id)
         return TenantResponse.model_validate(tenant)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except InvalidAssignmentError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get(
@@ -306,11 +312,11 @@ def reactivate_tenant(
     summary="Statistiques d'un tenant",
 )
 def get_tenant_stats(
-        tenant_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """Récupère les statistiques d'utilisation d'un tenant."""
     service = TenantService(db)
@@ -318,30 +324,31 @@ def get_tenant_stats(
         stats = service.get_stats(tenant_id)
         return TenantStats(**stats)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # AUDIT LOGS
 # =============================================================================
 
+
 @router.get(
     "/audit-logs",
     summary="Liste des logs d'audit",
 )
 def list_audit_logs(
-        page: int = Query(1, ge=1),
-        size: int = Query(50, ge=1, le=200),
-        super_admin_id: Optional[int] = Query(None, description="Filtrer par super admin"),
-        action: Optional[str] = Query(None, description="Filtrer par action"),
-        resource_type: Optional[str] = Query(None, description="Filtrer par type de ressource"),
-        tenant_id: Optional[int] = Query(None, description="Filtrer par tenant"),
-        date_from: Optional[datetime] = Query(None, description="Date de début"),
-        date_to: Optional[datetime] = Query(None, description="Date de fin"),
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.AUDIT_VIEW)
-        ),
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=200),
+    super_admin_id: int | None = Query(None, description="Filtrer par super admin"),
+    action: str | None = Query(None, description="Filtrer par action"),
+    resource_type: str | None = Query(None, description="Filtrer par type de ressource"),
+    tenant_id: int | None = Query(None, description="Filtrer par tenant"),
+    date_from: datetime | None = Query(None, description="Date de début"),
+    date_to: datetime | None = Query(None, description="Date de fin"),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.AUDIT_VIEW)
+    ),
 ):
     """Liste les logs d'audit avec pagination et filtres."""
     filters = AuditLogFilters(
@@ -382,11 +389,11 @@ def list_audit_logs(
     summary="Détails d'un log d'audit",
 )
 def get_audit_log(
-        log_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.AUDIT_VIEW)
-        ),
+    log_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.AUDIT_VIEW)
+    ),
 ):
     """Récupère les détails d'un log d'audit."""
     service = PlatformAuditLogService(db)
@@ -399,29 +406,30 @@ def get_audit_log(
             response.tenant_code = log.target_tenant.code
         return response
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # USER TENANT ASSIGNMENTS (CROSS-TENANT ACCESS)
 # =============================================================================
 
+
 @router.get(
     "/assignments",
     summary="Liste des affectations cross-tenant",
 )
 def list_assignments(
-        page: int = Query(1, ge=1),
-        size: int = Query(20, ge=1, le=100),
-        user_id: Optional[int] = Query(None, description="Filtrer par utilisateur"),
-        tenant_id: Optional[int] = Query(None, description="Filtrer par tenant de destination"),
-        assignment_type: Optional[AssignmentTypeAPI] = Query(None, description="Filtrer par type"),
-        is_active: Optional[bool] = Query(None, description="Filtrer par statut actif"),
-        include_expired: bool = Query(False, description="Inclure les affectations expirées"),
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_VIEW)
-        ),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    user_id: int | None = Query(None, description="Filtrer par utilisateur"),
+    tenant_id: int | None = Query(None, description="Filtrer par tenant de destination"),
+    assignment_type: AssignmentTypeAPI | None = Query(None, description="Filtrer par type"),
+    is_active: bool | None = Query(None, description="Filtrer par statut actif"),
+    include_expired: bool = Query(False, description="Inclure les affectations expirées"),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_VIEW)
+    ),
 ):
     """Liste les affectations cross-tenant."""
     filters = UserTenantAssignmentFilters(
@@ -465,11 +473,11 @@ def list_assignments(
     summary="Créer une affectation cross-tenant",
 )
 def create_assignment(
-        data: UserTenantAssignmentCreate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_CREATE)
-        ),
+    data: UserTenantAssignmentCreate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_CREATE)
+    ),
 ):
     """Crée une nouvelle affectation cross-tenant."""
     service = UserTenantAssignmentService(db)
@@ -486,11 +494,11 @@ def create_assignment(
         response.days_remaining = assignment.days_remaining
         return response
     except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except (DuplicateAssignmentError, InvalidAssignmentError) as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get(
@@ -499,11 +507,11 @@ def create_assignment(
     summary="Détails d'une affectation",
 )
 def get_assignment(
-        assignment_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_VIEW)
-        ),
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_VIEW)
+    ),
 ):
     """Récupère les détails d'une affectation."""
     service = UserTenantAssignmentService(db)
@@ -520,7 +528,7 @@ def get_assignment(
         response.days_remaining = assignment.days_remaining
         return response
     except UserTenantAssignmentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.patch(
@@ -529,12 +537,12 @@ def get_assignment(
     summary="Modifier une affectation",
 )
 def update_assignment(
-        assignment_id: int,
-        data: UserTenantAssignmentUpdate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_UPDATE)
-        ),
+    assignment_id: int,
+    data: UserTenantAssignmentUpdate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_UPDATE)
+    ),
 ):
     """Met à jour une affectation."""
     service = UserTenantAssignmentService(db)
@@ -551,7 +559,7 @@ def update_assignment(
         response.days_remaining = assignment.days_remaining
         return response
     except UserTenantAssignmentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete(
@@ -560,23 +568,24 @@ def update_assignment(
     summary="Supprimer une affectation",
 )
 def delete_assignment(
-        assignment_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_DELETE)
-        ),
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.ASSIGNMENTS_DELETE)
+    ),
 ):
     """Désactive une affectation (soft delete)."""
     service = UserTenantAssignmentService(db)
     try:
         service.delete(assignment_id, deleted_by_id=current_admin.id)
     except UserTenantAssignmentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # PLATFORM STATS
 # =============================================================================
+
 
 @router.get(
     "/stats",
@@ -584,8 +593,8 @@ def delete_assignment(
     summary="Statistiques globales de la plateforme",
 )
 def get_platform_stats(
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(get_current_super_admin),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(get_current_super_admin),
 ):
     """Récupère les statistiques globales de la plateforme."""
     service = PlatformStatsService(db)
@@ -593,10 +602,10 @@ def get_platform_stats(
     return PlatformStats(**stats)
 
 
-
 # =============================================================================
 # TENANT ENTITIES (STRUCTURE D'UN TENANT)
 # =============================================================================
+
 
 @router.get(
     "/tenants/{tenant_id}/entities",
@@ -604,19 +613,19 @@ def get_platform_stats(
     description="Récupère la liste paginée des entités d'un tenant avec filtres.",
 )
 def list_tenant_entities(
-        tenant_id: int,
-        page: int = Query(1, ge=1, description="Numéro de page"),
-        size: int = Query(20, ge=1, le=100, description="Éléments par page"),
-        sort_by: str = Query("name", description="Champ de tri"),
-        sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Ordre de tri"),
-        entity_type: Optional[EntityType] = Query(None, description="Type d'entité"),
-        integration_type: Optional[IntegrationType] = Query(None, description="Type d'intégration"),
-        search: Optional[str] = Query(None, description="Recherche (nom, FINESS, SIRET)"),
-        is_active: Optional[bool] = Query(None, description="Statut actif"),
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    tenant_id: int,
+    page: int = Query(1, ge=1, description="Numéro de page"),
+    size: int = Query(20, ge=1, le=100, description="Éléments par page"),
+    sort_by: str = Query("name", description="Champ de tri"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Ordre de tri"),
+    entity_type: EntityType | None = Query(None, description="Type d'entité"),
+    integration_type: IntegrationType | None = Query(None, description="Type d'intégration"),
+    search: str | None = Query(None, description="Recherche (nom, FINESS, SIRET)"),
+    is_active: bool | None = Query(None, description="Statut actif"),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """
     Liste toutes les entités d'un tenant.
@@ -648,9 +657,7 @@ def list_tenant_entities(
             size=size,
         )
     except TenantNotFoundForEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.post(
@@ -660,12 +667,12 @@ def list_tenant_entities(
     summary="Créer une entité dans un tenant",
 )
 def create_tenant_entity(
-        tenant_id: int,
-        data: PlatformEntityCreate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    data: PlatformEntityCreate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """
     Crée une entité dans un tenant.
@@ -680,21 +687,13 @@ def create_tenant_entity(
         entity = service.create(data)
         return EntityResponse.model_validate(entity)
     except TenantNotFoundForEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except RootAlreadyExistsError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except (DuplicateFINESSError, DuplicateSIRETError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except EntityCountryNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.get(
@@ -703,12 +702,12 @@ def create_tenant_entity(
     summary="Détails d'une entité d'un tenant",
 )
 def get_tenant_entity(
-        tenant_id: int,
-        entity_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    tenant_id: int,
+    entity_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """Récupère les détails d'une entité d'un tenant."""
     try:
@@ -716,13 +715,9 @@ def get_tenant_entity(
         entity = service.get_by_id(entity_id)
         return EntityResponse.model_validate(entity)
     except TenantNotFoundForEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PlatformEntityNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.patch(
@@ -731,13 +726,13 @@ def get_tenant_entity(
     summary="Modifier une entité d'un tenant",
 )
 def update_tenant_entity(
-        tenant_id: int,
-        entity_id: int,
-        data: EntityUpdate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    entity_id: int,
+    data: EntityUpdate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """
     Met à jour partiellement une entité d'un tenant.
@@ -750,25 +745,15 @@ def update_tenant_entity(
         entity = service.update(entity_id, data)
         return EntityResponse.model_validate(entity)
     except TenantNotFoundForEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PlatformEntityNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except (DuplicateFINESSError, DuplicateSIRETError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except CircularHierarchyError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.delete(
@@ -777,12 +762,12 @@ def update_tenant_entity(
     summary="Supprimer une entité d'un tenant",
 )
 def delete_tenant_entity(
-        tenant_id: int,
-        entity_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    entity_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """
     Désactive une entité (soft delete).
@@ -794,17 +779,11 @@ def delete_tenant_entity(
         service = PlatformEntityService(db, tenant_id)
         service.delete(entity_id)
     except TenantNotFoundForEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PlatformEntityNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except CannotDeleteRootWithChildrenError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.get(
@@ -813,12 +792,12 @@ def delete_tenant_entity(
     description="Récupère les entités directement rattachées à une entité parente.",
 )
 def get_tenant_entity_children(
-        tenant_id: int,
-        entity_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    tenant_id: int,
+    entity_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """
     Liste les enfants directs d'une entité.
@@ -831,18 +810,15 @@ def get_tenant_entity_children(
         children = service.get_children(entity_id)
         return [EntitySummary.model_validate(child) for child in children]
     except TenantNotFoundForEntityError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except PlatformEntityNotFoundError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # ROUTES TENANT ADMIN — À AJOUTER dans app/api/v1/platform/routes.py
 # =============================================================================
+
 
 @router.post(
     "/tenants/{tenant_id}/admin-user",
@@ -850,15 +826,15 @@ def get_tenant_entity_children(
     status_code=status.HTTP_201_CREATED,
     summary="Créer un administrateur client",
     description="Crée le premier administrateur d'un tenant. "
-                "Le rôle ADMIN_FULL est attribué automatiquement.",
+    "Le rôle ADMIN_FULL est attribué automatiquement.",
 )
 def create_tenant_admin_user(
-        tenant_id: int,
-        data: TenantAdminUserCreate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
-        ),
+    tenant_id: int,
+    data: TenantAdminUserCreate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
 ):
     """
     Crée un administrateur client pour un tenant.
@@ -877,29 +853,29 @@ def create_tenant_admin_user(
     try:
         return service.create_admin_user(tenant_id, data, current_admin)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except TenantNotActiveError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except AdminEmailExistsError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except NoRootEntityError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
     except EntityNotInTenantError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.get(
     "/tenants/{tenant_id}/admin-users",
-    response_model=List[TenantAdminUserResponse],
+    response_model=list[TenantAdminUserResponse],
     summary="Liste des administrateurs d'un tenant",
     description="Retourne les utilisateurs admin actifs d'un tenant.",
 )
 def list_tenant_admin_users(
-        tenant_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
-        ),
+    tenant_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)
+    ),
 ):
     """
     Liste les administrateurs d'un tenant.
@@ -911,25 +887,13 @@ def list_tenant_admin_users(
     try:
         return service.list_admin_users(tenant_id)
     except TenantNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-
-
-
-
-
-
-
-
-
-
-
-
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
 # SUPER ADMINS
 # =============================================================================
+
 
 @router.post(
     "/auth/login",
@@ -938,8 +902,8 @@ def list_tenant_admin_users(
     description="Authentifie un super administrateur et retourne les tokens JWT.",
 )
 def super_admin_login(
-        credentials: SuperAdminLoginRequest,
-        db: Session = Depends(get_db),
+    credentials: SuperAdminLoginRequest,
+    db: Session = Depends(get_db),
 ):
     """Login super admin."""
     service = SuperAdminService(db)
@@ -973,18 +937,19 @@ def super_admin_login(
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
+
 @router.get(
     "/super-admins",
     summary="Liste des super admins",
 )
 def list_super_admins(
-        page: int = Query(1, ge=1),
-        size: int = Query(20, ge=1, le=100),
-        include_inactive: bool = Query(False, description="Inclure les comptes désactivés"),
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_VIEW)
-        ),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    include_inactive: bool = Query(False, description="Inclure les comptes désactivés"),
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_VIEW)
+    ),
 ):
     """Liste les super admins."""
     service = SuperAdminService(db)
@@ -1009,11 +974,11 @@ def list_super_admins(
     summary="Créer un super admin",
 )
 def create_super_admin(
-        data: SuperAdminCreate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_CREATE)
-        ),
+    data: SuperAdminCreate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_CREATE)
+    ),
 ):
     """Crée un nouveau super admin."""
     service = SuperAdminService(db)
@@ -1021,7 +986,7 @@ def create_super_admin(
         admin = service.create(data, created_by_id=current_admin.id)
         return SuperAdminResponse.model_validate(admin)
     except SuperAdminEmailExistsError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get(
@@ -1030,11 +995,11 @@ def create_super_admin(
     summary="Détails d'un super admin",
 )
 def get_super_admin(
-        admin_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_VIEW)
-        ),
+    admin_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_VIEW)
+    ),
 ):
     """Récupère les détails d'un super admin."""
     service = SuperAdminService(db)
@@ -1042,7 +1007,7 @@ def get_super_admin(
         admin = service.get_by_id(admin_id)
         return SuperAdminResponse.model_validate(admin)
     except SuperAdminNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.patch(
@@ -1051,12 +1016,12 @@ def get_super_admin(
     summary="Modifier un super admin",
 )
 def update_super_admin(
-        admin_id: int,
-        data: SuperAdminUpdate,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_UPDATE)
-        ),
+    admin_id: int,
+    data: SuperAdminUpdate,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_UPDATE)
+    ),
 ):
     """Met à jour un super admin."""
     service = SuperAdminService(db)
@@ -1064,9 +1029,9 @@ def update_super_admin(
         admin = service.update(admin_id, data, updated_by_id=current_admin.id)
         return SuperAdminResponse.model_validate(admin)
     except SuperAdminNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except SuperAdminEmailExistsError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.delete(
@@ -1075,20 +1040,20 @@ def update_super_admin(
     summary="Supprimer un super admin",
 )
 def delete_super_admin(
-        admin_id: int,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(
-            require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_DELETE)
-        ),
+    admin_id: int,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.SUPERADMINS_DELETE)
+    ),
 ):
     """Désactive un super admin (soft delete)."""
     service = SuperAdminService(db)
     try:
         service.delete(admin_id, deleted_by_id=current_admin.id)
     except SuperAdminNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except InvalidAssignmentError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
 
 @router.post(
@@ -1097,23 +1062,23 @@ def delete_super_admin(
     summary="Changer le mot de passe",
 )
 def change_super_admin_password(
-        admin_id: int,
-        data: SuperAdminPasswordChange,
-        db: Session = Depends(get_db),
-        current_admin: SuperAdmin = Depends(get_current_super_admin),
+    admin_id: int,
+    data: SuperAdminPasswordChange,
+    db: Session = Depends(get_db),
+    current_admin: SuperAdmin = Depends(get_current_super_admin),
 ):
     """Change le mot de passe d'un super admin (soi-même uniquement)."""
     # Seul le super admin lui-même peut changer son mot de passe
     if current_admin.id != admin_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Vous ne pouvez changer que votre propre mot de passe"
+            detail="Vous ne pouvez changer que votre propre mot de passe",
         )
 
     service = SuperAdminService(db)
     try:
         service.change_password(admin_id, data)
     except SuperAdminNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except InvalidPasswordError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e

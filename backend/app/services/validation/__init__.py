@@ -7,14 +7,15 @@ Contient les services de validation :
 
 from app.services.validation.schema_validator import (
     EvaluationSchemaValidator,
-    SchemaValidationError,
     SchemaNotFoundError,
+    SchemaValidationError,
     get_schema_validator,
 )
 
+
 __all__ = [
     "EvaluationSchemaValidator",
-    "SchemaValidationError",
     "SchemaNotFoundError",
+    "SchemaValidationError",
     "get_schema_validator",
 ]

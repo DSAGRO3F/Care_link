@@ -9,17 +9,17 @@
 
 /** Paramètres de pagination */
 export interface PaginationParams {
-  page?: number
-  size?: number
+  page?: number;
+  size?: number;
 }
 
 /** Réponse paginée générique */
 export interface PaginatedResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  size: number
-  pages: number
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
 }
 
 // =============================================================================
@@ -28,19 +28,19 @@ export interface PaginatedResponse<T> {
 
 /** Erreur API standard */
 export interface ApiError {
-  detail: string
-  status_code?: number
+  detail: string;
+  status_code?: number;
 }
 
 /** Erreur de validation (422) */
 export interface ValidationError {
-  detail: ValidationErrorDetail[]
+  detail: ValidationErrorDetail[];
 }
 
 export interface ValidationErrorDetail {
-  loc: (string | number)[]
-  msg: string
-  type: string
+  loc: (string | number)[];
+  msg: string;
+  type: string;
 }
 
 // =============================================================================
@@ -49,14 +49,14 @@ export interface ValidationErrorDetail {
 
 /** État générique d'un appel API */
 export interface ApiState<T> {
-  data: T | null
-  loading: boolean
-  error: string | null
+  data: T | null;
+  loading: boolean;
+  error: string | null;
 }
 
 /** État de liste avec pagination */
 export interface ListState<T> extends ApiState<T[]> {
-  total: number
-  page: number
-  pages: number
+  total: number;
+  page: number;
+  pages: number;
 }

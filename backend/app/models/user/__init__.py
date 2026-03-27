@@ -16,19 +16,21 @@ Changelog:
     v4.3: Ajout Permission, RolePermission (normalisation)
     v4.3: Déplacement UserTenantAssignment depuis platform/
 """
-from app.models.user.permission import Permission, INITIAL_PERMISSIONS
-from app.models.user.profession import Profession, INITIAL_PROFESSIONS
-from app.models.user.role import Role, INITIAL_ROLES
-from app.models.user.role_permission import RolePermission, INITIAL_ROLE_PERMISSIONS
+
+from app.models.user.permission import INITIAL_PERMISSIONS, Permission
+from app.models.user.profession import INITIAL_PROFESSIONS, Profession
+from app.models.user.role import INITIAL_ROLES, Role
+from app.models.user.role_permission import INITIAL_ROLE_PERMISSIONS, RolePermission
 from app.models.user.user import User
-from app.models.user.user_associations import UserRole, UserEntity
+from app.models.user.user_associations import UserEntity, UserRole
 from app.models.user.user_availability import UserAvailability
 from app.models.user.user_tenant_assignment import (
-    UserTenantAssignment,
     AssignmentType,
-    get_user_tenant_access,
+    UserTenantAssignment,
     check_user_tenant_access,
+    get_user_tenant_access,
 )
+
 
 __all__ = [
     # Modèles principaux
@@ -36,21 +38,17 @@ __all__ = [
     "Role",
     "Permission",
     "Profession",
-
     # Tables de jonction
     "RolePermission",
     "UserRole",
     "UserEntity",
     "UserAvailability",
     "UserTenantAssignment",
-
     # Enums
     "AssignmentType",
-
     # Fonctions utilitaires
     "get_user_tenant_access",
     "check_user_tenant_access",
-
     # Données initiales (seed)
     "INITIAL_ROLES",
     "INITIAL_PERMISSIONS",

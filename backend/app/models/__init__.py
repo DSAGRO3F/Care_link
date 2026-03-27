@@ -27,97 +27,111 @@ Changelog:
 from app.models.careplan.care_plan import CarePlan
 from app.models.careplan.care_plan_service import CarePlanService
 from app.models.catalog.entity_service import EntityService
+
 # === Modèles catalogue ===
-from app.models.catalog.service_template import ServiceTemplate, INITIAL_SERVICE_TEMPLATES
+from app.models.catalog.service_template import INITIAL_SERVICE_TEMPLATES, ServiceTemplate
+
 # === Modèles coordination ===
 from app.models.coordination.coordination_entry import CoordinationEntry
 from app.models.coordination.scheduled_intervention import ScheduledIntervention
+
 # === Enums ===
 from app.models.enums import (
+    # Patients
+    AccessType,
+    AssignmentStatus,
+    # Plans d'aide et interventions
+    CarePlanStatus,
+    ContractType,
+    # Coordination et services
+    CoordinationCategory,
+    DeviceType,
+    DocumentFormat,
+    DocumentType,
     # Types d'entités et organisation
     EntityType,
+    # Évaluations et documents
+    EvaluationSchemaType,
+    FrequencyType,
+    GirLevel,
     IntegrationType,
+    InterventionStatus,
     OrganizationModel,
-    TerritoryType,
+    PatientStatus,
+    PermissionCategory,  # v4.3
     # Professions et rôles
     ProfessionCategory,
     RoleName,
-    ContractType,
-    PermissionCategory,  # v4.3
-    # Patients
-    AccessType,
-    PatientStatus,
-    GirLevel,
-    # Constantes vitales
-    VitalType,
-    VitalStatus,
-    VitalSource,
-    DeviceType,
-    # Évaluations et documents
-    EvaluationSchemaType,
-    DocumentType,
-    DocumentFormat,
-    # Coordination et services
-    CoordinationCategory,
     ServiceCategory,
+    ServicePriority,
     ServiceType,
     ServiceUnit,
-    # Plans d'aide et interventions
-    CarePlanStatus,
-    FrequencyType,
-    ServicePriority,
-    AssignmentStatus,
-    InterventionStatus,
+    TerritoryType,
+    VitalSource,
+    VitalStatus,
+    # Constantes vitales
+    VitalType,
 )
+
 # === Mixins ===
 from app.models.mixins import (
-    TimestampMixin,
     AuditMixin,
-    VersionedMixin,
     StatusMixin,
+    TimestampMixin,
+    VersionedMixin,
 )
+
 # === Modèles d'organisation ===
 from app.models.organization.entity import Entity
 from app.models.patient.evaluation_session import EvaluationSession
+
 # === Modèles patients ===
 from app.models.patient.patient import Patient
 from app.models.patient.patient_access import PatientAccess
 from app.models.patient.patient_document import PatientDocument
 from app.models.patient.patient_evaluation import PatientEvaluation
-from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
+from app.models.patient.patient_vitals import PatientDevice, PatientThreshold, PatientVitals
+
 # === Modèles Platform (v4.2) ===
 from app.models.platform import (
+    AuditAction,
+    PlatformAuditLog,
     SuperAdmin,
     SuperAdminRole,
-    PlatformAuditLog,
-    AuditAction,
 )
+
 # === Modèles de référence ===
 from app.models.reference.country import Country
+
 # === Modèles Tenant (v4.1) ===
 from app.models.tenants import (
-    Tenant,
-    TenantStatus,
-    TenantType,
+    BillingCycle,
     Subscription,
     SubscriptionPlan,
     SubscriptionStatus,
-    BillingCycle,
     SubscriptionUsage,
+    Tenant,
+    TenantStatus,
+    TenantType,
 )
-from app.models.user.permission import Permission, INITIAL_PERMISSIONS
-from app.models.user.profession import Profession, INITIAL_PROFESSIONS
+from app.models.user.permission import INITIAL_PERMISSIONS, Permission
+from app.models.user.profession import INITIAL_PROFESSIONS, Profession
 from app.models.user.profession_permissions import (  # S4
     PROFESSION_DEFAULT_PERMISSIONS,
     get_profession_permissions,
 )
-from app.models.user.role import Role, INITIAL_ROLES
-from app.models.user.role_permission import RolePermission, INITIAL_ROLE_PERMISSIONS
+from app.models.user.role import INITIAL_ROLES, Role
+from app.models.user.role_permission import INITIAL_ROLE_PERMISSIONS, RolePermission
+
 # === Modèles utilisateurs et permissions (v4.3) ===
 from app.models.user.user import User
-from app.models.user.user_associations import UserRole, UserEntity
+from app.models.user.user_associations import UserEntity, UserRole
 from app.models.user.user_availability import UserAvailability
-from app.models.user.user_tenant_assignment import UserTenantAssignment, AssignmentType  # Déplacé depuis platform/ v4.3
+from app.models.user.user_tenant_assignment import (
+    AssignmentType,
+    UserTenantAssignment,
+)  # Déplacé depuis platform/ v4.3
+
 
 # === Export explicite ===
 __all__ = [
@@ -156,21 +170,17 @@ __all__ = [
     "ServicePriority",
     "AssignmentStatus",
     "InterventionStatus",
-
     # --- Mixins ---
     "TimestampMixin",
     "AuditMixin",
     "VersionedMixin",
     "StatusMixin",
-
     # --- Modèles ---
-
     # Platform (v4.2)
     "SuperAdmin",
     "SuperAdminRole",
     "PlatformAuditLog",
     "AuditAction",
-
     # Tenant (v4.1)
     "Tenant",
     "TenantStatus",
@@ -180,13 +190,10 @@ __all__ = [
     "SubscriptionStatus",
     "BillingCycle",
     "SubscriptionUsage",
-
     # Référence
     "Country",
-
     # Organisation
     "Entity",
-
     # Utilisateurs et permissions (v4.3)
     "User",
     "Role",
@@ -198,13 +205,12 @@ __all__ = [
     "Profession",
     "INITIAL_PROFESSIONS",
     "PROFESSION_DEFAULT_PERMISSIONS",  # S4
-    "get_profession_permissions",      # S4
+    "get_profession_permissions",  # S4
     "UserRole",
     "UserEntity",
     "UserAvailability",
     "UserTenantAssignment",
     "AssignmentType",
-
     # Patients
     "Patient",
     "PatientAccess",
@@ -214,16 +220,13 @@ __all__ = [
     "PatientVitals",
     "PatientDevice",
     "PatientDocument",
-
     # Catalogue
     "ServiceTemplate",
     "INITIAL_SERVICE_TEMPLATES",
     "EntityService",
-
     # Plans d'aide
     "CarePlan",
     "CarePlanService",
-
     # Coordination
     "CoordinationEntry",
     "ScheduledIntervention",

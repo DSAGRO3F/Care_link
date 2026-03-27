@@ -1,7 +1,5 @@
 """Client Redis singleton pour l'application."""
 
-from typing import Optional
-
 import redis
 
 from app.core.config import settings
@@ -10,7 +8,7 @@ from app.core.config import settings
 class RedisClient:
     """Client Redis singleton avec pool de connexions."""
 
-    _instance: Optional[redis.Redis] = None
+    _instance: redis.Redis | None = None
 
     @classmethod
     def get_client(cls) -> redis.Redis:
@@ -26,7 +24,7 @@ class RedisClient:
                 decode_responses=True,  # Décoder automatiquement en string
                 socket_keepalive=True,
                 socket_connect_timeout=5,
-                retry_on_timeout=True
+                retry_on_timeout=True,
             )
         return cls._instance
 

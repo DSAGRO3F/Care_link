@@ -6,34 +6,35 @@ Toutes les routes sont réservées aux SuperAdmins (équipe CareLink).
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.platform.super_admin_security import (
-    require_super_admin_permission,
     SuperAdminPermissions,
+    require_super_admin_permission,
 )
 from app.database.session_rls import get_db_no_rls
-from app.models.platform.platform_audit_log import PlatformAuditLog, AuditAction
+from app.models.enums import TenantStatus, TenantType
+from app.models.platform.platform_audit_log import AuditAction, PlatformAuditLog
 from app.models.platform.super_admin import SuperAdmin
 from app.models.tenants.tenant import Tenant
-from app.models.enums import TenantStatus, TenantType
+
 from .schemas import (
-    TenantCreate,
-    TenantUpdate,
-    TenantStatusUpdate,
-    TenantResponse,
-    TenantSummary,
-    TenantWithStats,
+    FederationView,
+    MemberTenantInfo,
     PaginatedTenants,
     ParentTenantInfo,
-    MemberTenantInfo,
-    FederationView,
+    TenantCreate,
+    TenantResponse,
+    TenantStatusUpdate,
+    TenantSummary,
+    TenantUpdate,
+    TenantWithStats,
 )
+
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
@@ -42,11 +43,12 @@ router = APIRouter(prefix="/tenants", tags=["Tenants"])
 # HELPERS — Validation fédération
 # =============================================================================
 
+
 def validate_federation_parent(
-        db: Session,
-        parent_tenant_id: Optional[int],
-        tenant_id: Optional[int] = None,  # None pour create, renseigné pour update
-) -> Optional[Tenant]:
+    db: Session,
+    parent_tenant_id: int | None,
+    tenant_id: int | None = None,  # None pour create, renseigné pour update
+) -> Tenant | None:
     """
     Vérifie la cohérence du rattachement à un groupement fédérateur.
 
@@ -60,7 +62,7 @@ def validate_federation_parent(
     if tenant_id is not None and parent_tenant_id == tenant_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Un tenant ne peut pas être son propre parent."
+            detail="Un tenant ne peut pas être son propre parent.",
         )
 
     # Le parent existe-t-il ?
@@ -68,7 +70,7 @@ def validate_federation_parent(
     if not parent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Groupement fédérateur introuvable (id={parent_tenant_id})."
+            detail=f"Groupement fédérateur introuvable (id={parent_tenant_id}).",
         )
 
     # Le parent est-il un GCSMS ou GTSMS ?
@@ -79,14 +81,14 @@ def validate_federation_parent(
                 f"Le tenant '{parent.name}' (type={parent.tenant_type.value}) "
                 f"n'est pas un groupement fédérateur. "
                 f"Seuls les GCSMS et GTSMS peuvent avoir des membres."
-            )
+            ),
         )
 
     # Le parent est-il actif ?
     if parent.status == TenantStatus.TERMINATED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Le groupement '{parent.name}' est résilié et ne peut plus accueillir de membres."
+            detail=f"Le groupement '{parent.name}' est résilié et ne peut plus accueillir de membres.",
         )
 
     return parent
@@ -95,6 +97,7 @@ def validate_federation_parent(
 # =============================================================================
 # LIST / SEARCH
 # =============================================================================
+
 
 @router.get(
     "",
@@ -106,9 +109,11 @@ async def list_tenants(
     admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)),
     db: Session = Depends(get_db_no_rls),
     pagination: PaginationParams = Depends(),
-    status_filter: Optional[TenantStatus] = Query(None, alias="status", description="Filtrer par statut"),
-    tenant_type: Optional[str] = Query(None, description="Filtrer par type"),
-    search: Optional[str] = Query(None, description="Recherche par nom ou code"),
+    status_filter: TenantStatus | None = Query(
+        None, alias="status", description="Filtrer par statut"
+    ),
+    tenant_type: str | None = Query(None, description="Filtrer par type"),
+    search: str | None = Query(None, description="Recherche par nom ou code"),
 ):
     """Liste tous les tenants avec pagination et filtres."""
 
@@ -122,8 +127,7 @@ async def list_tenants(
     if search:
         search_filter = f"%{search}%"
         query = query.filter(
-            (Tenant.name.ilike(search_filter)) |
-            (Tenant.code.ilike(search_filter))
+            (Tenant.name.ilike(search_filter)) | (Tenant.code.ilike(search_filter))
         )
 
     # Total
@@ -148,13 +152,14 @@ async def list_tenants(
         total=total,
         page=pagination.page,
         size=pagination.size,
-        pages=(total + pagination.size - 1) // pagination.size if total > 0 else 0
+        pages=(total + pagination.size - 1) // pagination.size if total > 0 else 0,
     )
 
 
 # =============================================================================
 # CREATE
 # =============================================================================
+
 
 @router.post(
     "",
@@ -165,7 +170,9 @@ async def list_tenants(
 )
 async def create_tenant(
     tenant_data: TenantCreate,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_CREATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_CREATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Crée un nouveau tenant."""
@@ -175,7 +182,7 @@ async def create_tenant(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Le code '{tenant_data.code}' est déjà utilisé"
+            detail=f"Le code '{tenant_data.code}' est déjà utilisé",
         )
 
     # Vérifier unicité du SIRET si fourni
@@ -184,7 +191,7 @@ async def create_tenant(
         if existing_siret:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Le SIRET '{tenant_data.siret}' est déjà utilisé"
+                detail=f"Le SIRET '{tenant_data.siret}' est déjà utilisé",
             )
 
     # Valider le rattachement fédération ──
@@ -211,7 +218,7 @@ async def create_tenant(
             "code": tenant.code,
             "name": tenant.name,
             "type": tenant.tenant_type.value,
-        }
+        },
     )
     db.add(audit_log)
 
@@ -224,6 +231,7 @@ async def create_tenant(
 # =============================================================================
 # READ
 # =============================================================================
+
 
 @router.get(
     "/{tenant_id}",
@@ -241,10 +249,7 @@ async def get_tenant(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     # Log d'audit (consultation)
     audit_log = PlatformAuditLog.create_log(
@@ -271,6 +276,7 @@ async def get_tenant(
 # UPDATE
 # =============================================================================
 
+
 @router.patch(
     "/{tenant_id}",
     response_model=TenantResponse,
@@ -280,7 +286,9 @@ async def get_tenant(
 async def update_tenant(
     tenant_id: int,
     tenant_data: TenantUpdate,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Met à jour un tenant."""
@@ -288,24 +296,22 @@ async def update_tenant(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     update_data = tenant_data.model_dump(exclude_unset=True)
     old_values = {k: getattr(tenant, k) for k in update_data.keys()}
 
     # Vérifier unicité du SIRET si modifié
-    if "siret" in update_data and update_data["siret"]:
-        existing_siret = db.query(Tenant).filter(
-            Tenant.siret == update_data["siret"],
-            Tenant.id != tenant_id
-        ).first()
+    if update_data.get("siret"):
+        existing_siret = (
+            db.query(Tenant)
+            .filter(Tenant.siret == update_data["siret"], Tenant.id != tenant_id)
+            .first()
+        )
         if existing_siret:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Le SIRET '{update_data['siret']}' est déjà utilisé"
+                detail=f"Le SIRET '{update_data['siret']}' est déjà utilisé",
             )
 
     # ── NOUVEAU : Logique fédération ──
@@ -322,7 +328,7 @@ async def update_tenant(
                     detail=(
                         f"Le tenant '{tenant.name}' est un groupement fédérateur "
                         f"({tenant.tenant_type.value}) et ne peut pas être rattaché à un parent."
-                    )
+                    ),
                 )
 
             # Valider le parent (existence, type, statut)
@@ -338,7 +344,7 @@ async def update_tenant(
                     detail=(
                         "Le type d'intégration (integration_type) est obligatoire "
                         "lors du rattachement à un groupement."
-                    )
+                    ),
                 )
 
         else:
@@ -357,7 +363,7 @@ async def update_tenant(
                 detail=(
                     f"Impossible de changer le type en {new_type.value} "
                     f"car ce tenant est rattaché à un groupement. Détachez-le d'abord."
-                )
+                ),
             )
 
     # Appliquer les modifications
@@ -383,9 +389,11 @@ async def update_tenant(
 
     return TenantResponse.model_validate(tenant)
 
+
 # =============================================================================
 # STATUS CHANGE (actions spécifiques)
 # =============================================================================
+
 
 @router.post(
     "/{tenant_id}/suspend",
@@ -396,7 +404,9 @@ async def update_tenant(
 async def suspend_tenant(
     tenant_id: int,
     data: TenantStatusUpdate,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_SUSPEND)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_SUSPEND)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Suspend un tenant."""
@@ -404,15 +414,12 @@ async def suspend_tenant(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     if tenant.status == TenantStatus.TERMINATED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Impossible de suspendre un tenant résilié"
+            detail="Impossible de suspendre un tenant résilié",
         )
 
     old_status = tenant.status
@@ -426,7 +433,7 @@ async def suspend_tenant(
         details={
             "reason": data.reason,
             "old_status": old_status.value,
-        }
+        },
     )
     db.add(audit_log)
 
@@ -444,7 +451,9 @@ async def suspend_tenant(
 )
 async def activate_tenant(
     tenant_id: int,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_UPDATE)
+    ),
     db: Session = Depends(get_db_no_rls),
 ):
     """Active un tenant."""
@@ -452,29 +461,26 @@ async def activate_tenant(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     if tenant.status == TenantStatus.TERMINATED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Impossible de réactiver un tenant résilié"
+            detail="Impossible de réactiver un tenant résilié",
         )
 
     old_status = tenant.status
     tenant.status = TenantStatus.ACTIVE
 
     if not tenant.activated_at:
-        tenant.activated_at = datetime.now(timezone.utc)
+        tenant.activated_at = datetime.now(UTC)
 
     # Log d'audit
     audit_log = PlatformAuditLog.create_log(
         super_admin_id=admin.id,
         action=AuditAction.TENANT_ACTIVATED,
         target_tenant_id=tenant_id,
-        details={"old_status": old_status.value}
+        details={"old_status": old_status.value},
     )
     db.add(audit_log)
 
@@ -488,6 +494,7 @@ async def activate_tenant(
 # DELETE (soft delete via TERMINATED)
 # =============================================================================
 
+
 @router.delete(
     "/{tenant_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -496,7 +503,9 @@ async def activate_tenant(
 )
 async def terminate_tenant(
     tenant_id: int,
-    admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_DELETE)),
+    admin: SuperAdmin = Depends(
+        require_super_admin_permission(SuperAdminPermissions.TENANTS_DELETE)
+    ),
     db: Session = Depends(get_db_no_rls),
     confirm: bool = Query(False, description="Confirmation requise"),
 ):
@@ -505,21 +514,17 @@ async def terminate_tenant(
     if not confirm:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Confirmation requise: ajoutez ?confirm=true à l'URL"
+            detail="Confirmation requise: ajoutez ?confirm=true à l'URL",
         )
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     if tenant.status == TenantStatus.TERMINATED:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ce tenant est déjà résilié"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Ce tenant est déjà résilié"
         )
 
     if tenant.is_federation_parent and tenant.member_tenants:
@@ -533,12 +538,12 @@ async def terminate_tenant(
                     f"Ce groupement a encore {len(active_members)} membre(s) actif(s) : "
                     f"{member_names}{suffix}. "
                     f"Détachez ou résiliez les membres avant de résilier le groupement."
-                )
+                ),
             )
 
     old_status = tenant.status
     tenant.status = TenantStatus.TERMINATED
-    tenant.terminated_at = datetime.now(timezone.utc)
+    tenant.terminated_at = datetime.now(UTC)
 
     # Log d'audit
     audit_log = PlatformAuditLog.create_log(
@@ -549,22 +554,23 @@ async def terminate_tenant(
             "code": tenant.code,
             "name": tenant.name,
             "old_status": old_status.value,
-        }
+        },
     )
     db.add(audit_log)
 
     db.commit()
 
-    return None
+    return
 
 
 # =============================================================================
 # FEDERATION ENDPOINTS
 # =============================================================================
 
+
 @router.get(
     "/{tenant_id}/members",
-    response_model=List[MemberTenantInfo],
+    response_model=list[MemberTenantInfo],
     summary="Membres d'un groupement",
     description="Liste les tenants membres d'un groupement fédérateur (GCSMS/GTSMS).",
 )
@@ -572,17 +578,14 @@ async def list_tenant_members(
     tenant_id: int,
     admin: SuperAdmin = Depends(require_super_admin_permission(SuperAdminPermissions.TENANTS_VIEW)),
     db: Session = Depends(get_db_no_rls),
-    status_filter: Optional[TenantStatus] = Query(None, alias="status"),
+    status_filter: TenantStatus | None = Query(None, alias="status"),
 ):
     """Liste les membres d'un groupement fédérateur."""
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     if not tenant.is_federation_parent:
         raise HTTPException(
@@ -590,7 +593,7 @@ async def list_tenant_members(
             detail=(
                 f"Le tenant '{tenant.name}' (type={tenant.tenant_type.value}) "
                 f"n'est pas un groupement fédérateur."
-            )
+            ),
         )
 
     members = tenant.member_tenants
@@ -618,27 +621,21 @@ async def get_federation_view(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     # Si c'est un membre, remonter au parent
     if tenant.is_federation_member:
         tenant = tenant.parent_tenant
         if not tenant:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Groupement fédérateur introuvable"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Groupement fédérateur introuvable"
             )
 
     # Si c'est un tenant indépendant, pas de fédération
     if not tenant.is_federation_parent:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Le tenant '{tenant.name}' n'appartient à aucune fédération."
-            )
+            detail=(f"Le tenant '{tenant.name}' n'appartient à aucune fédération."),
         )
 
     members = tenant.member_tenants
@@ -677,10 +674,7 @@ async def get_tenant_stats(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant non trouvé"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     # Stats propres au tenant
     current_patients = len(tenant.patients) if tenant.patients else 0
@@ -703,7 +697,7 @@ async def get_tenant_stats(
         "current_patients_count": current_patients,
         "current_users_count": current_users,
         "current_storage_used_mb": 0,  # TODO: Calculer le stockage réel
-        "active_subscription": None,   # TODO: Charger l'abonnement actif
+        "active_subscription": None,  # TODO: Charger l'abonnement actif
         "federation_patients_count": federation_patients,
         "federation_users_count": federation_users,
         "members_count": members_count,

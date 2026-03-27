@@ -12,63 +12,60 @@
  * Note : pour le SuperAdmin, les endpoints sont préfixés
  *        /platform/tenants/{tenantId}/entities
  */
-import api, { getErrorMessage } from './api'
-import type { EntityResponse, EntityCreate, EntityUpdate } from '@/types/entity'
+import api, { getErrorMessage } from './api';
+import type { EntityResponse, EntityCreate, EntityUpdate } from '@/types';
 
 // =============================================================================
 // TENANT CONTEXT (Admin tenant — routes /entities)
 // =============================================================================
 
-const TENANT_BASE = '/organizations/entities'
+const TENANT_BASE = '/organizations/entities';
 
 /**
  * Liste toutes les entités du tenant courant
  */
 export async function listEntities(): Promise<EntityResponse[]> {
-  const response = await api.get(TENANT_BASE)
-  return response.data.items ?? response.data
+  const response = await api.get(TENANT_BASE);
+  return response.data.items ?? response.data;
 }
 
 /**
  * Récupère une entité par son ID
  */
 export async function getEntity(entityId: number): Promise<EntityResponse> {
-  const response = await api.get(`${TENANT_BASE}/${entityId}`)
-  return response.data
+  const response = await api.get(`${TENANT_BASE}/${entityId}`);
+  return response.data;
 }
 
 /**
  * Crée une nouvelle entité
  */
 export async function createEntity(data: EntityCreate): Promise<EntityResponse> {
-  const response = await api.post(TENANT_BASE, data)
-  return response.data
+  const response = await api.post(TENANT_BASE, data);
+  return response.data;
 }
 
 /**
  * Met à jour une entité
  */
-export async function updateEntity(
-  entityId: number,
-  data: EntityUpdate
-): Promise<EntityResponse> {
-  const response = await api.patch(`${TENANT_BASE}/${entityId}`, data)
-  return response.data
+export async function updateEntity(entityId: number, data: EntityUpdate): Promise<EntityResponse> {
+  const response = await api.patch(`${TENANT_BASE}/${entityId}`, data);
+  return response.data;
 }
 
 /**
  * Supprime une entité
  */
 export async function deleteEntity(entityId: number): Promise<void> {
-  await api.delete(`${TENANT_BASE}/${entityId}`)
+  await api.delete(`${TENANT_BASE}/${entityId}`);
 }
 
 /**
  * Récupère les enfants directs d'une entité
  */
 export async function getEntityChildren(entityId: number): Promise<EntityResponse[]> {
-  const response = await api.get(`${TENANT_BASE}/${entityId}/children`)
-  return response.data.items ?? response.data
+  const response = await api.get(`${TENANT_BASE}/${entityId}/children`);
+  return response.data.items ?? response.data;
 }
 
 // =============================================================================
@@ -76,26 +73,23 @@ export async function getEntityChildren(entityId: number): Promise<EntityRespons
 // =============================================================================
 
 function platformBase(tenantId: number): string {
-  return `/platform/tenants/${tenantId}/entities`
+  return `/platform/tenants/${tenantId}/entities`;
 }
 
 /**
  * Liste les entités d'un tenant (SuperAdmin)
  */
 export async function listTenantEntities(tenantId: number): Promise<EntityResponse[]> {
-  const response = await api.get(platformBase(tenantId))
-  return response.data.items ?? response.data
+  const response = await api.get(platformBase(tenantId));
+  return response.data.items ?? response.data;
 }
 
 /**
  * Récupère une entité d'un tenant (SuperAdmin)
  */
-export async function getTenantEntity(
-  tenantId: number,
-  entityId: number
-): Promise<EntityResponse> {
-  const response = await api.get(`${platformBase(tenantId)}/${entityId}`)
-  return response.data
+export async function getTenantEntity(tenantId: number, entityId: number): Promise<EntityResponse> {
+  const response = await api.get(`${platformBase(tenantId)}/${entityId}`);
+  return response.data;
 }
 
 /**
@@ -103,10 +97,10 @@ export async function getTenantEntity(
  */
 export async function createTenantEntity(
   tenantId: number,
-  data: EntityCreate
+  data: EntityCreate,
 ): Promise<EntityResponse> {
-  const response = await api.post(platformBase(tenantId), data)
-  return response.data
+  const response = await api.post(platformBase(tenantId), data);
+  return response.data;
 }
 
 /**
@@ -115,20 +109,17 @@ export async function createTenantEntity(
 export async function updateTenantEntity(
   tenantId: number,
   entityId: number,
-  data: EntityUpdate
+  data: EntityUpdate,
 ): Promise<EntityResponse> {
-  const response = await api.patch(`${platformBase(tenantId)}/${entityId}`, data)
-  return response.data
+  const response = await api.patch(`${platformBase(tenantId)}/${entityId}`, data);
+  return response.data;
 }
 
 /**
  * Supprime une entité d'un tenant (SuperAdmin)
  */
-export async function deleteTenantEntity(
-  tenantId: number,
-  entityId: number
-): Promise<void> {
-  await api.delete(`${platformBase(tenantId)}/${entityId}`)
+export async function deleteTenantEntity(tenantId: number, entityId: number): Promise<void> {
+  await api.delete(`${platformBase(tenantId)}/${entityId}`);
 }
 
 /**
@@ -136,10 +127,10 @@ export async function deleteTenantEntity(
  */
 export async function getTenantEntityChildren(
   tenantId: number,
-  entityId: number
+  entityId: number,
 ): Promise<EntityResponse[]> {
-  const response = await api.get(`${platformBase(tenantId)}/${entityId}/children`)
-  return response.data.items ?? response.data
+  const response = await api.get(`${platformBase(tenantId)}/${entityId}/children`);
+  return response.data.items ?? response.data;
 }
 
 // =============================================================================
@@ -164,7 +155,7 @@ export const entityService = {
     delete: deleteTenantEntity,
     getChildren: getTenantEntityChildren,
   },
-}
+};
 
-export default entityService
-export { getErrorMessage }
+export default entityService;
+export { getErrorMessage };

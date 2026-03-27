@@ -8,6 +8,7 @@ Ce module contient les modèles liés à l'organisation :
 
 from app.models.organization.entity import Entity
 
+
 __all__ = [
     "Entity",
 ]

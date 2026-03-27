@@ -21,6 +21,7 @@ from .routes import router as tenant_router
 from .subscription_routes import router as subscription_router
 from .usage_routes import router as usage_router
 
+
 # Router principal du module
 router = APIRouter()
 

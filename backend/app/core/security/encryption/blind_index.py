@@ -29,7 +29,6 @@ import hashlib
 import hmac
 import re
 import unicodedata
-from typing import Optional
 
 from app.core.security.encryption.key_manager import get_key_manager
 
@@ -73,39 +72,38 @@ def normalize_value(value: str, field_name: str) -> str:
     result = result.lower()
 
     # 3. Suppression des accents (NFD décompose, puis on enlève les diacritiques)
-    result = unicodedata.normalize('NFD', result)
-    result = ''.join(
-        char for char in result
-        if unicodedata.category(char) != 'Mn'  # Mn = Mark, Nonspacing (accents)
+    result = unicodedata.normalize("NFD", result)
+    result = "".join(
+        char
+        for char in result
+        if unicodedata.category(char) != "Mn"  # Mn = Mark, Nonspacing (accents)
     )
 
     # 4. Règles spécifiques selon le champ
-    if field_name in ('nir', 'ins', 'rpps', 'phone'):
+    if field_name in ("nir", "ins", "rpps", "phone"):
         # Pour les identifiants numériques: garder uniquement les chiffres
-        result = re.sub(r'[^0-9]', '', result)
+        result = re.sub(r"[^0-9]", "", result)
 
-    elif field_name in ('first_name', 'last_name'):
+    elif field_name in ("first_name", "last_name"):
         # Pour les noms: normaliser les espaces, garder tirets et apostrophes
-        result = re.sub(r'\s+', ' ', result)  # Plusieurs espaces → un seul
+        result = re.sub(r"\s+", " ", result)  # Plusieurs espaces → un seul
         # Garder les caractères alphabétiques, espaces, tirets, apostrophes
-        result = re.sub(r"[^a-z \-']", '', result)
+        result = re.sub(r"[^a-z \-']", "", result)
 
-    elif field_name == 'email':
+    elif field_name == "email":
         # Pour les emails: tout en minuscules, pas d'espaces
-        result = result.replace(' ', '')
+        result = result.replace(" ", "")
 
     else:
         # Par défaut: normaliser les espaces
-        result = re.sub(r'\s+', ' ', result)
+        result = re.sub(r"\s+", " ", result)
 
     return result
 
 
 def create_blind_index(
-    value: Optional[str],
-    field_name: str,
-    tenant_id: Optional[int] = None
-) -> Optional[str]:
+    value: str | None, field_name: str, tenant_id: int | None = None
+) -> str | None:
     """
     Crée un blind index (empreinte) pour une valeur.
 
@@ -148,23 +146,17 @@ def create_blind_index(
     # Créer le message avec contexte du champ
     # Le contexte empêche les collisions entre champs différents
     # (même valeur dans deux champs = deux blind indexes différents)
-    message = f"{field_name}:{normalized}".encode('utf-8')
+    message = f"{field_name}:{normalized}".encode()
 
     # Calculer HMAC-SHA256
-    digest = hmac.new(
-        key=blind_key,
-        msg=message,
-        digestmod=hashlib.sha256
-    ).hexdigest()
+    digest = hmac.new(key=blind_key, msg=message, digestmod=hashlib.sha256).hexdigest()
 
     return digest
 
 
 def create_blind_index_for_search(
-    search_value: str,
-    field_name: str,
-    tenant_id: Optional[int] = None
-) -> Optional[str]:
+    search_value: str, field_name: str, tenant_id: int | None = None
+) -> str | None:
     """
     Crée un blind index pour une recherche.
 
@@ -188,10 +180,7 @@ def create_blind_index_for_search(
 
 
 def verify_blind_index(
-    value: str,
-    stored_blind: str,
-    field_name: str,
-    tenant_id: Optional[int] = None
+    value: str, stored_blind: str, field_name: str, tenant_id: int | None = None
 ) -> bool:
     """
     Vérifie qu'une valeur correspond à un blind index stocké.

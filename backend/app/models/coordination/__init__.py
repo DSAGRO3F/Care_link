@@ -7,6 +7,7 @@ Ce module contient les modèles liés à la coordination :
 
 from app.models.coordination.coordination_entry import CoordinationEntry
 
+
 __all__ = [
     "CoordinationEntry",
 ]

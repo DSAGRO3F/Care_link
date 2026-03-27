@@ -25,7 +25,7 @@
 
             "personnePhysique": {
               "type": "object",
-              "required": ["nomFamille", "premierPrenomActeNaissance", "sexe", "dateNaissance"],
+              "required": ["nomFamille", "premierPrenomActeNaissance", "dateNaissance"],
               "properties": {
                 "civilite": {
                   "type": "string",
@@ -99,7 +99,8 @@
           "properties": {
             "domicile": {
               "type": ["string", "null"],
-              "description": "Numéro de téléphone fixe"
+              "pattern": "^[0-9]{10}$|^$",
+              "description": "Numéro de téléphone fixe (10 chiffres)"
             },
             "mobile": {
               "type": ["string", "null"],
@@ -171,10 +172,20 @@
     },
 
     "materiels": {
-      "type": "array",
-      "description": "Liste des matériels et équipements (existants ou à prévoir)",
-      "items": {
-        "$ref": "#/$defs/materiel"
+      "type": "object",
+      "description": "Matériels et équipements (existants ou à prévoir)",
+      "properties": {
+        "noMateriel": {
+          "type": "boolean",
+          "description": "True si aucun matériel n'est nécessaire"
+        },
+        "items": {
+          "type": "array",
+          "description": "Liste des matériels sélectionnés (vide si noMateriel=true)",
+          "items": {
+            "$ref": "#/$defs/materiel"
+          }
+        }
       }
     },
 
@@ -225,14 +236,39 @@
       }
     },
 
-    "planningInterventions": {
+    "poaAutonomie": {
       "type": "object",
-      "description": "Planning des interventions à domicile",
+      "description": "Plan d'Objectifs et d'Actions - Volet Autonomie (interventions à domicile)",
       "properties": {
-        "interventions": {
+        "preoccupationPatient": {
+          "type": "string",
+          "enum": ["Faible", "Assez faible", "Assez élevée", "Élevée", ""],
+          "description": "Niveau de préoccupation du patient concernant l'autonomie"
+        },
+        "preoccupationProfessionel": {
+          "type": "string",
+          "enum": ["Faible", "Assez faible", "Assez élevée", "Élevée", ""],
+          "description": "Niveau de préoccupation du professionnel concernant l'autonomie"
+        },
+        "actions": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/intervention"
+          }
+        }
+      }
+    },
+
+    "_wizard_meta": {
+      "type": "object",
+      "description": "Métadonnées internes du wizard (statuts de sections). Pas de données cliniques — usage interne CareLink uniquement.",
+      "properties": {
+        "sectionStatuses": {
+          "type": "object",
+          "description": "Statut de chaque section du wizard (empty, partial, complete)",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["empty", "partial", "complete"]
           }
         }
       }
@@ -309,8 +345,16 @@
         "contactInfosPersonnels": {
           "type": "object",
           "properties": {
-            "domicile": { "type": ["string", "null"] },
-            "mobile": { "type": ["string", "null"] },
+            "domicile": {
+              "type": ["string", "null"],
+              "pattern": "^[0-9]{10}$|^$",
+              "description": "Numéro de téléphone fixe (10 chiffres)"
+            },
+            "mobile": {
+              "type": ["string", "null"],
+              "pattern": "^[0-9]{10}$|^$",
+              "description": "Numéro de téléphone mobile (10 chiffres)"
+            },
             "mailMSSANTE": {
               "type": "string",
               "description": "Adresse MSSanté (messagerie sécurisée de santé)"
@@ -477,7 +521,7 @@
       "properties": {
         "nom": {
           "type": "string",
-          "enum": ["Contexte", "Participation sociale", "PEC"],
+          "enum": ["Contexte", "Habitat", "Vie Sociale", "PEC"],
           "description": "Nom du bloc social"
         },
         "questionReponse": {
@@ -614,7 +658,7 @@
             "Cardio-respiratoire",
             "Cognition",
             "Dépression",
-            "Elimination",
+            "Élimination",
             "Général et ressenti",
             "Préparations et prise médicamenteuse",
             "Mobilité",

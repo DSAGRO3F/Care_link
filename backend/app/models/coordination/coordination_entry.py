@@ -5,20 +5,21 @@ Ce module définit la table `coordination_entries` qui stocke les interventions
 des professionnels de santé pour assurer la coordination et éviter les doublons.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import CoordinationCategory
 from app.models.mixins import TimestampMixin
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
-    from app.models.patient.patient import Patient
     from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.patient.patient import Patient
+    from app.models.user.user import User
 
 
 class CoordinationEntry(TimestampMixin, Base):
@@ -44,16 +45,11 @@ class CoordinationEntry(TimestampMixin, Base):
     """
 
     __tablename__ = "coordination_entries"
-    __table_args__ = {
-        "comment": "Carnet de coordination des interventions"
-    }
+    __table_args__ = {"comment": "Carnet de coordination des interventions"}
 
     # === Colonnes ===
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique de l'entrée"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique de l'entrée")
 
     # === Multi-tenant ===
 
@@ -61,7 +57,7 @@ class CoordinationEntry(TimestampMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # --- Références ---
@@ -70,14 +66,14 @@ class CoordinationEntry(TimestampMixin, Base):
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        doc="ID du patient concerné"
+        doc="ID du patient concerné",
     )
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=False,
         index=True,
-        doc="Professionnel ayant réalisé l'intervention"
+        doc="Professionnel ayant réalisé l'intervention",
     )
 
     # --- Catégorisation ---
@@ -87,36 +83,27 @@ class CoordinationEntry(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="Catégorie d'intervention",
-        info={
-            "enum": [e.value for e in CoordinationCategory],
-            "example": "SOINS"
-        }
+        info={"enum": [e.value for e in CoordinationCategory], "example": "SOINS"},
     )
 
     intervention_type: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
-        doc="Type spécifique d'intervention (toilette, pansement, injection...)"
+        doc="Type spécifique d'intervention (toilette, pansement, injection...)",
     )
 
     # --- Contenu ---
 
     description: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-        doc="Description de l'intervention réalisée"
+        Text, nullable=False, doc="Description de l'intervention réalisée"
     )
 
     observations: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        doc="Observations complémentaires (état du patient, remarques...)"
+        Text, nullable=True, doc="Observations complémentaires (état du patient, remarques...)"
     )
 
     next_actions: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        doc="Actions à prévoir pour la prochaine intervention"
+        Text, nullable=True, doc="Actions à prévoir pour la prochaine intervention"
     )
 
     # --- Horodatage ---
@@ -125,42 +112,36 @@ class CoordinationEntry(TimestampMixin, Base):
         DateTime(timezone=True),
         nullable=False,
         index=True,
-        doc="Date/heure de réalisation de l'intervention"
+        doc="Date/heure de réalisation de l'intervention",
     )
 
     duration_minutes: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        doc="Durée de l'intervention en minutes"
+        Integer, nullable=True, doc="Durée de l'intervention en minutes"
     )
 
     # --- Soft delete ---
 
     deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Date de suppression logique (NULL = actif)"
+        DateTime(timezone=True), nullable=True, doc="Date de suppression logique (NULL = actif)"
     )
 
     # === Relations ===
 
     patient: Mapped["Patient"] = relationship(
-        "Patient",
-        back_populates="coordination_entries",
-        doc="Patient concerné"
+        "Patient", back_populates="coordination_entries", doc="Patient concerné"
     )
 
     user: Mapped["User"] = relationship(
         "User",
         foreign_keys="[CoordinationEntry.user_id]",
-        doc="Professionnel ayant réalisé l'intervention"
+        doc="Professionnel ayant réalisé l'intervention",
     )
 
     scheduled_intervention: Mapped[Optional["ScheduledIntervention"]] = relationship(
         "ScheduledIntervention",
         back_populates="coordination_entry",
         uselist=False,
-        doc="Intervention planifiée à l'origine de cette entrée"
+        doc="Intervention planifiée à l'origine de cette entrée",
     )
 
     # === Propriétés ===
@@ -180,11 +161,11 @@ class CoordinationEntry(TimestampMixin, Base):
         """Retourne True si l'intervention date de moins de 24h."""
         if self.performed_at is None:
             return False
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Gérer les datetime naive
         performed = self.performed_at
         if performed.tzinfo is None:
-            performed = performed.replace(tzinfo=timezone.utc)
+            performed = performed.replace(tzinfo=UTC)
         delta = now - performed
         return delta.total_seconds() < 24 * 3600  # 24 heures
 
@@ -198,7 +179,7 @@ class CoordinationEntry(TimestampMixin, Base):
 
     def soft_delete(self) -> None:
         """Supprime logiquement l'entrée (soft delete)."""
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
 
     def restore(self) -> None:
         """Restaure une entrée supprimée."""

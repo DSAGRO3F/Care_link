@@ -11,19 +11,20 @@ Chaque entité active ensuite les services qu'elle propose via `entity_services`
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Integer, Boolean, Text, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Boolean, Enum as SQLEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import ServiceCategory
-from app.models.mixins import TimestampMixin, StatusMixin
+from app.models.mixins import StatusMixin, TimestampMixin
+
 
 if TYPE_CHECKING:
-    from app.models.user.profession import Profession
-    from app.models.catalog.entity_service import EntityService
     from app.models.careplan.care_plan_service import CarePlanService
+    from app.models.catalog.entity_service import EntityService
+    from app.models.user.profession import Profession
 
 
 class ServiceTemplate(TimestampMixin, StatusMixin, Base):
@@ -53,23 +54,19 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         ...     name="Aide à la toilette complète",
         ...     category=ServiceCategory.HYGIENE,
         ...     default_duration_minutes=45,
-        ...     required_profession_id=aide_soignant.id
+        ...     required_profession_id=aide_soignant.id,
         ... )
     """
 
     __tablename__ = "service_templates"
-    __table_args__ = {
-        "comment": "Catalogue national des types de prestations"
-    }
+    __table_args__ = {"comment": "Catalogue national des types de prestations"}
 
     # === Clé primaire ===
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du service",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Identification ===
@@ -82,8 +79,8 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         doc="Code unique du service",
         info={
             "description": "Code identifiant unique du service (majuscules, underscores)",
-            "example": "TOILETTE_COMPLETE"
-        }
+            "example": "TOILETTE_COMPLETE",
+        },
     )
 
     name: Mapped[str] = mapped_column(
@@ -92,8 +89,8 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         doc="Nom lisible du service",
         info={
             "description": "Nom complet du service pour affichage",
-            "example": "Aide à la toilette complète"
-        }
+            "example": "Aide à la toilette complète",
+        },
     )
 
     category: Mapped[ServiceCategory] = mapped_column(
@@ -104,17 +101,15 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         info={
             "description": "Classification du service",
             "enum": [e.value for e in ServiceCategory],
-            "example": "HYGIENE"
-        }
+            "example": "HYGIENE",
+        },
     )
 
     description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         doc="Description détaillée du service",
-        info={
-            "description": "Description complète pour documentation et aide contextuelle"
-        }
+        info={"description": "Description complète pour documentation et aide contextuelle"},
     )
 
     # === Exigences professionnelles ===
@@ -126,8 +121,8 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         doc="Profession requise pour réaliser ce service",
         info={
             "description": "FK vers professions. NULL = service polyvalent (toute profession)",
-            "example": "ID de la profession Infirmier pour une injection"
-        }
+            "example": "ID de la profession Infirmier pour une injection",
+        },
     )
 
     required_qualification: Mapped[str | None] = mapped_column(
@@ -136,8 +131,8 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         doc="Qualification spécifique requise",
         info={
             "description": "Qualification additionnelle au-delà de la profession",
-            "example": "Diplôme IDE, Formation pansements complexes"
-        }
+            "example": "Diplôme IDE, Formation pansements complexes",
+        },
     )
 
     # === Caractéristiques temporelles ===
@@ -150,8 +145,8 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         info={
             "description": "Durée par défaut pour planification",
             "unit": "minutes",
-            "example": 45
-        }
+            "example": 45,
+        },
     )
 
     # === Contraintes réglementaires ===
@@ -161,10 +156,7 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         nullable=False,
         default=False,
         doc="Nécessite une ordonnance médicale",
-        info={
-            "description": "True si une prescription médicale est obligatoire",
-            "default": False
-        }
+        info={"description": "True si une prescription médicale est obligatoire", "default": False},
     )
 
     is_medical_act: Mapped[bool] = mapped_column(
@@ -174,8 +166,8 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         doc="Est un acte médical ou paramédical",
         info={
             "description": "True si c'est un acte de soin (vs aide à la personne)",
-            "default": False
-        }
+            "default": False,
+        },
     )
 
     apa_eligible: Mapped[bool] = mapped_column(
@@ -183,10 +175,7 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         nullable=False,
         default=True,
         doc="Facturable dans le cadre de l'APA",
-        info={
-            "description": "True si le service peut être financé par l'APA",
-            "default": True
-        }
+        info={"description": "True si le service peut être financé par l'APA", "default": True},
     )
 
     # === Affichage ===
@@ -196,32 +185,29 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
         nullable=False,
         default=100,
         doc="Ordre d'affichage dans les listes",
-        info={
-            "description": "Permet de trier les services dans l'interface",
-            "default": 100
-        }
+        info={"description": "Permet de trier les services dans l'interface", "default": 100},
     )
 
     # === Relations ===
 
-    required_profession: Mapped[Optional["Profession"]] = relationship(
+    required_profession: Mapped[Profession | None] = relationship(
         "Profession",
         back_populates="service_templates",
         lazy="joined",
-        doc="Profession requise pour ce service"
+        doc="Profession requise pour ce service",
     )
 
-    entity_services: Mapped[List["EntityService"]] = relationship(
+    entity_services: Mapped[list[EntityService]] = relationship(
         "EntityService",
         back_populates="service_template",
         cascade="all, delete-orphan",
-        doc="Services activés par les entités basés sur ce template"
+        doc="Services activés par les entités basés sur ce template",
     )
 
-    care_plan_services: Mapped[List["CarePlanService"]] = relationship(
+    care_plan_services: Mapped[list[CarePlanService]] = relationship(
         "CarePlanService",
         back_populates="service_template",
-        doc="Services de plans d'aide utilisant ce template"
+        doc="Services de plans d'aide utilisant ce template",
     )
 
     # === Méthodes ===
@@ -239,7 +225,6 @@ class ServiceTemplate(TimestampMixin, StatusMixin, Base):
     def deactivate(self) -> None:
         """Désactive le service."""
         self.status = "inactive"
-
 
     # === Propriétés ===
 
@@ -270,7 +255,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide à la toilette du haut du corps (visage, bras, torse)",
         "default_duration_minutes": 20,
         "is_medical_act": False,
-        "display_order": 10
+        "display_order": 10,
     },
     {
         "code": "TOILETTE_BAS",
@@ -279,7 +264,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide à la toilette du bas du corps (jambes, pieds, parties intimes)",
         "default_duration_minutes": 25,
         "is_medical_act": False,
-        "display_order": 11
+        "display_order": 11,
     },
     {
         "code": "TOILETTE_COMPLETE",
@@ -288,7 +273,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide à la toilette intégrale du corps",
         "default_duration_minutes": 45,
         "is_medical_act": False,
-        "display_order": 12
+        "display_order": 12,
     },
     {
         "code": "HABILLAGE",
@@ -297,9 +282,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide pour s'habiller et se déshabiller",
         "default_duration_minutes": 15,
         "is_medical_act": False,
-        "display_order": 13
+        "display_order": 13,
     },
-
     # === SOINS ===
     {
         "code": "INJECTION_INSULINE",
@@ -310,7 +294,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "requires_prescription": True,
         "is_medical_act": True,
         "required_profession_code": "60",  # IDE
-        "display_order": 20
+        "display_order": 20,
     },
     {
         "code": "INJECTION_SC",
@@ -321,7 +305,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "requires_prescription": True,
         "is_medical_act": True,
         "required_profession_code": "60",  # IDE
-        "display_order": 21
+        "display_order": 21,
     },
     {
         "code": "PANSEMENT_SIMPLE",
@@ -332,7 +316,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "requires_prescription": True,
         "is_medical_act": True,
         "required_profession_code": "60",  # IDE
-        "display_order": 22
+        "display_order": 22,
     },
     {
         "code": "PANSEMENT_COMPLEXE",
@@ -343,7 +327,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "requires_prescription": True,
         "is_medical_act": True,
         "required_profession_code": "60",  # IDE
-        "display_order": 23
+        "display_order": 23,
     },
     {
         "code": "PRISE_MEDICAMENTS",
@@ -352,7 +336,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide à la prise des médicaments préparés (pilulier)",
         "default_duration_minutes": 10,
         "is_medical_act": False,
-        "display_order": 24
+        "display_order": 24,
     },
     {
         "code": "SURVEILLANCE_CONSTANTES",
@@ -362,9 +346,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "default_duration_minutes": 15,
         "is_medical_act": True,
         "required_profession_code": "60",  # IDE
-        "display_order": 25
+        "display_order": 25,
     },
-
     # === REPAS ===
     {
         "code": "AIDE_REPAS",
@@ -373,7 +356,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide pour manger (installation, aide à porter les aliments à la bouche)",
         "default_duration_minutes": 30,
         "is_medical_act": False,
-        "display_order": 30
+        "display_order": 30,
     },
     {
         "code": "PREPARATION_REPAS",
@@ -382,9 +365,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Préparation des repas à domicile",
         "default_duration_minutes": 45,
         "is_medical_act": False,
-        "display_order": 31
+        "display_order": 31,
     },
-
     # === MOBILITE ===
     {
         "code": "AIDE_LEVER",
@@ -393,7 +375,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide pour se lever du lit et s'installer",
         "default_duration_minutes": 15,
         "is_medical_act": False,
-        "display_order": 40
+        "display_order": 40,
     },
     {
         "code": "AIDE_COUCHER",
@@ -402,7 +384,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide pour se mettre au lit",
         "default_duration_minutes": 15,
         "is_medical_act": False,
-        "display_order": 41
+        "display_order": 41,
     },
     {
         "code": "AIDE_DEPLACEMENT",
@@ -411,7 +393,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide pour se déplacer dans le logement",
         "default_duration_minutes": 15,
         "is_medical_act": False,
-        "display_order": 42
+        "display_order": 42,
     },
     {
         "code": "KINE_MOBILISATION",
@@ -422,9 +404,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "requires_prescription": True,
         "is_medical_act": True,
         "required_profession_code": "70",  # Kiné
-        "display_order": 43
+        "display_order": 43,
     },
-
     # === COURSES ===
     {
         "code": "AIDE_COURSES",
@@ -433,9 +414,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Accompagnement ou réalisation des courses alimentaires",
         "default_duration_minutes": 60,
         "is_medical_act": False,
-        "display_order": 50
+        "display_order": 50,
     },
-
     # === MENAGE ===
     {
         "code": "ENTRETIEN_LOGEMENT",
@@ -444,7 +424,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Ménage, nettoyage des sols et surfaces",
         "default_duration_minutes": 60,
         "is_medical_act": False,
-        "display_order": 60
+        "display_order": 60,
     },
     {
         "code": "ENTRETIEN_LINGE",
@@ -453,9 +433,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Lavage, séchage, repassage du linge",
         "default_duration_minutes": 45,
         "is_medical_act": False,
-        "display_order": 61
+        "display_order": 61,
     },
-
     # === ADMINISTRATIF ===
     {
         "code": "AIDE_ADMINISTRATIVE",
@@ -464,9 +443,8 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Aide pour les papiers, courriers, démarches",
         "default_duration_minutes": 30,
         "is_medical_act": False,
-        "display_order": 70
+        "display_order": 70,
     },
-
     # === SOCIAL ===
     {
         "code": "ACCOMPAGNEMENT_SORTIE",
@@ -475,7 +453,7 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Accompagnement pour sorties (médecin, promenade...)",
         "default_duration_minutes": 60,
         "is_medical_act": False,
-        "display_order": 80
+        "display_order": 80,
     },
     {
         "code": "VISITE_CONVIVIALITE",
@@ -484,6 +462,6 @@ INITIAL_SERVICE_TEMPLATES = [
         "description": "Visite pour rompre l'isolement, discussion, compagnie",
         "default_duration_minutes": 30,
         "is_medical_act": False,
-        "display_order": 81
+        "display_order": 81,
     },
 ]

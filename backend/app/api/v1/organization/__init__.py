@@ -11,34 +11,36 @@ Usage:
     # Dans main.py ou router principal
     app.include_router(router, prefix="/api/v1")
 """
+
 from .routes import router
 from .schemas import (
     # Country
     CountryBase,
     CountryCreate,
-    CountryUpdate,
-    CountryResponse,
     CountryList,
+    CountryResponse,
+    CountryUpdate,
     # Entity
     EntityBase,
     EntityCreate,
-    EntityUpdate,
+    EntityFilters,
+    EntityList,
     EntityResponse,
     EntitySummary,
+    EntityUpdate,
     EntityWithChildren,
-    EntityList,
-    EntityFilters,
 )
 from .services import (
-    CountryService,
-    EntityService,
-    EntityNotFoundError,
+    CircularHierarchyError,
     CountryNotFoundError,
+    CountryService,
+    DuplicateCountryCodeError,
     DuplicateFINESSError,
     DuplicateSIRETError,
-    DuplicateCountryCodeError,
-    CircularHierarchyError,
+    EntityNotFoundError,
+    EntityService,
 )
+
 
 __all__ = [
     # Router

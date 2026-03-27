@@ -34,16 +34,17 @@ Usage:
 import json
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Union
 
-from app.core.security.cipher import encrypt_field, decrypt_field
+from app.core.security.cipher import decrypt_field, encrypt_field
 
 
 # =============================================================================
 # DATES
 # =============================================================================
 
-def encrypt_date(value: Optional[date]) -> Optional[str]:
+
+def encrypt_date(value: date | None) -> str | None:
     """
     Chiffre une date.
 
@@ -72,7 +73,7 @@ def encrypt_date(value: Optional[date]) -> Optional[str]:
     return encrypt_field(date_str)
 
 
-def decrypt_date(ciphertext: Optional[str]) -> Optional[date]:
+def decrypt_date(ciphertext: str | None) -> date | None:
     """
     Déchiffre une date.
 
@@ -98,7 +99,7 @@ def decrypt_date(ciphertext: Optional[str]) -> Optional[date]:
     return date.fromisoformat(date_str)
 
 
-def encrypt_datetime(value: Optional[datetime]) -> Optional[str]:
+def encrypt_datetime(value: datetime | None) -> str | None:
     """
     Chiffre un datetime.
 
@@ -119,7 +120,7 @@ def encrypt_datetime(value: Optional[datetime]) -> Optional[str]:
     return encrypt_field(dt_str)
 
 
-def decrypt_datetime(ciphertext: Optional[str]) -> Optional[datetime]:
+def decrypt_datetime(ciphertext: str | None) -> datetime | None:
     """
     Déchiffre un datetime.
 
@@ -144,6 +145,7 @@ def decrypt_datetime(ciphertext: Optional[str]) -> Optional[datetime]:
 # JSON (pour données structurées comme evaluation_data)
 # =============================================================================
 
+
 class EncryptionJSONEncoder(json.JSONEncoder):
     """
     Encodeur JSON personnalisé pour les types non-standard.
@@ -157,9 +159,9 @@ class EncryptionJSONEncoder(json.JSONEncoder):
     def default(self, obj: Any) -> Any:
         if isinstance(obj, datetime):
             return {"__type__": "datetime", "value": obj.isoformat()}
-        elif isinstance(obj, date):
+        if isinstance(obj, date):
             return {"__type__": "date", "value": obj.isoformat()}
-        elif isinstance(obj, Decimal):
+        if isinstance(obj, Decimal):
             return {"__type__": "decimal", "value": str(obj)}
         return super().default(obj)
 
@@ -174,9 +176,9 @@ def _decode_special_types(obj: Any) -> Any:
 
         if type_name == "datetime":
             return datetime.fromisoformat(value)
-        elif type_name == "date":
+        if type_name == "date":
             return date.fromisoformat(value)
-        elif type_name == "decimal":
+        if type_name == "decimal":
             return Decimal(value)
 
     return obj
@@ -195,13 +197,13 @@ def _recursive_decode(obj: Any) -> Any:
         # Sinon, parcourir récursivement
         return {k: _recursive_decode(v) for k, v in obj.items()}
 
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [_recursive_decode(item) for item in obj]
 
     return obj
 
 
-def encrypt_json(value: Optional[Union[Dict, List]]) -> Optional[str]:
+def encrypt_json(value: Union[dict, list] | None) -> str | None:
     """
     Chiffre une structure JSON (dict ou list).
 
@@ -230,7 +232,7 @@ def encrypt_json(value: Optional[Union[Dict, List]]) -> Optional[str]:
     return encrypt_field(json_str)
 
 
-def decrypt_json(ciphertext: Optional[str]) -> Optional[Union[Dict, List]]:
+def decrypt_json(ciphertext: str | None) -> Union[dict, list] | None:
     """
     Déchiffre une structure JSON.
 
@@ -260,10 +262,8 @@ def decrypt_json(ciphertext: Optional[str]) -> Optional[Union[Dict, List]]:
 # CHIFFREMENT SÉLECTIF DE CHAMPS DANS UN DICT
 # =============================================================================
 
-def encrypt_dict_fields(
-    data: Dict[str, Any],
-    fields_to_encrypt: List[str]
-) -> Dict[str, Any]:
+
+def encrypt_dict_fields(data: dict[str, Any], fields_to_encrypt: list[str]) -> dict[str, Any]:
     """
     Chiffre sélectivement certains champs d'un dictionnaire.
 
@@ -297,10 +297,7 @@ def encrypt_dict_fields(
     return result
 
 
-def decrypt_dict_fields(
-    data: Dict[str, Any],
-    fields_to_decrypt: List[str]
-) -> Dict[str, Any]:
+def decrypt_dict_fields(data: dict[str, Any], fields_to_decrypt: list[str]) -> dict[str, Any]:
     """
     Déchiffre sélectivement certains champs d'un dictionnaire.
 
@@ -337,10 +334,10 @@ def decrypt_dict_fields(
 # CHAMPS JSONB AVEC CHIFFREMENT PARTIEL
 # =============================================================================
 
+
 def encrypt_jsonb_text_fields(
-    jsonb_data: Optional[Dict[str, Any]],
-    text_field_paths: List[str]
-) -> Optional[Dict[str, Any]]:
+    jsonb_data: dict[str, Any] | None, text_field_paths: list[str]
+) -> dict[str, Any] | None:
     """
     Chiffre les champs texte libre dans une structure JSONB complexe.
 
@@ -361,9 +358,7 @@ def encrypt_jsonb_text_fields(
     Examples:
         >>> data = {
         ...     "observations": "Texte sensible",
-        ...     "activities": {
-        ...         "toilette": {"score": 1, "commentaire": "Aide partielle"}
-        ...     }
+        ...     "activities": {"toilette": {"score": 1, "commentaire": "Aide partielle"}},
         ... }
         >>> encrypt_jsonb_text_fields(data, ["observations", "activities.*.commentaire"])
         {
@@ -377,18 +372,18 @@ def encrypt_jsonb_text_fields(
         return None
 
     import copy
+
     result = copy.deepcopy(jsonb_data)
 
     for path in text_field_paths:
-        _encrypt_path(result, path.split('.'))
+        _encrypt_path(result, path.split("."))
 
     return result
 
 
 def decrypt_jsonb_text_fields(
-    jsonb_data: Optional[Dict[str, Any]],
-    text_field_paths: List[str]
-) -> Optional[Dict[str, Any]]:
+    jsonb_data: dict[str, Any] | None, text_field_paths: list[str]
+) -> dict[str, Any] | None:
     """
     Déchiffre les champs texte libre dans une structure JSONB.
 
@@ -398,15 +393,16 @@ def decrypt_jsonb_text_fields(
         return None
 
     import copy
+
     result = copy.deepcopy(jsonb_data)
 
     for path in text_field_paths:
-        _decrypt_path(result, path.split('.'))
+        _decrypt_path(result, path.split("."))
 
     return result
 
 
-def _encrypt_path(obj: Any, path_parts: List[str]) -> None:
+def _encrypt_path(obj: Any, path_parts: list[str]) -> None:
     """
     Chiffre récursivement un champ selon son chemin.
 
@@ -418,7 +414,7 @@ def _encrypt_path(obj: Any, path_parts: List[str]) -> None:
     current = path_parts[0]
     remaining = path_parts[1:]
 
-    if current == '*':
+    if current == "*":
         # Itérer sur tous les éléments
         if isinstance(obj, dict):
             for key in obj:
@@ -437,7 +433,7 @@ def _encrypt_path(obj: Any, path_parts: List[str]) -> None:
             _encrypt_path(obj[current], remaining)
 
 
-def _decrypt_path(obj: Any, path_parts: List[str]) -> None:
+def _decrypt_path(obj: Any, path_parts: list[str]) -> None:
     """
     Déchiffre récursivement un champ selon son chemin.
 
@@ -449,7 +445,7 @@ def _decrypt_path(obj: Any, path_parts: List[str]) -> None:
     current = path_parts[0]
     remaining = path_parts[1:]
 
-    if current == '*':
+    if current == "*":
         if isinstance(obj, dict):
             for key in obj:
                 _decrypt_path(obj[key], remaining)

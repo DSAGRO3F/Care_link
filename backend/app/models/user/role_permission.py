@@ -11,7 +11,7 @@ Avantages :
 - Multi-tenant : permissions héritées ou spécifiques
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Integer, UniqueConstraint
@@ -19,11 +19,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 
+
 if TYPE_CHECKING:
-    from app.models.user.role import Role
-    from app.models.user.permission import Permission
-    from app.models.user.user import User
     from app.models.tenants.tenant import Tenant
+    from app.models.user.permission import Permission
+    from app.models.user.role import Role
+    from app.models.user.user import User
 
 
 class RolePermission(Base):
@@ -49,24 +50,24 @@ class RolePermission(Base):
     __tablename__ = "role_permissions"
     __table_args__ = (
         UniqueConstraint("role_id", "permission_id", name="uq_role_permission"),
-        {"comment": "Table de jonction Role ↔ Permission (many-to-many)"}
+        {"comment": "Table de jonction Role ↔ Permission (many-to-many)"},
     )
 
     # === Clé primaire ===
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'association",
-        info={"description": "Clé primaire auto-incrémentée"}
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Clés étrangères ===
-    
+
     role_id: Mapped[int] = mapped_column(
         ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         doc="ID du rôle",
-        info={"description": "Référence vers le rôle"}
+        info={"description": "Référence vers le rôle"},
     )
 
     permission_id: Mapped[int] = mapped_column(
@@ -74,7 +75,7 @@ class RolePermission(Base):
         nullable=False,
         index=True,
         doc="ID de la permission",
-        info={"description": "Référence vers la permission"}
+        info={"description": "Référence vers la permission"},
     )
 
     # === Multi-tenant ===
@@ -85,47 +86,41 @@ class RolePermission(Base):
         nullable=True,
         index=True,
         doc="Tenant propriétaire (NULL = association système)",
-        info={"description": "Clé étrangère vers le tenant"}
+        info={"description": "Clé étrangère vers le tenant"},
     )
 
     # === Traçabilité ===
-    
+
     granted_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
         doc="Date et heure d'attribution de la permission",
-        info={"description": "Timestamp de l'attribution", "auto_generated": True}
+        info={"description": "Timestamp de l'attribution", "auto_generated": True},
     )
 
     granted_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID de l'utilisateur ayant accordé cette permission",
-        info={"description": "Référence vers l'administrateur (NULL = système)"}
+        info={"description": "Référence vers l'administrateur (NULL = système)"},
     )
 
     # === Relations ===
 
     role: Mapped["Role"] = relationship(
-        "Role",
-        back_populates="permission_associations",
-        doc="Rôle concerné"
+        "Role", back_populates="permission_associations", doc="Rôle concerné"
     )
 
     permission: Mapped["Permission"] = relationship(
-        "Permission",
-        back_populates="role_associations",
-        doc="Permission accordée"
+        "Permission", back_populates="role_associations", doc="Permission accordée"
     )
 
     granted_by: Mapped["User | None"] = relationship(
-        "User",
-        doc="Utilisateur ayant accordé cette permission"
+        "User", doc="Utilisateur ayant accordé cette permission"
     )
 
     tenant: Mapped["Tenant | None"] = relationship(
-        "Tenant",
-        doc="Tenant propriétaire de cette association"
+        "Tenant", doc="Tenant propriétaire de cette association"
     )
 
     # === Méthodes ===
@@ -148,30 +143,42 @@ INITIAL_ROLE_PERMISSIONS = {
     "ADMIN": [
         "ADMIN_FULL"  # Donne accès à tout
     ],
-
     "COORDINATEUR": [
-        "PATIENT_VIEW", "PATIENT_CREATE", "PATIENT_EDIT",
-        "EVALUATION_VIEW", "EVALUATION_CREATE",
-        "COORDINATION_VIEW", "COORDINATION_CREATE", "COORDINATION_EDIT",
-        "CAREPLAN_VIEW", "CAREPLAN_CREATE", "CAREPLAN_EDIT", "CAREPLAN_VALIDATE",
+        "PATIENT_VIEW",
+        "PATIENT_CREATE",
+        "PATIENT_EDIT",
+        "EVALUATION_VIEW",
+        "EVALUATION_CREATE",
+        "COORDINATION_VIEW",
+        "COORDINATION_CREATE",
+        "COORDINATION_EDIT",
+        "CAREPLAN_VIEW",
+        "CAREPLAN_CREATE",
+        "CAREPLAN_EDIT",
+        "CAREPLAN_VALIDATE",
         "USER_VIEW",
-        "ACCESS_GRANT", "ACCESS_REVOKE",
-        "ROLE_VIEW", "ROLE_ASSIGN",
+        "ACCESS_GRANT",
+        "ACCESS_REVOKE",
+        "ROLE_VIEW",
+        "ROLE_ASSIGN",
     ],
-
     "REFERENT": [
-        "PATIENT_VIEW", "PATIENT_EDIT",
-        "EVALUATION_VIEW", "EVALUATION_CREATE",
-        "COORDINATION_VIEW", "COORDINATION_CREATE", "COORDINATION_EDIT",
+        "PATIENT_VIEW",
+        "PATIENT_EDIT",
+        "EVALUATION_VIEW",
+        "EVALUATION_CREATE",
+        "COORDINATION_VIEW",
+        "COORDINATION_CREATE",
+        "COORDINATION_EDIT",
         "CAREPLAN_VIEW",
     ],
-
     "EVALUATEUR": [
         "PATIENT_VIEW",
-        "EVALUATION_VIEW", "EVALUATION_CREATE", "EVALUATION_VALIDATE",
+        "EVALUATION_VIEW",
+        "EVALUATION_CREATE",
+        "EVALUATION_VALIDATE",
         "VITALS_VIEW",
     ],
-
     "INTERVENANT": [
         "PATIENT_VIEW",
         "VITALS_VIEW",

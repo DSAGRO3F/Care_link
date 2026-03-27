@@ -11,20 +11,20 @@
  * Ex: "0612345678" → "06 12 34 56 78"
  */
 export function formatPhone(phone?: string): string {
-  if (!phone) return ''
-  const cleaned = phone.replace(/\D/g, '')
-  return cleaned.length === 10 ? cleaned.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : phone
+  if (!phone) return '';
+  const cleaned = phone.replace(/\D/g, '');
+  return cleaned.length === 10 ? cleaned.replace(/(\d{2})(?=\d)/g, '$1 ').trim() : phone;
 }
 
 /**
  * Formate une date ISO en format français (JJ/MM/AAAA).
  */
 export function formatDate(date?: string): string {
-  if (!date) return ''
+  if (!date) return '';
   try {
-    return new Date(date).toLocaleDateString('fr-FR')
+    return new Date(date).toLocaleDateString('fr-FR');
   } catch {
-    return date
+    return date;
   }
 }
 
@@ -32,17 +32,17 @@ export function formatDate(date?: string): string {
  * Formate une date/heure ISO en format français (JJ/MM/AAAA HH:MM).
  */
 export function formatDateTime(dateStr?: string): string {
-  if (!dateStr) return '-'
+  if (!dateStr) return '-';
   try {
     return new Date(dateStr).toLocaleString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    })
+      minute: '2-digit',
+    });
   } catch {
-    return dateStr
+    return dateStr;
   }
 }
 
@@ -51,10 +51,10 @@ export function formatDateTime(dateStr?: string): string {
  * Utilisé par PoaSection et PoaAutonomieSection.
  */
 export function getPreoccLevel(level?: string): string {
-  const l = level?.toLowerCase() || ''
-  if (l.includes('élevé') && !l.includes('assez')) return 'high'
-  if (l.includes('assez élevé')) return 'medium-high'
-  if (l.includes('assez faible')) return 'medium-low'
-  if (l.includes('faible')) return 'low'
-  return 'medium'
+  const l = level?.toLowerCase() || '';
+  if (l.includes('élevé') && !l.includes('assez')) return 'high';
+  if (l.includes('assez élevé')) return 'medium-high';
+  if (l.includes('assez faible')) return 'medium-low';
+  if (l.includes('faible')) return 'low';
+  return 'medium';
 }

@@ -6,21 +6,22 @@ des documents générés par LLM/RAG (PPA, PPCS, Recommandations).
 Le fichier binaire (PDF/DOCX) est stocké sur le filesystem/object storage.
 """
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Dict
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import String, Integer, Text, ForeignKey, DateTime
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.enums import DocumentType, DocumentFormat
+from app.models.enums import DocumentFormat, DocumentType
 from app.models.mixins import TimestampMixin
 from app.models.types import JSONBCompatible
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
     from app.models.patient.patient import Patient
     from app.models.patient.patient_evaluation import PatientEvaluation
+    from app.models.user.user import User
 
 
 class PatientDocument(TimestampMixin, Base):
@@ -48,16 +49,11 @@ class PatientDocument(TimestampMixin, Base):
     """
 
     __tablename__ = "patient_documents"
-    __table_args__ = {
-        "comment": "Documents générés pour les patients (PPA, PPCS, Recommandations)"
-    }
+    __table_args__ = {"comment": "Documents générés pour les patients (PPA, PPCS, Recommandations)"}
 
     # === Colonnes ===
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique du document"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique du document")
 
     # === Multi-tenant ===
 
@@ -65,7 +61,7 @@ class PatientDocument(TimestampMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # --- Références ---
@@ -74,7 +70,7 @@ class PatientDocument(TimestampMixin, Base):
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        doc="ID du patient concerné"
+        doc="ID du patient concerné",
     )
 
     # --- Type de document ---
@@ -84,22 +80,13 @@ class PatientDocument(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="Type de document",
-        info={
-            "enum": [e.value for e in DocumentType],
-            "example": "PPA"
-        }
+        info={"enum": [e.value for e in DocumentType], "example": "PPA"},
     )
 
-    title: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        doc="Titre du document"
-    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False, doc="Titre du document")
 
     description: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        doc="Description ou résumé du contenu"
+        Text, nullable=True, doc="Description ou résumé du contenu"
     )
 
     # --- Source de génération (traçabilité LLM/RAG) ---
@@ -107,49 +94,36 @@ class PatientDocument(TimestampMixin, Base):
     source_evaluation_id: Mapped[int | None] = mapped_column(
         ForeignKey("patient_evaluations.id", ondelete="SET NULL"),
         nullable=True,
-        doc="Évaluation source pour PPA/PPCS"
+        doc="Évaluation source pour PPA/PPCS",
     )
 
     generation_prompt: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        doc="Question/prompt envoyé au LLM (pour audit)"
+        Text, nullable=True, doc="Question/prompt envoyé au LLM (pour audit)"
     )
 
-    generation_context: Mapped[Dict[str, Any] | None] = mapped_column(
-        JSONBCompatible,
-        nullable=True,
-        doc="Contexte JSON envoyé au LLM (pour reproductibilité)"
+    generation_context: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONBCompatible, nullable=True, doc="Contexte JSON envoyé au LLM (pour reproductibilité)"
     )
 
     # --- Fichier ---
 
     file_path: Mapped[str] = mapped_column(
-        String(500),
-        nullable=False,
-        doc="Chemin relatif vers le fichier stocké"
+        String(500), nullable=False, doc="Chemin relatif vers le fichier stocké"
     )
 
     file_format: Mapped[str] = mapped_column(
         String(10),
         nullable=False,
         doc="Format du fichier",
-        info={
-            "enum": [e.value for e in DocumentFormat],
-            "example": "pdf"
-        }
+        info={"enum": [e.value for e in DocumentFormat], "example": "pdf"},
     )
 
     file_size_bytes: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
-        doc="Taille du fichier en octets"
+        Integer, nullable=True, doc="Taille du fichier en octets"
     )
 
     file_hash: Mapped[str | None] = mapped_column(
-        String(64),
-        nullable=True,
-        doc="Hash SHA-256 du fichier (intégrité)"
+        String(64), nullable=True, doc="Hash SHA-256 du fichier (intégrité)"
     )
 
     # --- Métadonnées ---
@@ -157,34 +131,32 @@ class PatientDocument(TimestampMixin, Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        doc="Date/heure de génération"
+        default=lambda: datetime.now(UTC),
+        doc="Date/heure de génération",
     )
 
     generated_by: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=False,
-        doc="Utilisateur ayant demandé la génération"
+        doc="Utilisateur ayant demandé la génération",
     )
 
     # === Relations ===
 
     patient: Mapped["Patient"] = relationship(
-        "Patient",
-        back_populates="documents",
-        doc="Patient concerné"
+        "Patient", back_populates="documents", doc="Patient concerné"
     )
 
     source_evaluation: Mapped["PatientEvaluation | None"] = relationship(
         "PatientEvaluation",
         foreign_keys="[PatientDocument.source_evaluation_id]",
-        doc="Évaluation source"
+        doc="Évaluation source",
     )
 
     generator: Mapped["User"] = relationship(
         "User",
         foreign_keys="[PatientDocument.generated_by]",
-        doc="Utilisateur ayant généré le document"
+        doc="Utilisateur ayant généré le document",
     )
 
     # === Propriétés ===

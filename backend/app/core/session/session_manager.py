@@ -8,7 +8,6 @@ d'édition concurrente entre plusieurs utilisateurs.
 import json
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Optional, Dict, List
 
 from app.core.config import settings
 from app.core.session.redis_client import get_redis
@@ -16,6 +15,7 @@ from app.core.session.redis_client import get_redis
 
 class ResourceType(str, Enum):
     """Types de ressources verrouillables."""
+
     PATIENT = "patient"
     AGGIR_EVALUATION = "aggir_evaluation"
     # Ajouter d'autres types selon les besoins
@@ -25,12 +25,12 @@ class LockInfo:
     """Informations sur un lock d'édition."""
 
     def __init__(
-            self,
-            user_id: int,
-            user_name: str,
-            user_email: str,
-            started_at: datetime,
-            expires_at: datetime
+        self,
+        user_id: int,
+        user_name: str,
+        user_email: str,
+        started_at: datetime,
+        expires_at: datetime,
     ):
         self.user_id = user_id
         self.user_name = user_name
@@ -38,25 +38,25 @@ class LockInfo:
         self.started_at = started_at
         self.expires_at = expires_at
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Sérialise en dictionnaire."""
         return {
             "user_id": self.user_id,
             "user_name": self.user_name,
             "user_email": self.user_email,
             "started_at": self.started_at.isoformat(),
-            "expires_at": self.expires_at.isoformat()
+            "expires_at": self.expires_at.isoformat(),
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "LockInfo":
+    def from_dict(cls, data: dict) -> "LockInfo":
         """Désérialise depuis un dictionnaire."""
         return cls(
             user_id=data["user_id"],
             user_name=data["user_name"],
             user_email=data["user_email"],
             started_at=datetime.fromisoformat(data["started_at"]),
-            expires_at=datetime.fromisoformat(data["expires_at"])
+            expires_at=datetime.fromisoformat(data["expires_at"]),
         )
 
     def is_expired(self) -> bool:
@@ -94,13 +94,13 @@ class SessionManager:
         return f"user_locks:{user_id}"
 
     def acquire_lock(
-            self,
-            resource_type: ResourceType,
-            resource_id: int,
-            user_id: int,
-            user_name: str,
-            user_email: str
-    ) -> tuple[bool, Optional[LockInfo]]:
+        self,
+        resource_type: ResourceType,
+        resource_id: int,
+        user_id: int,
+        user_name: str,
+        user_email: str,
+    ) -> tuple[bool, LockInfo | None]:
         """
         Tente d'acquérir un lock d'édition sur une ressource.
 
@@ -166,15 +166,11 @@ class SessionManager:
             user_name=user_name,
             user_email=user_email,
             started_at=now,
-            expires_at=expires_at
+            expires_at=expires_at,
         )
 
         # Stocker dans Redis avec TTL
-        self.redis.setex(
-            lock_key,
-            self.lock_ttl,
-            json.dumps(lock_info.to_dict())
-        )
+        self.redis.setex(lock_key, self.lock_ttl, json.dumps(lock_info.to_dict()))
 
         # Ajouter à la liste des locks de l'utilisateur (pour nettoyage)
         user_locks_key = self._get_user_locks_key(user_id)
@@ -185,12 +181,7 @@ class SessionManager:
 
         return True, lock_info
 
-    def release_lock(
-            self,
-            resource_type: ResourceType,
-            resource_id: int,
-            user_id: int
-    ) -> bool:
+    def release_lock(self, resource_type: ResourceType, resource_id: int, user_id: int) -> bool:
         """
         Libère un lock d'édition.
 
@@ -228,11 +219,8 @@ class SessionManager:
         return True
 
     def keep_alive(
-            self,
-            resource_type: ResourceType,
-            resource_id: int,
-            user_id: int
-    ) -> tuple[bool, Optional[int]]:
+        self, resource_type: ResourceType, resource_id: int, user_id: int
+    ) -> tuple[bool, int | None]:
         """
         Renouvelle le TTL d'un lock (heartbeat).
 
@@ -271,11 +259,7 @@ class SessionManager:
 
         return True, self.lock_ttl
 
-    def get_lock_info(
-            self,
-            resource_type: ResourceType,
-            resource_id: int
-    ) -> Optional[LockInfo]:
+    def get_lock_info(self, resource_type: ResourceType, resource_id: int) -> LockInfo | None:
         """
         Récupère les informations d'un lock existant.
 
@@ -294,26 +278,19 @@ class SessionManager:
 
         return LockInfo.from_dict(json.loads(lock_data))
 
-    def is_locked(
-            self,
-            resource_type: ResourceType,
-            resource_id: int
-    ) -> bool:
+    def is_locked(self, resource_type: ResourceType, resource_id: int) -> bool:
         """Vérifie si une ressource est actuellement verrouillée."""
         lock_key = self._get_lock_key(resource_type, resource_id)
         return self.redis.exists(lock_key) > 0
 
     def is_locked_by_user(
-            self,
-            resource_type: ResourceType,
-            resource_id: int,
-            user_id: int
+        self, resource_type: ResourceType, resource_id: int, user_id: int
     ) -> bool:
         """Vérifie si une ressource est verrouillée par un utilisateur spécifique."""
         lock_info = self.get_lock_info(resource_type, resource_id)
         return lock_info is not None and lock_info.user_id == user_id
 
-    def get_user_locks(self, user_id: int) -> List[str]:
+    def get_user_locks(self, user_id: int) -> list[str]:
         """
         Récupère la liste des locks détenus par un utilisateur.
 
@@ -350,11 +327,7 @@ class SessionManager:
 
         return count
 
-    def force_release_lock(
-            self,
-            resource_type: ResourceType,
-            resource_id: int
-    ) -> bool:
+    def force_release_lock(self, resource_type: ResourceType, resource_id: int) -> bool:
         """
         Force la libération d'un lock (admin uniquement).
 
@@ -379,7 +352,7 @@ class SessionManager:
 
 
 # Instance singleton
-_session_manager: Optional[SessionManager] = None
+_session_manager: SessionManager | None = None
 
 
 def get_session_manager() -> SessionManager:

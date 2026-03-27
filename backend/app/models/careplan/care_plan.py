@@ -14,23 +14,24 @@ Un plan d'aide contient :
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Integer, Text, ForeignKey, Date, DateTime, Numeric, Enum as SQLEnum
+from sqlalchemy import Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import CarePlanStatus
-from app.models.mixins import TimestampMixin, AuditMixin
+from app.models.mixins import AuditMixin, TimestampMixin
+
 
 if TYPE_CHECKING:
+    from app.models.careplan.care_plan_service import CarePlanService
+    from app.models.organization.entity import Entity
     from app.models.patient.patient import Patient
     from app.models.patient.patient_evaluation import PatientEvaluation
-    from app.models.organization.entity import Entity
     from app.models.user.user import User
-    from app.models.careplan.care_plan_service import CarePlanService
 
 
 class CarePlan(TimestampMixin, AuditMixin, Base):
@@ -67,23 +68,19 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         ...     entity_id=ssiad.id,
         ...     title="Plan d'aide 2024",
         ...     status=CarePlanStatus.DRAFT,
-        ...     start_date=date.today()
+        ...     start_date=date.today(),
         ... )
     """
 
     __tablename__ = "care_plans"
-    __table_args__ = {
-        "comment": "Plans d'aide patients"
-    }
+    __table_args__ = {"comment": "Plans d'aide patients"}
 
     # === Clé primaire ===
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du plan d'aide",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Multi-tenant ===
@@ -92,7 +89,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # === Références ===
@@ -102,10 +99,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         nullable=False,
         index=True,
         doc="Patient concerné par ce plan",
-        info={
-            "description": "FK vers patients. Suppression en cascade",
-            "example": 1
-        }
+        info={"description": "FK vers patients. Suppression en cascade", "example": 1},
     )
 
     source_evaluation_id: Mapped[int | None] = mapped_column(
@@ -113,9 +107,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         nullable=True,
         index=True,
         doc="Évaluation à l'origine du plan",
-        info={
-            "description": "FK vers patient_evaluations. L'évaluation ayant conduit à ce plan"
-        }
+        info={"description": "FK vers patient_evaluations. L'évaluation ayant conduit à ce plan"},
     )
 
     entity_id: Mapped[int] = mapped_column(
@@ -123,10 +115,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         nullable=False,
         index=True,
         doc="Entité responsable de la coordination",
-        info={
-            "description": "FK vers entities. Structure coordinatrice du plan",
-            "example": 1
-        }
+        info={"description": "FK vers entities. Structure coordinatrice du plan", "example": 1},
     )
 
     # === Identification ===
@@ -137,8 +126,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         doc="Titre du plan d'aide",
         info={
             "description": "Titre descriptif du plan",
-            "example": "Plan d'aide 2024 - Maintien à domicile"
-        }
+            "example": "Plan d'aide 2024 - Maintien à domicile",
+        },
     )
 
     reference_number: Mapped[str | None] = mapped_column(
@@ -148,8 +137,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         doc="Numéro de référence unique",
         info={
             "description": "Référence administrative unique (format libre)",
-            "example": "PA-2024-00123"
-        }
+            "example": "PA-2024-00123",
+        },
     )
 
     # === Statut ===
@@ -163,8 +152,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         info={
             "description": "État actuel du plan dans son cycle de vie",
             "enum": [e.value for e in CarePlanStatus],
-            "default": "DRAFT"
-        }
+            "default": "DRAFT",
+        },
     )
 
     # === Période ===
@@ -175,8 +164,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         doc="Date de début du plan",
         info={
             "description": "Date à partir de laquelle le plan est effectif",
-            "example": "2024-01-01"
-        }
+            "example": "2024-01-01",
+        },
     )
 
     end_date: Mapped[date | None] = mapped_column(
@@ -185,8 +174,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         doc="Date de fin prévue du plan",
         info={
             "description": "Date de fin prévue. NULL = durée indéterminée",
-            "example": "2024-12-31"
-        }
+            "example": "2024-12-31",
+        },
     )
 
     # === Volumétrie ===
@@ -198,8 +187,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         info={
             "description": "Volume horaire hebdomadaire prévu pour l'ensemble des services",
             "unit": "heures/semaine",
-            "example": "12.50"
-        }
+            "example": "12.50",
+        },
     )
 
     gir_at_creation: Mapped[int | None] = mapped_column(
@@ -210,8 +199,8 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
             "description": "Niveau GIR (1-6) issu de l'évaluation source",
             "min": 1,
             "max": 6,
-            "example": 4
-        }
+            "example": 4,
+        },
     )
 
     # === Validation ===
@@ -220,18 +209,14 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="Utilisateur ayant validé le plan",
-        info={
-            "description": "FK vers users. Coordinateur ou médecin validateur"
-        }
+        info={"description": "FK vers users. Coordinateur ou médecin validateur"},
     )
 
     validated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         doc="Date et heure de validation",
-        info={
-            "description": "Timestamp de validation du plan"
-        }
+        info={"description": "Timestamp de validation du plan"},
     )
 
     # === Notes ===
@@ -240,50 +225,46 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         Text,
         nullable=True,
         doc="Observations générales sur le plan",
-        info={
-            "description": "Notes libres, contexte, recommandations particulières"
-        }
+        info={"description": "Notes libres, contexte, recommandations particulières"},
     )
 
     # === Relations ===
 
-    patient: Mapped["Patient"] = relationship(
-        "Patient",
-        back_populates="care_plans",
-        doc="Patient concerné par ce plan"
+    patient: Mapped[Patient] = relationship(
+        "Patient", back_populates="care_plans", doc="Patient concerné par ce plan"
     )
 
-    source_evaluation: Mapped[Optional["PatientEvaluation"]] = relationship(
+    source_evaluation: Mapped[PatientEvaluation | None] = relationship(
         "PatientEvaluation",
         back_populates="care_plans",
-        doc="Évaluation source ayant généré ce plan"
+        doc="Évaluation source ayant généré ce plan",
     )
 
-    entity: Mapped["Entity"] = relationship(
-        "Entity",
-        back_populates="care_plans",
-        doc="Entité responsable de la coordination"
+    entity: Mapped[Entity] = relationship(
+        "Entity", back_populates="care_plans", doc="Entité responsable de la coordination"
     )
 
-    validated_by: Mapped[Optional["User"]] = relationship(
+    validated_by: Mapped[User | None] = relationship(
         "User",
         foreign_keys=[validated_by_id],
         back_populates="validated_care_plans",
-        doc="Utilisateur ayant validé le plan"
+        doc="Utilisateur ayant validé le plan",
     )
 
-    services: Mapped[List["CarePlanService"]] = relationship(
+    services: Mapped[list[CarePlanService]] = relationship(
         "CarePlanService",
         back_populates="care_plan",
         cascade="all, delete-orphan",
         order_by="CarePlanService.id",
-        doc="Services composant ce plan d'aide"
+        doc="Services composant ce plan d'aide",
     )
 
     # === Méthodes ===
 
     def __repr__(self) -> str:
-        return f"<CarePlan(id={self.id}, patient_id={self.patient_id}, status='{self.status.value}')>"
+        return (
+            f"<CarePlan(id={self.id}, patient_id={self.patient_id}, status='{self.status.value}')>"
+        )
 
     def __str__(self) -> str:
         return f"{self.title} ({self.status.value})"
@@ -337,7 +318,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         """Indique si tous les services sont affectés."""
         return self.assignment_completion_rate == 1.0
 
-    def validate(self, user: "User") -> None:
+    def validate(self, user: User) -> None:
         """
         Valide le plan d'aide.
 
@@ -346,7 +327,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         """
         self.status = CarePlanStatus.ACTIVE
         self.validated_by_id = user.id
-        self.validated_at = datetime.now(timezone.utc)
+        self.validated_at = datetime.now(UTC)
 
     def submit_for_validation(self) -> None:
         """Soumet le plan pour validation."""
@@ -363,7 +344,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         """
         self.status = CarePlanStatus.SUSPENDED
         if reason:
-            suspension_note = f"\n[SUSPENSION {datetime.now(timezone.utc).isoformat()}] {reason}"
+            suspension_note = f"\n[SUSPENSION {datetime.now(UTC).isoformat()}] {reason}"
             self.notes = (self.notes or "") + suspension_note
 
     def reactivate(self) -> None:
@@ -385,5 +366,5 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         """
         self.status = CarePlanStatus.CANCELLED
         if reason:
-            cancellation_note = f"\n[ANNULATION {datetime.now(timezone.utc).isoformat()}] {reason}"
+            cancellation_note = f"\n[ANNULATION {datetime.now(UTC).isoformat()}] {reason}"
             self.notes = (self.notes or "") + cancellation_note

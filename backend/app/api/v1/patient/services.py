@@ -20,49 +20,64 @@ PRINCIPES:
 
 MULTI-TENANT: Toutes les opérations Patient sont filtrées par tenant_id.
 """
-from datetime import datetime, timezone, date, timedelta
-from typing import Optional, List, Tuple, Dict, Any, TYPE_CHECKING
+
+import logging
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Any
+
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     # Ces imports ne sont utilisés QUE pour les type hints
     # Ils ne sont pas exécutés à runtime → pas d'import circulaire
     pass
 
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from app.api.v1.patient.schemas import (
+    PatientAccessCreate,
+    PatientCreate,
+    PatientDeviceCreate,
+    PatientDeviceUpdate,
+    PatientDocumentCreate,
+    PatientEvaluationCreate,
+    PatientEvaluationUpdate,
+    PatientFilters,
+    PatientThresholdCreate,
+    PatientThresholdUpdate,
+    PatientUpdate,
+    PatientVitalsCreate,
+    VitalsFilters,
+)
+from app.models.organization.entity import Entity
+from app.models.patient.evaluation_session import EvaluationSession
 from app.models.patient.patient import Patient
 from app.models.patient.patient_access import PatientAccess
-from app.models.patient.patient_evaluation import PatientEvaluation
-from app.models.patient.evaluation_session import EvaluationSession
-from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
 from app.models.patient.patient_document import PatientDocument
+from app.models.patient.patient_evaluation import PatientEvaluation
+from app.models.patient.patient_vitals import PatientDevice, PatientThreshold, PatientVitals
 from app.models.user.user import User
-from app.models.organization.entity import Entity
-
-from app.api.v1.patient.schemas import (
-    PatientCreate, PatientUpdate, PatientFilters,
-    PatientAccessCreate,
-    PatientEvaluationCreate, PatientEvaluationUpdate,
-    PatientThresholdCreate, PatientThresholdUpdate,
-    PatientVitalsCreate, VitalsFilters,
-    PatientDeviceCreate, PatientDeviceUpdate,
-    PatientDocumentCreate,
-    EvaluationSessionCreate, EvaluationSessionUpdate,
-)
-
-from app.services.validation.schema_validator import (
-    get_schema_validator,
-    SchemaValidationError,
-    SchemaNotFoundError,
+from app.services.aggir.calculator import (
+    AggiralgorithmTable,
+    AggirCalculator,
+    Variable,
 )
 
 # Import du service de chiffrement
 from app.services.encryption import (
-    patient_encryptor,
-    evaluation_encryptor,
-    encrypt_evaluation_data,
     decrypt_evaluation_data,
+    encrypt_evaluation_data,
+    patient_encryptor,
+)
+
+# Import des calculateurs cliniques et AGGIR
+from app.services.sante.test_calculators import compute_all_sante_tests
+from app.services.validation.schema_validator import (
+    SchemaNotFoundError,
+    SchemaValidationError,
+    get_schema_validator,
 )
 
 
@@ -70,93 +85,84 @@ from app.services.encryption import (
 # EXCEPTIONS
 # =============================================================================
 
+
 class PatientNotFoundError(Exception):
     """Patient non trouvé."""
-    pass
 
 
 class EntityNotFoundError(Exception):
     """Entité non trouvée."""
-    pass
 
 
 class UserNotFoundError(Exception):
     """Utilisateur non trouvé."""
-    pass
 
 
 class EvaluationNotFoundError(Exception):
     """Évaluation non trouvée."""
-    pass
 
 
 class SessionNotFoundError(Exception):
     """Session d'évaluation non trouvée."""
-    pass
 
 
 class ThresholdNotFoundError(Exception):
     """Seuil non trouvé."""
-    pass
 
 
 class VitalsNotFoundError(Exception):
     """Mesure non trouvée."""
-    pass
 
 
 class DeviceNotFoundError(Exception):
     """Device non trouvé."""
-    pass
 
 
 class DocumentNotFoundError(Exception):
     """Document non trouvé."""
-    pass
 
 
 class AccessNotFoundError(Exception):
     """Accès non trouvé."""
-    pass
 
 
 class DuplicateThresholdError(Exception):
     """Seuil déjà défini pour ce type de constante."""
-    pass
 
 
 class DuplicateDeviceError(Exception):
     """Device déjà enregistré."""
-    pass
 
 
 class AccessDeniedError(Exception):
     """Accès refusé au dossier patient."""
-    pass
 
 
 class EvaluationAlreadyValidatedError(Exception):
     """L'évaluation est déjà validée."""
-    pass
 
 
 class EvaluationInProgressError(Exception):
-    """Une évaluation est déjà en cours pour ce patient."""
-    pass
+    """Une évaluation est déjà en cours pour ce patient.
+    Porte l'ID de l'évaluation existante pour que le frontend puisse basculer en mode PATCH.
+    """
+
+    def __init__(self, message: str, evaluation_id: int):
+        super().__init__(message)
+        self.evaluation_id = evaluation_id
 
 
 class EvaluationExpiredError(Exception):
     """L'évaluation a expiré."""
-    pass
 
 
 class EvaluationNotEditableError(Exception):
     """L'évaluation ne peut plus être modifiée (validée ou expirée)."""
-    pass
 
 
 class InvalidEvaluationDataError(Exception):
     """Données d'évaluation invalides selon le JSON Schema."""
+
     def __init__(self, message: str, errors: list = None):
         self.message = message
         self.errors = errors or []
@@ -165,17 +171,16 @@ class InvalidEvaluationDataError(Exception):
 
 class DuplicateNIRError(Exception):
     """Un patient avec ce NIR existe déjà."""
-    pass
 
 
 class SessionAlreadyActiveError(Exception):
     """Une session est déjà active pour cette évaluation."""
-    pass
 
 
 # =============================================================================
 # PATIENT SERVICE (MULTI-TENANT) - AVEC CHIFFREMENT
 # =============================================================================
+
 
 class PatientService:
     """
@@ -208,7 +213,7 @@ class PatientService:
     # HELPERS DE DÉCHIFFREMENT
     # =========================================================================
 
-    def _decrypt_patient(self, patient: Patient) -> Dict[str, Any]:
+    def _decrypt_patient(self, patient: Patient) -> dict[str, Any]:
         """
         Déchiffre les données d'un patient pour l'API.
 
@@ -222,6 +227,16 @@ class PatientService:
         decrypted = patient_encryptor.decrypt_model(patient)
 
         # Construire le dict de réponse
+        #
+        # Résolution du nom de l'entité de rattachement (B5 — évite "Entité #387" côté frontend).
+        # Une seule requête supplémentaire, acceptable pour un GET /patients/{id} unitaire.
+        entity_name = None
+        if patient.entity_id:
+            entity = self.db.execute(
+                select(Entity.name).where(Entity.id == patient.entity_id)
+            ).scalar_one_or_none()
+            entity_name = entity  # scalar_one_or_none retourne directement la valeur str
+
         return {
             "id": patient.id,
             "first_name": decrypted.get("first_name"),
@@ -230,10 +245,13 @@ class PatientService:
             "nir": decrypted.get("nir"),
             "ins": decrypted.get("ins"),
             "address": decrypted.get("address"),
+            "postal_code": decrypted.get("postal_code"),
+            "city": decrypted.get("city"),
             "phone": decrypted.get("phone"),
             "email": decrypted.get("email"),
             "status": patient.status,
             "entity_id": patient.entity_id,
+            "entity_name": entity_name,
             "medecin_traitant_id": patient.medecin_traitant_id,
             "latitude": patient.latitude,
             "longitude": patient.longitude,
@@ -242,7 +260,7 @@ class PatientService:
             "updated_at": patient.updated_at,
         }
 
-    def _decrypt_patient_summary(self, patient: Patient) -> Dict[str, Any]:
+    def _decrypt_patient_summary(self, patient: Patient) -> dict[str, Any]:
         """
         Déchiffre les données minimales d'un patient pour les listes.
 
@@ -270,13 +288,13 @@ class PatientService:
     # =========================================================================
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            sort_by: str = "created_at",
-            sort_order: str = "desc",
-            filters: Optional[PatientFilters] = None,
-    ) -> Tuple[List[Dict[str, Any]], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        filters: PatientFilters | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         Liste les patients avec pagination et filtres.
 
@@ -317,8 +335,7 @@ class PatientService:
         return [self._decrypt_patient_summary(p) for p in patients], total
 
     def get_by_id(self, patient_id: int) -> Patient:
-        """Récupère un patient par son ID.
-        """
+        """Récupère un patient par son ID."""
         query = self._base_query().where(Patient.id == patient_id)
         patient = self.db.execute(query).scalar_one_or_none()
 
@@ -327,7 +344,7 @@ class PatientService:
 
         return patient
 
-    def get_by_id_decrypted(self, patient_id: int) -> Dict[str, Any]:
+    def get_by_id_decrypted(self, patient_id: int) -> dict[str, Any]:
         """Récupère un patient déchiffré par son ID."""
         patient = self.get_by_id(patient_id)
         return self._decrypt_patient(patient)
@@ -336,10 +353,7 @@ class PatientService:
         """Crée un nouveau patient avec chiffrement."""
         # Vérifier l'entité
         entity = self.db.execute(
-            select(Entity).where(
-                Entity.id == data.entity_id,
-                Entity.tenant_id == self.tenant_id
-            )
+            select(Entity).where(Entity.id == data.entity_id, Entity.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not entity:
@@ -349,9 +363,7 @@ class PatientService:
         if data.nir:
             existing = self.search_by_nir(data.nir)
             if existing:
-                raise DuplicateNIRError(
-                    f"Un patient avec ce NIR existe déjà (ID: {existing.id})"
-                )
+                raise DuplicateNIRError(f"Un patient avec ce NIR existe déjà (ID: {existing.id})")
 
         # Préparer les données à chiffrer
         plain_data = {
@@ -361,6 +373,8 @@ class PatientService:
             "nir": data.nir,
             "ins": data.ins,
             "address": data.address,
+            "postal_code": data.postal_code,
+            "city": data.city,
             "phone": data.phone,
             "email": data.email,
         }
@@ -377,7 +391,7 @@ class PatientService:
             longitude=data.longitude,
             status="ACTIVE",
             created_by=created_by,
-            **encrypted
+            **encrypted,
         )
 
         self.db.add(patient)
@@ -386,10 +400,10 @@ class PatientService:
         return patient
 
     def update(
-            self,
-            patient_id: int,
-            data: PatientUpdate,
-            updated_by: Optional[int] = None,
+        self,
+        patient_id: int,
+        data: PatientUpdate,
+        updated_by: int | None = None,
     ) -> Patient:
         """Met à jour un patient."""
         patient = self.get_by_id(patient_id)
@@ -399,11 +413,10 @@ class PatientService:
             return patient
 
         # Vérifier médecin traitant si modifié
-        if "medecin_traitant_id" in update_data and update_data["medecin_traitant_id"]:
+        if update_data.get("medecin_traitant_id"):
             medecin = self.db.execute(
                 select(User).where(
-                    User.id == update_data["medecin_traitant_id"],
-                    User.tenant_id == self.tenant_id
+                    User.id == update_data["medecin_traitant_id"], User.tenant_id == self.tenant_id
                 )
             ).scalar_one_or_none()
 
@@ -411,12 +424,10 @@ class PatientService:
                 raise UserNotFoundError(f"Médecin {update_data['medecin_traitant_id']} non trouvé")
 
         # Vérifier l'unicité du NIR si modifié
-        if "nir" in update_data and update_data["nir"]:
+        if update_data.get("nir"):
             existing = self.search_by_nir(update_data["nir"])
             if existing and existing.id != patient_id:
-                raise DuplicateNIRError(
-                    f"Un patient avec ce NIR existe déjà (ID: {existing.id})"
-                )
+                raise DuplicateNIRError(f"Un patient avec ce NIR existe déjà (ID: {existing.id})")
 
         # Séparer les champs chiffrés des champs non chiffrés
         encrypted_field_names = patient_encryptor.get_encrypted_field_names()
@@ -432,9 +443,7 @@ class PatientService:
 
         # Chiffrer les champs PII modifiés
         if fields_to_encrypt:
-            encrypted_update = patient_encryptor.encrypt_for_db(
-                fields_to_encrypt, self.tenant_id
-            )
+            encrypted_update = patient_encryptor.encrypt_for_db(fields_to_encrypt, self.tenant_id)
             # Appliquer les valeurs chiffrées
             for db_field, value in encrypted_update.items():
                 setattr(patient, db_field, value)
@@ -461,13 +470,13 @@ class PatientService:
     # MÉTHODES DE RECHERCHE (BLIND INDEX)
     # =========================================================================
 
-    def search_by_nir(self, nir: str) -> Optional[Patient]:
+    def search_by_nir(self, nir: str) -> Patient | None:
         """Recherche un patient par son NIR."""
         blind = patient_encryptor.search_by_nir(nir, self.tenant_id)
         query = self._base_query().where(Patient.nir_blind == blind)
         return self.db.execute(query).scalar_one_or_none()
 
-    def search_by_ins(self, ins: str) -> Optional[Patient]:
+    def search_by_ins(self, ins: str) -> Patient | None:
         """Recherche un patient par son INS."""
         blind = patient_encryptor.search_by_ins(ins, self.tenant_id)
         query = self._base_query().where(Patient.ins_blind == blind)
@@ -475,9 +484,9 @@ class PatientService:
 
     def search_by_name(
         self,
-        last_name: Optional[str] = None,
-        first_name: Optional[str] = None,
-    ) -> List[Patient]:
+        last_name: str | None = None,
+        first_name: str | None = None,
+    ) -> list[Patient]:
         """Recherche des patients par nom et/ou prénom."""
         query = self._base_query()
 
@@ -497,10 +506,10 @@ class PatientService:
 
     def check_duplicate(
         self,
-        nir: Optional[str] = None,
-        ins: Optional[str] = None,
-        exclude_patient_id: Optional[int] = None,
-    ) -> Optional[Patient]:
+        nir: str | None = None,
+        ins: str | None = None,
+        exclude_patient_id: int | None = None,
+    ) -> Patient | None:
         """Vérifie si un patient avec le même NIR ou INS existe."""
         if nir:
             existing = self.search_by_nir(nir)
@@ -519,6 +528,7 @@ class PatientService:
 # PATIENT ACCESS SERVICE (RGPD) - Hérite du tenant via patient
 # =============================================================================
 
+
 class PatientAccessService:
     """
     Service pour la gestion des accès patients (RGPD).
@@ -533,10 +543,7 @@ class PatientAccessService:
     def _verify_patient_access(self, patient_id: int) -> Patient:
         """Vérifie que le patient appartient au tenant."""
         patient = self.db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.tenant_id == self.tenant_id
-            )
+            select(Patient).where(Patient.id == patient_id, Patient.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not patient:
@@ -544,10 +551,10 @@ class PatientAccessService:
         return patient
 
     def get_all_for_patient(
-            self,
-            patient_id: int,
-            active_only: bool = True,
-    ) -> List[PatientAccess]:
+        self,
+        patient_id: int,
+        active_only: bool = True,
+    ) -> list[PatientAccess]:
         """Liste les accès d'un patient."""
         self._verify_patient_access(patient_id)
 
@@ -569,21 +576,18 @@ class PatientAccessService:
         return access
 
     def grant_access(
-            self,
-            patient_id: int,
-            user_id: int,
-            data: PatientAccessCreate,
-            granted_by: int,
+        self,
+        patient_id: int,
+        user_id: int,
+        data: PatientAccessCreate,
+        granted_by: int,
     ) -> PatientAccess:
         """Accorde un accès à un utilisateur."""
         self._verify_patient_access(patient_id)
 
         # Vérifier que l'utilisateur existe ET appartient au tenant
         user = self.db.execute(
-            select(User).where(
-                User.id == user_id,
-                User.tenant_id == self.tenant_id
-            )
+            select(User).where(User.id == user_id, User.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not user:
@@ -617,6 +621,7 @@ class PatientAccessService:
 # PATIENT EVALUATION SERVICE (MULTI-SESSION + JSON SCHEMA)
 # =============================================================================
 
+
 class PatientEvaluationService:
     """
     Service pour la gestion des évaluations patients.
@@ -637,10 +642,7 @@ class PatientEvaluationService:
     def _verify_patient_access(self, patient_id: int) -> Patient:
         """Vérifie que le patient appartient au tenant."""
         patient = self.db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.tenant_id == self.tenant_id
-            )
+            select(Patient).where(Patient.id == patient_id, Patient.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not patient:
@@ -650,24 +652,16 @@ class PatientEvaluationService:
     def _check_evaluation_editable(self, evaluation: PatientEvaluation) -> None:
         """Vérifie que l'évaluation peut être modifiée."""
         if evaluation.status == "VALIDATED":
-            raise EvaluationAlreadyValidatedError(
-                f"L'évaluation {evaluation.id} est déjà validée"
-            )
+            raise EvaluationAlreadyValidatedError(f"L'évaluation {evaluation.id} est déjà validée")
         if evaluation.is_expired:
-            raise EvaluationExpiredError(
-                f"L'évaluation {evaluation.id} a expiré"
-            )
+            raise EvaluationExpiredError(f"L'évaluation {evaluation.id} a expiré")
         if evaluation.status not in ["DRAFT", "IN_PROGRESS"]:
             raise EvaluationNotEditableError(
                 f"L'évaluation {evaluation.id} ne peut plus être modifiée (statut: {evaluation.status})"
             )
 
     def _validate_evaluation_data(
-            self,
-            data: Dict[str, Any],
-            schema_type: str,
-            schema_version: str,
-            partial: bool = True
+        self, data: dict[str, Any], schema_type: str, schema_version: str, partial: bool = True
     ) -> None:
         """
         Valide les données d'évaluation contre le JSON Schema.
@@ -679,18 +673,92 @@ class PatientEvaluationService:
             partial: True pour validation partielle, False pour complète
         """
         try:
-            validator = get_schema_validator(schema_type, schema_version)
+            validator = get_schema_validator()  # ✅ singleton sans args
             if partial:
-                validator.validate_partial(data)
+                validator.validate_partial(
+                    schema_type, schema_version, data
+                )  # ✅ signature correcte
             else:
-                validator.validate_complete(data)
+                validator.validate_full(
+                    schema_type, schema_version, data
+                )  # ✅ validate_full (pas validate_complete)
         except SchemaNotFoundError as e:
-            raise InvalidEvaluationDataError(f"Schéma inconnu: {e}")
+            raise InvalidEvaluationDataError(f"Schéma inconnu: {e}") from e
         except SchemaValidationError as e:
             raise InvalidEvaluationDataError(
-                message=f"Données invalides: {e.message}",
-                errors=e.errors
-            )
+                message=f"Données invalides: {e.message}", errors=e.errors
+            ) from e
+
+    def _commit_with_tenant(self) -> None:
+        """
+        Commit et repositionne le tenant_id RLS pour les requêtes post-commit.
+
+        Après db.commit(), PostgreSQL démarre une nouvelle transaction implicite
+        qui ne porte plus le current_setting('app.current_tenant_id').
+        Le db.refresh() suivant échoue car le SELECT est bloqué par RLS.
+        Ce helper repositionne le setting pour que refresh() fonctionne.
+        """
+        self.db.commit()
+        self.db.execute(text("SET app.current_tenant_id = :tid"), {"tid": str(self.tenant_id)})
+
+    def _compute_gir_from_data(self, aggir_variables: list) -> int | None:
+        """
+        Calcule le score GIR à partir des Resultat pré-calculés dans AggirVariable[].
+
+        Le wizard stocke les variables AGGIR avec des noms français
+        (ex: "Transferts", "Cohérence") et des Resultat déjà calculés (A/B/C).
+        Cette méthode lit ces Resultat directement et applique l'algorithme
+        officiel (décret 1997-04-28) via les tables de scoring.
+
+        Args:
+            aggir_variables: liste AggirVariable depuis evaluation_data["aggir"]["AggirVariable"]
+
+        Returns:
+            Score GIR (1-6) ou None si données insuffisantes
+        """
+        # Mapping noms français → Variable enum (10 discriminantes)
+        NOM_TO_VARIABLE = {
+            "Cohérence": Variable.COHERENCE,
+            "Orientation": Variable.ORIENTATION,
+            "Toilette": Variable.TOILETTE,
+            "Habillage": Variable.HABILLAGE,
+            "Alimentation": Variable.ALIMENTATION,
+            "Élimination": Variable.ELIMINATION,
+            "Elimination": Variable.ELIMINATION,  # variante sans accent (wizard)
+            "Transferts": Variable.TRANSFERTS,
+            "Déplacements intérieurs": Variable.DEPLACEMENTS_INTERNES,
+            "Déplacements extérieurs": Variable.DEPLACEMENTS_EXTERNES,
+            "Alerter": Variable.ALERTER,
+        }
+
+        try:
+            lettres_principales = {}
+            for var in aggir_variables:
+                nom = var.get("Nom", "")
+                resultat = var.get("Resultat")
+                variable_enum = NOM_TO_VARIABLE.get(nom)
+                if variable_enum and resultat in ("A", "B", "C"):
+                    lettres_principales[variable_enum] = resultat
+
+            # Il faut les 10 variables discriminantes pour un calcul fiable
+            if len(lettres_principales) < 10:
+                return None
+
+            # Appliquer l'algorithme officiel directement sur les lettres
+            ordre_groupes = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+            for groupe_name in ordre_groupes:
+                groupe = AggiralgorithmTable.GROUPES[groupe_name]
+                score = AggirCalculator.calculer_score_groupe(lettres_principales, groupe)
+                gir = AggirCalculator.determiner_gir_depuis_score(score, groupe_name)
+                if gir is not None:
+                    return gir
+
+            return 6  # Défaut (autonome) si aucun groupe ne matche
+        except Exception as e:
+            # Logger l'erreur au lieu de l'avaler silencieusement
+            logger.error(f"GIR calculation failed: {type(e).__name__}: {e}")
+            return None
 
     # =========================================================================
     # CRUD ÉVALUATIONS
@@ -698,10 +766,10 @@ class PatientEvaluationService:
 
     # ---------- Lire évaluations d'un patient ---------------
     def get_all_for_patient(
-            self,
-            patient_id: int,
-            include_expired: bool = False,
-    ) -> List[PatientEvaluation]:
+        self,
+        patient_id: int,
+        include_expired: bool = False,
+    ) -> list[PatientEvaluation]:
         """
         Liste les évaluations d'un patient.
 
@@ -711,7 +779,7 @@ class PatientEvaluationService:
 
         query = select(PatientEvaluation).where(
             PatientEvaluation.patient_id == patient_id,
-            PatientEvaluation.tenant_id == self.tenant_id
+            PatientEvaluation.tenant_id == self.tenant_id,
         )
 
         if not include_expired:
@@ -739,7 +807,7 @@ class PatientEvaluationService:
             select(PatientEvaluation).where(
                 PatientEvaluation.id == evaluation_id,
                 PatientEvaluation.patient_id == patient_id,
-                PatientEvaluation.tenant_id == self.tenant_id
+                PatientEvaluation.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -755,13 +823,57 @@ class PatientEvaluationService:
 
         return evaluation
 
+    # ---------- Dernière évaluation soumise (pré-remplissage) ---------------
+
+    def get_latest_submitted(self, patient_id: int) -> PatientEvaluation | None:
+        """
+        Retourne la dernière évaluation soumise (non-brouillon) d'un patient.
+
+        Utilisé pour pré-remplir une nouvelle évaluation avec les sections
+        stables (usager, contacts, social, matériels, dispositifs).
+
+        Statuts considérés comme "soumis" :
+        PENDING_MEDICAL, PENDING_DEPARTMENT, VALIDATED.
+
+        CHIFFREMENT: evaluation_data est déchiffré avant retour.
+
+        Returns:
+            PatientEvaluation ou None si aucune évaluation soumise n'existe.
+        """
+        self._verify_patient_access(patient_id)
+
+        SUBMITTED_STATUSES = ["PENDING_MEDICAL", "PENDING_DEPARTMENT", "VALIDATED"]
+
+        evaluation = (
+            self.db.execute(
+                select(PatientEvaluation)
+                .where(
+                    PatientEvaluation.patient_id == patient_id,
+                    PatientEvaluation.tenant_id == self.tenant_id,
+                    PatientEvaluation.status.in_(SUBMITTED_STATUSES),
+                )
+                .order_by(PatientEvaluation.evaluation_date.desc())
+            )
+            .scalars()
+            .first()
+        )
+
+        if not evaluation:
+            return None
+
+        # Déchiffrer evaluation_data
+        if evaluation.evaluation_data:
+            evaluation.evaluation_data = decrypt_evaluation_data(evaluation.evaluation_data)
+
+        return evaluation
+
     # ---------- Créer Nouvelle évaluation patient ---------------
 
     def create(
-            self,
-            patient_id: int,
-            data: PatientEvaluationCreate,
-            evaluator_id: int,
+        self,
+        patient_id: int,
+        data: PatientEvaluationCreate,
+        evaluator_id: int,
     ) -> PatientEvaluation:
         """
         Crée une nouvelle évaluation.
@@ -776,22 +888,20 @@ class PatientEvaluationService:
             select(PatientEvaluation).where(
                 PatientEvaluation.patient_id == patient_id,
                 PatientEvaluation.tenant_id == self.tenant_id,
-                PatientEvaluation.status.in_(["DRAFT", "IN_PROGRESS"])
+                PatientEvaluation.status.in_(["DRAFT", "IN_PROGRESS"]),
             )
         ).scalar_one_or_none()
 
         if existing:
             raise EvaluationInProgressError(
-                f"Une évaluation est déjà en cours (ID: {existing.id})"
+                f"Une évaluation est déjà en cours (ID: {existing.id})",
+                evaluation_id=existing.id,
             )
 
         # Validation partielle des données (EN CLAIR - avant chiffrement)
         if data.evaluation_data:
             self._validate_evaluation_data(
-                data.evaluation_data,
-                data.schema_type,
-                data.schema_version,
-                partial=True
+                data.evaluation_data, data.schema_type, data.schema_version, partial=True
             )
 
         evaluation = PatientEvaluation(
@@ -820,7 +930,7 @@ class PatientEvaluationService:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
         self.db.add(evaluation)
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(evaluation)
 
         # Déchiffrer pour le retour API
@@ -832,10 +942,10 @@ class PatientEvaluationService:
     # ---------- Mise à jour évaluation patient ---------------
 
     def update(
-            self,
-            evaluation_id: int,
-            patient_id: int,
-            data: PatientEvaluationUpdate,
+        self,
+        evaluation_id: int,
+        patient_id: int,
+        data: PatientEvaluationUpdate,
     ) -> PatientEvaluation:
         """
         Met à jour une évaluation (validation partielle).
@@ -854,10 +964,7 @@ class PatientEvaluationService:
             # Fusionner avec les données existantes (les deux sont en clair)
             merged_data = {**evaluation.evaluation_data, **update_data["evaluation_data"]}
             self._validate_evaluation_data(
-                merged_data,
-                evaluation.schema_type,
-                evaluation.schema_version,
-                partial=True
+                merged_data, evaluation.schema_type, evaluation.schema_version, partial=True
             )
             evaluation.evaluation_data = merged_data
 
@@ -878,7 +985,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(evaluation)
 
         # NOUVEAU: Déchiffrer pour le retour API
@@ -894,9 +1001,7 @@ class PatientEvaluationService:
         evaluation = self.get_by_id(evaluation_id, patient_id)
 
         if evaluation.status != "DRAFT":
-            raise EvaluationNotEditableError(
-                f"Seules les évaluations DRAFT peuvent être supprimées"
-            )
+            raise EvaluationNotEditableError("Seules les évaluations DRAFT peuvent être supprimées")
 
         self.db.delete(evaluation)
         self.db.commit()
@@ -907,7 +1012,15 @@ class PatientEvaluationService:
 
     def submit(self, evaluation_id: int, patient_id: int) -> PatientEvaluation:
         """
-        Soumet l'évaluation pour validation (validation JSON Schema complète).
+        Soumet l'évaluation pour validation médicale.
+
+        Étapes :
+        1. Calcul de tous les tests cliniques (injection dans sante.blocs[].test[])
+        2. Calcul du score GIR via calculator.py (décret 1997)
+        3. Mise à jour du current_gir du patient
+        4. Validation JSON Schema COMPLÈTE
+        5. Transition de statut → PENDING_MEDICAL
+        6. Chiffrement + persistance
 
         CHIFFREMENT: get_by_id() déchiffre, on re-chiffre avant commit.
         """
@@ -915,34 +1028,84 @@ class PatientEvaluationService:
         evaluation = self.get_by_id(evaluation_id, patient_id)
         self._check_evaluation_editable(evaluation)
 
-        # Validation COMPLÈTE des données (EN CLAIR)
+        # =====================================================================
+        # 1) Calcul des tests cliniques (injecte les résultats dans test[])
+        # =====================================================================
+        sante_data = evaluation.evaluation_data.get("sante", {})
+        sante_blocs = sante_data.get("blocs", [])
+        aggir_data = evaluation.evaluation_data.get("aggir", {})
+        aggir_variables = aggir_data.get("AggirVariable", [])
+
+        # Nom patient pour les interprétations textuelles des tests
+        usager = evaluation.evaluation_data.get("usager", {})
+        nom = usager.get("nom", usager.get("Nom", ""))
+        prenom = usager.get("prenom", usager.get("Prénom", ""))
+        patient_display = f"{prenom} {nom}".strip() or "Le patient"
+
+        if sante_blocs:
+            updated_blocs = compute_all_sante_tests(sante_blocs, aggir_variables, patient_display)
+            # Réécrire les blocs avec les test[] calculés
+            if "sante" not in evaluation.evaluation_data:
+                evaluation.evaluation_data["sante"] = {}
+            evaluation.evaluation_data["sante"]["blocs"] = updated_blocs
+
+        # =====================================================================
+        # 2) Calcul du score GIR
+        # =====================================================================
+        if aggir_variables:
+            gir_score = self._compute_gir_from_data(aggir_variables)
+            if gir_score is not None:
+                evaluation.gir_score = gir_score
+                # Stocker aussi dans evaluation_data pour export JSON
+                if "aggir" not in evaluation.evaluation_data:
+                    evaluation.evaluation_data["aggir"] = {}
+                evaluation.evaluation_data["aggir"]["GIR"] = gir_score
+
+        # =====================================================================
+        # 3) Mise à jour du GIR courant du patient
+        # =====================================================================
+        if evaluation.gir_score:
+            patient = self._verify_patient_access(patient_id)
+            patient.current_gir = evaluation.gir_score
+
+        # =====================================================================
+        # 4) Validation JSON Schema COMPLÈTE (EN CLAIR)
+        # =====================================================================
+        # Schéma evaluation_v1.json aligné avec buildEvaluationData() — v5.9+
+        # (5 écarts corrigés : poaAutonomie, blocSocial enum, seuilVital,
+        #  materiels wrapper, _wizard_meta — session 16/03/2026)
         self._validate_evaluation_data(
             evaluation.evaluation_data,
             evaluation.schema_type,
             evaluation.schema_version,
-            partial=False  # Validation stricte
+            partial=False,
         )
 
+        # =====================================================================
+        # 5) Transition de statut
+        # =====================================================================
         evaluation.submit_for_validation()
 
-        # NOUVEAU: Re-chiffrer avant commit
+        # =====================================================================
+        # 6) Chiffrement + persistance
+        # =====================================================================
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(evaluation)
 
-        # NOUVEAU: Déchiffrer pour le retour API
+        # Déchiffrer pour le retour API
         if evaluation.evaluation_data:
             evaluation.evaluation_data = decrypt_evaluation_data(evaluation.evaluation_data)
 
         return evaluation
 
     def validate_medical(
-            self,
-            evaluation_id: int,
-            patient_id: int,
-            validator_id: int,
+        self,
+        evaluation_id: int,
+        patient_id: int,
+        validator_id: int,
     ) -> PatientEvaluation:
         """
         Validation par le médecin coordonnateur.
@@ -954,7 +1117,7 @@ class PatientEvaluationService:
 
         if evaluation.status != "PENDING_MEDICAL":
             raise EvaluationNotEditableError(
-                f"L'évaluation doit être en attente de validation médicale"
+                "L'évaluation doit être en attente de validation médicale"
             )
 
         evaluation.validate_medical(validator_id)
@@ -963,7 +1126,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(evaluation)
 
         # NOUVEAU: Déchiffrer pour le retour API
@@ -973,11 +1136,11 @@ class PatientEvaluationService:
         return evaluation
 
     def validate_department(
-            self,
-            evaluation_id: int,
-            patient_id: int,
-            validator_name: str,
-            validator_reference: str,
+        self,
+        evaluation_id: int,
+        patient_id: int,
+        validator_name: str,
+        validator_reference: str,
     ) -> PatientEvaluation:
         """
         Validation par le Conseil Départemental.
@@ -988,9 +1151,7 @@ class PatientEvaluationService:
         evaluation = self.get_by_id(evaluation_id, patient_id)
 
         if evaluation.status != "PENDING_DEPARTMENT":
-            raise EvaluationNotEditableError(
-                f"L'évaluation doit être en attente de validation CD"
-            )
+            raise EvaluationNotEditableError("L'évaluation doit être en attente de validation CD")
 
         evaluation.validate_department(validator_name, validator_reference)
 
@@ -1003,7 +1164,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(evaluation)
 
         # NOUVEAU: Déchiffrer pour le retour API
@@ -1016,17 +1177,17 @@ class PatientEvaluationService:
     # GESTION DES SESSIONS
     # =========================================================================
 
-    def get_sessions(self, evaluation_id: int, patient_id: int) -> List[EvaluationSession]:
+    def get_sessions(self, evaluation_id: int, patient_id: int) -> list[EvaluationSession]:
         """Liste les sessions d'une évaluation."""
         evaluation = self.get_by_id(evaluation_id, patient_id)
         return list(evaluation.sessions)
 
     def start_session(
-            self,
-            evaluation_id: int,
-            patient_id: int,
-            user_id: int,
-            device_info: Optional[str] = None,
+        self,
+        evaluation_id: int,
+        patient_id: int,
+        user_id: int,
+        device_info: str | None = None,
     ) -> EvaluationSession:
         """
         Démarre une nouvelle session de saisie.
@@ -1037,11 +1198,13 @@ class PatientEvaluationService:
         evaluation = self.get_by_id(evaluation_id, patient_id)
         self._check_evaluation_editable(evaluation)
 
-        # Vérifier qu'il n'y a pas de session active
+        # Auto-fermer une session orpheline (rechargement page, crash navigateur, etc.)
+        # Avant ce fix, une session non fermée proprement bloquait indéfiniment
+        # la création de nouvelles sessions (409 en boucle).
         if evaluation.current_session:
-            raise SessionAlreadyActiveError(
-                f"Une session est déjà active (ID: {evaluation.current_session.id})"
-            )
+            stale_id = evaluation.current_session.id
+            evaluation.current_session.end_session()
+            logger.info(f"Auto-closed stale session {stale_id} for evaluation {evaluation_id}")
 
         session = EvaluationSession(
             tenant_id=self.tenant_id,
@@ -1056,17 +1219,17 @@ class PatientEvaluationService:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
         self.db.add(session)
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(session)
         return session
 
     def end_session(
-            self,
-            session_id: int,
-            evaluation_id: int,
-            patient_id: int,
-            variables_recorded: Optional[List[str]] = None,
-            notes: Optional[str] = None,
+        self,
+        session_id: int,
+        evaluation_id: int,
+        patient_id: int,
+        variables_recorded: list[str] | None = None,
+        notes: str | None = None,
     ) -> EvaluationSession:
         """
         Termine une session de saisie.
@@ -1079,7 +1242,7 @@ class PatientEvaluationService:
             select(EvaluationSession).where(
                 EvaluationSession.id == session_id,
                 EvaluationSession.evaluation_id == evaluation_id,
-                EvaluationSession.tenant_id == self.tenant_id
+                EvaluationSession.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -1097,7 +1260,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(session)
         return session
 
@@ -1106,11 +1269,11 @@ class PatientEvaluationService:
     # =========================================================================
 
     def sync_offline_data(
-            self,
-            evaluation_id: int,
-            patient_id: int,
-            evaluation_data: Dict[str, Any],
-            local_session_id: Optional[str] = None,
+        self,
+        evaluation_id: int,
+        patient_id: int,
+        evaluation_data: dict[str, Any],
+        local_session_id: str | None = None,
     ) -> PatientEvaluation:
         """
         Synchronise les données saisies hors-ligne.
@@ -1136,10 +1299,7 @@ class PatientEvaluationService:
 
         # Valider les données fusionnées (EN CLAIR)
         self._validate_evaluation_data(
-            merged,
-            evaluation.schema_type,
-            evaluation.schema_version,
-            partial=True
+            merged, evaluation.schema_type, evaluation.schema_version, partial=True
         )
 
         evaluation.evaluation_data = merged
@@ -1150,7 +1310,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self.db.commit()
+        self._commit_with_tenant()
         self.db.refresh(evaluation)
 
         # NOUVEAU: Déchiffrer pour le retour API
@@ -1163,6 +1323,7 @@ class PatientEvaluationService:
 # =============================================================================
 # PATIENT THRESHOLD SERVICE (SEUILS PERSONNALISÉS)
 # =============================================================================
+
 
 class PatientThresholdService:
     """
@@ -1179,24 +1340,25 @@ class PatientThresholdService:
     def _verify_patient_access(self, patient_id: int) -> Patient:
         """Vérifie que le patient appartient au tenant."""
         patient = self.db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.tenant_id == self.tenant_id
-            )
+            select(Patient).where(Patient.id == patient_id, Patient.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not patient:
             raise PatientNotFoundError(f"Patient {patient_id} non trouvé")
         return patient
 
-    def get_all_for_patient(self, patient_id: int) -> List[PatientThreshold]:
+    def get_all_for_patient(self, patient_id: int) -> list[PatientThreshold]:
         """Liste tous les seuils d'un patient."""
         self._verify_patient_access(patient_id)
 
-        query = select(PatientThreshold).where(
-            PatientThreshold.patient_id == patient_id,
-            PatientThreshold.tenant_id == self.tenant_id
-        ).order_by(PatientThreshold.vital_type)
+        query = (
+            select(PatientThreshold)
+            .where(
+                PatientThreshold.patient_id == patient_id,
+                PatientThreshold.tenant_id == self.tenant_id,
+            )
+            .order_by(PatientThreshold.vital_type)
+        )
 
         return list(self.db.execute(query).scalars().all())
 
@@ -1208,7 +1370,7 @@ class PatientThresholdService:
             select(PatientThreshold).where(
                 PatientThreshold.id == threshold_id,
                 PatientThreshold.patient_id == patient_id,
-                PatientThreshold.tenant_id == self.tenant_id
+                PatientThreshold.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -1216,7 +1378,7 @@ class PatientThresholdService:
             raise ThresholdNotFoundError(f"Seuil {threshold_id} non trouvé")
         return threshold
 
-    def get_by_vital_type(self, patient_id: int, vital_type: str) -> Optional[PatientThreshold]:
+    def get_by_vital_type(self, patient_id: int, vital_type: str) -> PatientThreshold | None:
         """Récupère le seuil d'un patient pour un type de constante."""
         self._verify_patient_access(patient_id)
 
@@ -1224,7 +1386,7 @@ class PatientThresholdService:
             select(PatientThreshold).where(
                 PatientThreshold.patient_id == patient_id,
                 PatientThreshold.vital_type == vital_type,
-                PatientThreshold.tenant_id == self.tenant_id
+                PatientThreshold.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -1255,10 +1417,10 @@ class PatientThresholdService:
         return threshold
 
     def update(
-            self,
-            threshold_id: int,
-            patient_id: int,
-            data: PatientThresholdUpdate,
+        self,
+        threshold_id: int,
+        patient_id: int,
+        data: PatientThresholdUpdate,
     ) -> PatientThreshold:
         """Met à jour un seuil."""
         threshold = self.get_by_id(threshold_id, patient_id)
@@ -1282,6 +1444,7 @@ class PatientThresholdService:
 # PATIENT VITALS SERVICE (CONSTANTES VITALES)
 # =============================================================================
 
+
 class PatientVitalsService:
     """
     Service pour la gestion des mesures de constantes vitales.
@@ -1300,10 +1463,7 @@ class PatientVitalsService:
     def _verify_patient_access(self, patient_id: int) -> Patient:
         """Vérifie que le patient appartient au tenant."""
         patient = self.db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.tenant_id == self.tenant_id
-            )
+            select(Patient).where(Patient.id == patient_id, Patient.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not patient:
@@ -1311,18 +1471,17 @@ class PatientVitalsService:
         return patient
 
     def get_all_for_patient(
-            self,
-            patient_id: int,
-            filters: Optional[VitalsFilters] = None,
-            page: int = 1,
-            size: int = 50,
-    ) -> Tuple[List[PatientVitals], int]:
+        self,
+        patient_id: int,
+        filters: VitalsFilters | None = None,
+        page: int = 1,
+        size: int = 50,
+    ) -> tuple[list[PatientVitals], int]:
         """Liste les mesures d'un patient avec filtres et pagination."""
         self._verify_patient_access(patient_id)
 
         query = select(PatientVitals).where(
-            PatientVitals.patient_id == patient_id,
-            PatientVitals.tenant_id == self.tenant_id
+            PatientVitals.patient_id == patient_id, PatientVitals.tenant_id == self.tenant_id
         )
 
         # Appliquer les filtres
@@ -1356,7 +1515,7 @@ class PatientVitalsService:
             select(PatientVitals).where(
                 PatientVitals.id == vital_id,
                 PatientVitals.patient_id == patient_id,
-                PatientVitals.tenant_id == self.tenant_id
+                PatientVitals.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -1364,23 +1523,26 @@ class PatientVitalsService:
             raise VitalsNotFoundError(f"Mesure {vital_id} non trouvée")
         return vital
 
-    def get_latest(self, patient_id: int, vital_type: str) -> Optional[PatientVitals]:
+    def get_latest(self, patient_id: int, vital_type: str) -> PatientVitals | None:
         """Récupère la dernière mesure d'un type pour un patient."""
         self._verify_patient_access(patient_id)
 
         return self.db.execute(
-            select(PatientVitals).where(
+            select(PatientVitals)
+            .where(
                 PatientVitals.patient_id == patient_id,
                 PatientVitals.vital_type == vital_type,
-                PatientVitals.tenant_id == self.tenant_id
-            ).order_by(PatientVitals.measured_at.desc()).limit(1)
+                PatientVitals.tenant_id == self.tenant_id,
+            )
+            .order_by(PatientVitals.measured_at.desc())
+            .limit(1)
         ).scalar_one_or_none()
 
     def create(
-            self,
-            patient_id: int,
-            data: PatientVitalsCreate,
-            recorded_by: Optional[int] = None,
+        self,
+        patient_id: int,
+        data: PatientVitalsCreate,
+        recorded_by: int | None = None,
     ) -> PatientVitals:
         """
         Enregistre une nouvelle mesure.
@@ -1406,7 +1568,7 @@ class PatientVitalsService:
             status=status,
             source=data.source,
             device_id=data.device_id,
-            measured_at=data.measured_at or datetime.now(timezone.utc),
+            measured_at=data.measured_at or datetime.now(UTC),
             recorded_by=recorded_by,
             notes=data.notes,
         )
@@ -1427,6 +1589,7 @@ class PatientVitalsService:
 # PATIENT DEVICE SERVICE (DEVICES CONNECTÉS)
 # =============================================================================
 
+
 class PatientDeviceService:
     """
     Service pour la gestion des devices connectés des patients.
@@ -1442,23 +1605,19 @@ class PatientDeviceService:
     def _verify_patient_access(self, patient_id: int) -> Patient:
         """Vérifie que le patient appartient au tenant."""
         patient = self.db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.tenant_id == self.tenant_id
-            )
+            select(Patient).where(Patient.id == patient_id, Patient.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not patient:
             raise PatientNotFoundError(f"Patient {patient_id} non trouvé")
         return patient
 
-    def get_all_for_patient(self, patient_id: int, active_only: bool = True) -> List[PatientDevice]:
+    def get_all_for_patient(self, patient_id: int, active_only: bool = True) -> list[PatientDevice]:
         """Liste les devices d'un patient."""
         self._verify_patient_access(patient_id)
 
         query = select(PatientDevice).where(
-            PatientDevice.patient_id == patient_id,
-            PatientDevice.tenant_id == self.tenant_id
+            PatientDevice.patient_id == patient_id, PatientDevice.tenant_id == self.tenant_id
         )
 
         if active_only:
@@ -1475,7 +1634,7 @@ class PatientDeviceService:
             select(PatientDevice).where(
                 PatientDevice.id == device_id,
                 PatientDevice.patient_id == patient_id,
-                PatientDevice.tenant_id == self.tenant_id
+                PatientDevice.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -1491,14 +1650,12 @@ class PatientDeviceService:
         existing = self.db.execute(
             select(PatientDevice).where(
                 PatientDevice.device_type == data.device_type,
-                PatientDevice.device_identifier == data.device_identifier
+                PatientDevice.device_identifier == data.device_identifier,
             )
         ).scalar_one_or_none()
 
         if existing:
-            raise DuplicateDeviceError(
-                f"Ce device est déjà enregistré (ID: {existing.id})"
-            )
+            raise DuplicateDeviceError(f"Ce device est déjà enregistré (ID: {existing.id})")
 
         device = PatientDevice(
             tenant_id=self.tenant_id,
@@ -1515,10 +1672,10 @@ class PatientDeviceService:
         return device
 
     def update(
-            self,
-            device_id: int,
-            patient_id: int,
-            data: PatientDeviceUpdate,
+        self,
+        device_id: int,
+        patient_id: int,
+        data: PatientDeviceUpdate,
     ) -> PatientDevice:
         """Met à jour un device."""
         device = self.get_by_id(device_id, patient_id)
@@ -1552,6 +1709,7 @@ class PatientDeviceService:
 # PATIENT DOCUMENT SERVICE (DOCUMENTS GÉNÉRÉS)
 # =============================================================================
 
+
 class PatientDocumentService:
     """
     Service pour la gestion des documents générés pour les patients.
@@ -1567,10 +1725,7 @@ class PatientDocumentService:
     def _verify_patient_access(self, patient_id: int) -> Patient:
         """Vérifie que le patient appartient au tenant."""
         patient = self.db.execute(
-            select(Patient).where(
-                Patient.id == patient_id,
-                Patient.tenant_id == self.tenant_id
-            )
+            select(Patient).where(Patient.id == patient_id, Patient.tenant_id == self.tenant_id)
         ).scalar_one_or_none()
 
         if not patient:
@@ -1578,16 +1733,15 @@ class PatientDocumentService:
         return patient
 
     def get_all_for_patient(
-            self,
-            patient_id: int,
-            document_type: Optional[str] = None,
-    ) -> List[PatientDocument]:
+        self,
+        patient_id: int,
+        document_type: str | None = None,
+    ) -> list[PatientDocument]:
         """Liste les documents d'un patient."""
         self._verify_patient_access(patient_id)
 
         query = select(PatientDocument).where(
-            PatientDocument.patient_id == patient_id,
-            PatientDocument.tenant_id == self.tenant_id
+            PatientDocument.patient_id == patient_id, PatientDocument.tenant_id == self.tenant_id
         )
 
         if document_type:
@@ -1604,7 +1758,7 @@ class PatientDocumentService:
             select(PatientDocument).where(
                 PatientDocument.id == document_id,
                 PatientDocument.patient_id == patient_id,
-                PatientDocument.tenant_id == self.tenant_id
+                PatientDocument.tenant_id == self.tenant_id,
             )
         ).scalar_one_or_none()
 
@@ -1613,10 +1767,10 @@ class PatientDocumentService:
         return document
 
     def create(
-            self,
-            patient_id: int,
-            data: PatientDocumentCreate,
-            generated_by: int,
+        self,
+        patient_id: int,
+        data: PatientDocumentCreate,
+        generated_by: int,
     ) -> PatientDocument:
         """
         Crée un enregistrement de document.
@@ -1631,7 +1785,7 @@ class PatientDocumentService:
                 select(PatientEvaluation).where(
                     PatientEvaluation.id == data.source_evaluation_id,
                     PatientEvaluation.patient_id == patient_id,
-                    PatientEvaluation.tenant_id == self.tenant_id
+                    PatientEvaluation.tenant_id == self.tenant_id,
                 )
             ).scalar_one_or_none()
 

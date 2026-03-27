@@ -18,8 +18,8 @@
         <span v-else class="breadcrumb-item breadcrumb-current">
           {{ item.label }}
         </span>
-        <i 
-          v-if="index < breadcrumb.length - 1" 
+        <i
+          v-if="index < breadcrumb.length - 1"
           class="pi pi-chevron-right breadcrumb-separator"
         ></i>
       </template>
@@ -31,8 +31,8 @@
         icon="pi pi-arrow-left"
         label="Retour"
         severity="secondary"
-        text
         size="small"
+        text
         @click="onBack"
       />
     </div>
@@ -82,154 +82,154 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import Button from 'primevue/button'
+  import { computed } from 'vue';
+  import Button from 'primevue/button';
 
-export interface BreadcrumbItem {
-  label: string
-  key: string | null
-  isRoot: boolean
-}
+  export interface BreadcrumbItem {
+    label: string;
+    key: string | null;
+    isRoot: boolean;
+  }
 
-export interface SectionItem {
-  key: string
-  label: string
-  icon: string
-  hasChildren: boolean
-  childCount?: number
-}
+  export interface SectionItem {
+    key: string;
+    label: string;
+    icon: string;
+    hasChildren: boolean;
+    childCount?: number;
+  }
 
-export interface SubSectionItem {
-  key: string
-  label: string
-  parentKey?: string
-}
+  export interface SubSectionItem {
+    key: string;
+    label: string;
+    parentKey?: string;
+  }
 
-interface Props {
-  breadcrumb: BreadcrumbItem[]
-  sections?: SectionItem[]
-  subSections?: SubSectionItem[]
-  mode: 'sections' | 'subsections'
-}
+  interface Props {
+    breadcrumb: BreadcrumbItem[];
+    sections?: SectionItem[];
+    subSections?: SubSectionItem[];
+    mode: 'sections' | 'subsections';
+  }
 
-const props = defineProps<Props>()
+  const props = defineProps<Props>();
 
-const emit = defineEmits<{
-  (e: 'navigate', item: BreadcrumbItem): void
-  (e: 'select-section', section: SectionItem): void
-  (e: 'select-subsection', subSection: SubSectionItem): void
-  (e: 'back'): void
-}>()
+  const emit = defineEmits<{
+    (e: 'navigate', item: BreadcrumbItem): void;
+    (e: 'select-section', section: SectionItem): void;
+    (e: 'select-subsection', subSection: SubSectionItem): void;
+    (e: 'back'): void;
+  }>();
 
-const showBackButton = computed(() => {
-  return props.breadcrumb.length > 1
-})
+  const showBackButton = computed(() => {
+    return props.breadcrumb.length > 1;
+  });
 
-function onBreadcrumbClick(item: BreadcrumbItem) {
-  emit('navigate', item)
-}
+  function onBreadcrumbClick(item: BreadcrumbItem) {
+    emit('navigate', item);
+  }
 
-function onSectionClick(section: SectionItem) {
-  emit('select-section', section)
-}
+  function onSectionClick(section: SectionItem) {
+    emit('select-section', section);
+  }
 
-function onSubSectionClick(subSection: SubSectionItem) {
-  emit('select-subsection', subSection)
-}
+  function onSubSectionClick(subSection: SubSectionItem) {
+    emit('select-subsection', subSection);
+  }
 
-function onBack() {
-  emit('back')
-}
+  function onBack() {
+    emit('back');
+  }
 </script>
 
 <style scoped>
-.section-navigator {
-  @apply flex flex-col gap-4;
-}
+  .section-navigator {
+    @apply flex flex-col gap-4;
+  }
 
-/* Breadcrumb */
-.nav-breadcrumb {
-  @apply flex items-center flex-wrap gap-1 px-2 py-2 bg-slate-50 rounded-lg text-sm;
-}
+  /* Breadcrumb */
+  .nav-breadcrumb {
+    @apply flex items-center flex-wrap gap-1 px-2 py-2 bg-slate-50 rounded-lg text-sm;
+  }
 
-.breadcrumb-item {
-  @apply px-2 py-1 rounded;
-}
+  .breadcrumb-item {
+    @apply px-2 py-1 rounded;
+  }
 
-.breadcrumb-link {
-  @apply text-primary-600 hover:bg-primary-50 cursor-pointer transition-colors;
-  background: none;
-  border: none;
-  font: inherit;
-}
+  .breadcrumb-link {
+    @apply text-primary-600 hover:bg-primary-50 cursor-pointer transition-colors;
+    background: none;
+    border: none;
+    font: inherit;
+  }
 
-.breadcrumb-current {
-  @apply text-slate-700 font-medium;
-}
+  .breadcrumb-current {
+    @apply text-slate-700 font-medium;
+  }
 
-.breadcrumb-separator {
-  @apply text-slate-300 text-xs mx-1;
-}
+  .breadcrumb-separator {
+    @apply text-slate-300 text-xs mx-1;
+  }
 
-/* Bouton retour */
-.nav-back {
-  @apply -mt-2;
-}
+  /* Bouton retour */
+  .nav-back {
+    @apply -mt-2;
+  }
 
-/* Sections principales */
-.nav-sections {
-  @apply flex flex-col gap-2;
-}
+  /* Sections principales */
+  .nav-sections {
+    @apply flex flex-col gap-2;
+  }
 
-.section-card {
-  @apply flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl
+  .section-card {
+    @apply flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl
          cursor-pointer transition-all hover:border-primary-300 hover:shadow-sm;
-}
+  }
 
-.section-icon {
-  @apply w-10 h-10 rounded-lg bg-primary-50 text-primary-600
+  .section-icon {
+    @apply w-10 h-10 rounded-lg bg-primary-50 text-primary-600
          flex items-center justify-center text-lg;
-}
+  }
 
-.section-info {
-  @apply flex-1;
-}
+  .section-info {
+    @apply flex-1;
+  }
 
-.section-label {
-  @apply font-medium text-slate-800;
-}
+  .section-label {
+    @apply font-medium text-slate-800;
+  }
 
-.section-count {
-  @apply text-xs text-slate-400 mt-0.5;
-}
+  .section-count {
+    @apply text-xs text-slate-400 mt-0.5;
+  }
 
-.section-arrow {
-  @apply text-slate-300;
-}
+  .section-arrow {
+    @apply text-slate-300;
+  }
 
-.section-card:hover .section-arrow {
-  @apply text-primary-500;
-}
+  .section-card:hover .section-arrow {
+    @apply text-primary-500;
+  }
 
-/* Sous-sections */
-.subsection-card {
-  @apply flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-lg
+  /* Sous-sections */
+  .subsection-card {
+    @apply flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-lg
          cursor-pointer transition-all hover:border-primary-200 hover:bg-primary-50/30;
-}
+  }
 
-.subsection-bullet {
-  @apply w-2 h-2 rounded-full bg-primary-400;
-}
+  .subsection-bullet {
+    @apply w-2 h-2 rounded-full bg-primary-400;
+  }
 
-.subsection-label {
-  @apply flex-1 text-slate-700;
-}
+  .subsection-label {
+    @apply flex-1 text-slate-700;
+  }
 
-.subsection-arrow {
-  @apply text-slate-300 text-sm;
-}
+  .subsection-arrow {
+    @apply text-slate-300 text-sm;
+  }
 
-.subsection-card:hover .subsection-arrow {
-  @apply text-primary-500;
-}
+  .subsection-card:hover .subsection-arrow {
+    @apply text-primary-500;
+  }
 </style>

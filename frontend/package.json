@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
+    "quality": "prettier --write src/ && eslint . --fix",
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
@@ -28,17 +32,22 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.12.7",
     "@typescript-eslint/eslint-plugin": "^7.6.0",
     "@typescript-eslint/parser": "^7.6.0",
     "@vitejs/plugin-vue": "^6.0.4",
     "autoprefixer": "^10.4.19",
-    "eslint": "^8.57.0",
-    "eslint-plugin-vue": "^9.24.0",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.8.0",
     "postcss": "^8.4.38",
+    "prettier": "^3.8.1",
     "typescript": "^5.4.3",
+    "typescript-eslint": "^8.57.1",
     "vite": "^7.3.1",
     "vite-plugin-pwa": "^1.2.0",
+    "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^2.0.7",
     "workbox-window": "^7.0.0"
   }

@@ -2,6 +2,7 @@
 
 import bcrypt
 
+
 # Coût computationnel (plus = plus sécurisé mais plus lent)
 BCRYPT_ROUNDS = 12
 
@@ -16,10 +17,10 @@ def hash_password(password: str) -> str:
     Returns:
         Hash bcrypt du mot de passe
     """
-    password_bytes = password.encode('utf-8')
+    password_bytes = password.encode("utf-8")
     salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
     hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode('utf-8')
+    return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -34,8 +35,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True si le mot de passe correspond, False sinon
     """
     try:
-        password_bytes = plain_password.encode('utf-8')
-        hashed_bytes = hashed_password.encode('utf-8')
+        password_bytes = plain_password.encode("utf-8")
+        hashed_bytes = hashed_password.encode("utf-8")
         return bcrypt.checkpw(password_bytes, hashed_bytes)
     except Exception:
         return False
@@ -54,7 +55,7 @@ def verify_token_hash(plain_token: str, hashed_token: str) -> bool:
 def needs_update(hashed_value: str) -> bool:
     """Vérifie si un hash doit être régénéré."""
     try:
-        parts = hashed_value.split('$')
+        parts = hashed_value.split("$")
         if len(parts) >= 3:
             rounds = int(parts[2])
             return rounds < BCRYPT_ROUNDS

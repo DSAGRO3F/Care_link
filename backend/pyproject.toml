@@ -118,9 +118,11 @@ filterwarnings = [
 asyncio_mode = "auto"
 
 # === Ruff (Linter + Formatter) ===
+# Documentation : https://docs.astral.sh/ruff/configuration/
 [tool.ruff]
 target-version = "py313"
 line-length = 100
+src = ["app"]
 exclude = [
     ".git",
     ".venv",
@@ -129,30 +131,72 @@ exclude = [
     "alembic/versions",
 ]
 
+# ---------- LINTING ----------
 [tool.ruff.lint]
 select = [
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # Pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
-    "SIM",    # flake8-simplify
+    # --- Essentiels ---
+    "E",       # pycodestyle — erreurs de style
+    "W",       # pycodestyle — warnings
+    "F",       # pyflakes — variables/imports inutilisés, erreurs logiques
+    "I",       # isort — tri et groupement des imports
+    "UP",      # pyupgrade — modernise le code vers Python 3.13
+
+    # --- Qualité ---
+    "B",       # flake8-bugbear — bugs subtils et anti-patterns
+    "C4",      # flake8-comprehensions — simplifie list/dict/set comprehensions
+    "SIM",     # flake8-simplify — simplifications de code (if/else, with, etc.)
+    "RUF",     # ruff-specific — règles propres à Ruff (mutable defaults, etc.)
+    "N",       # pep8-naming — conventions de nommage (classes CamelCase, etc.)
+    "ASYNC",   # flake8-async — erreurs courantes en code async
+
+    # --- Sécurité (crucial pour CareLink / données de santé) ---
+    "S",       # flake8-bandit — détection vulnérabilités (SQL injection, exec, etc.)
+
+    # --- Propreté ---
+    "T20",     # flake8-print — interdit print() en code applicatif
+    "PIE",     # flake8-pie — code inutile (pass superflu, range(0, x), etc.)
+    "RET",     # flake8-return — cohérence des return statements
+    "PTH",     # flake8-use-pathlib — préfère pathlib à os.path
 ]
 ignore = [
-    "E501",   # line too long (géré par formatter)
-    "B008",   # do not perform function calls in argument defaults (FastAPI Depends)
+    "E501",    # Line too long → le formatter gère ça
+    "B008",    # Function call in default arg → FastAPI Depends() pattern légitime
+    "RET504",  # Unnecessary assignment before return → lisibilité parfois préférable
+    "N805",    # First arg of a method != self → Pydantic validators @field_validator
+    "UP007",   # Use X | Y for union → garder Optional[X] pour cohérence Pydantic v2
+
+    # --- Faux positifs structurels (Vague 1 — 27/03/2026) ---
+    "RUF001",  # Ambiguous Unicode string — emojis FR (ℹ️ ➕) dans init_db.py
+    "RUF002",  # Ambiguous Unicode docstring — tirets FR (– × ∪) dans docstrings
+    "RUF003",  # Ambiguous Unicode comment — symboles FR (∪) dans commentaires
+    "RUF012",  # Mutable class default — FP systématique sur SQLAlchemy relationships
 ]
 
+# --- Exceptions par dossier ---
+[tool.ruff.lint.per-file-ignores]
+"tests/**"           = ["S101", "S106", "S105", "T20"]
+"test_*.py"          = ["S101", "S106", "S105", "T20"]
+"alembic/**"         = ["F401", "I001", "E501"]
+"scripts/**"         = ["T20", "S101"]
+"app/core/config.py" = ["S105", "N802"]
+"__init__.py"        = ["F401"]
+
+# --- Tri des imports ---
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 force-single-line = false
 combine-as-imports = true
+lines-after-imports = 2
 
+# --- Règles Bandit / sécurité ---
+[tool.ruff.lint.flake8-bandit]
+check-typed-exception = true
+
+# ---------- FORMATTING ----------
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+docstring-code-format = true
 skip-magic-trailing-comma = false
 
 # === MyPy (Type checking) ===

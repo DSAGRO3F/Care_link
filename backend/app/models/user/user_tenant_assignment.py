@@ -15,24 +15,22 @@ Historique :
 - v4.3 : Déplacé de platform/ vers user/ (cohérence avec user_associations)
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import (
-    String, Text, Boolean, Date, DateTime,
-    ForeignKey, UniqueConstraint, Index
-)
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
 from app.models.types import JSONBCompatible
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
-    from app.models.tenants.tenant import Tenant
     from app.models.platform.super_admin import SuperAdmin
+    from app.models.tenants.tenant import Tenant
+    from app.models.user.user import User
 
 
 class AssignmentType(str, Enum):
@@ -45,6 +43,7 @@ class AssignmentType(str, Enum):
     - CONSULTANT : Intervention ponctuelle (médecin spécialiste)
     - PERMANENT : Rattachement permanent à un autre tenant
     """
+
     TEMPORARY = "TEMPORARY"  # Mission temporaire (ex: 3 mois)
     REPLACEMENT = "REPLACEMENT"  # Remplacement congé maternité, etc.
     CONSULTANT = "CONSULTANT"  # Intervention ponctuelle
@@ -89,38 +88,28 @@ class UserTenantAssignment(TimestampMixin, Base):
     __tablename__ = "user_tenant_assignments"
     __table_args__ = (
         # Un user ne peut avoir qu'un seul rattachement actif par tenant
-        UniqueConstraint(
-            "user_id", "tenant_id", "is_active",
-            name="uq_user_tenant_active"
-        ),
+        UniqueConstraint("user_id", "tenant_id", "is_active", name="uq_user_tenant_active"),
         # Index pour les requêtes fréquentes
         Index("ix_user_tenant_assignments_user", "user_id"),
         Index("ix_user_tenant_assignments_tenant", "tenant_id"),
         Index("ix_user_tenant_assignments_active", "is_active", "start_date", "end_date"),
-        {
-            "comment": "Rattachements d'utilisateurs à des tenants supplémentaires (cross-tenant)"
-        }
+        {"comment": "Rattachements d'utilisateurs à des tenants supplémentaires (cross-tenant)"},
     )
 
     # === Clé primaire ===
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique du rattachement"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique du rattachement")
 
     # === Références principales ===
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        doc="Utilisateur concerné"
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, doc="Utilisateur concerné"
     )
 
     tenant_id: Mapped[int] = mapped_column(
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
-        doc="Tenant de destination (différent du tenant principal)"
+        doc="Tenant de destination (différent du tenant principal)",
     )
 
     # === Type et période ===
@@ -129,35 +118,29 @@ class UserTenantAssignment(TimestampMixin, Base):
         String(20),
         nullable=False,
         default=AssignmentType.TEMPORARY.value,
-        doc="Type de rattachement"
+        doc="Type de rattachement",
     )
 
     start_date: Mapped[date] = mapped_column(
-        Date,
-        nullable=False,
-        doc="Date de début du rattachement"
+        Date, nullable=False, doc="Date de début du rattachement"
     )
 
     end_date: Mapped[date | None] = mapped_column(
-        Date,
-        nullable=True,
-        doc="Date de fin du rattachement (NULL = indéterminé)"
+        Date, nullable=True, doc="Date de fin du rattachement (NULL = indéterminé)"
     )
 
     # === Justification (traçabilité) ===
 
     reason: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        doc="Justification du rattachement (obligatoire pour conformité)"
+        Text, nullable=True, doc="Justification du rattachement (obligatoire pour conformité)"
     )
 
     # === Permissions spécifiques (optionnel) ===
 
-    permissions: Mapped[List[str] | None] = mapped_column(
+    permissions: Mapped[list[str] | None] = mapped_column(
         JSONBCompatible,
         nullable=True,
-        doc="Permissions spécifiques pour ce tenant (JSON array, NULL = hérite du user)"
+        doc="Permissions spécifiques pour ce tenant (JSON array, NULL = hérite du user)",
     )
 
     # === Qui a accordé l'accès ===
@@ -165,43 +148,35 @@ class UserTenantAssignment(TimestampMixin, Base):
     granted_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
-        doc="Admin du tenant ayant accordé l'accès"
+        doc="Admin du tenant ayant accordé l'accès",
     )
 
     granted_by_super_admin_id: Mapped[int | None] = mapped_column(
         ForeignKey("super_admins.id", ondelete="SET NULL"),
         nullable=True,
-        doc="Super-admin ayant accordé l'accès"
+        doc="Super-admin ayant accordé l'accès",
     )
 
     # === Statut ===
 
     is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-        nullable=False,
-        index=True,
-        doc="Rattachement actif"
+        Boolean, default=True, nullable=False, index=True, doc="Rattachement actif"
     )
 
     # === Révocation ===
 
     revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Date de révocation"
+        DateTime(timezone=True), nullable=True, doc="Date de révocation"
     )
 
     revoked_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
-        doc="Admin ayant révoqué l'accès"
+        doc="Admin ayant révoqué l'accès",
     )
 
     revoked_reason: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-        doc="Raison de la révocation"
+        Text, nullable=True, doc="Raison de la révocation"
     )
 
     # === Relations ===
@@ -210,30 +185,23 @@ class UserTenantAssignment(TimestampMixin, Base):
         "User",
         foreign_keys=[user_id],
         back_populates="tenant_assignments",
-        doc="Utilisateur concerné"
+        doc="Utilisateur concerné",
     )
 
     tenant: Mapped["Tenant"] = relationship(
-        "Tenant",
-        back_populates="user_assignments",
-        doc="Tenant de destination"
+        "Tenant", back_populates="user_assignments", doc="Tenant de destination"
     )
 
     granted_by_user: Mapped[Optional["User"]] = relationship(
-        "User",
-        foreign_keys=[granted_by_user_id],
-        doc="Admin du tenant ayant accordé l'accès"
+        "User", foreign_keys=[granted_by_user_id], doc="Admin du tenant ayant accordé l'accès"
     )
 
     granted_by_super_admin: Mapped[Optional["SuperAdmin"]] = relationship(
-        "SuperAdmin",
-        doc="Super-admin ayant accordé l'accès"
+        "SuperAdmin", doc="Super-admin ayant accordé l'accès"
     )
 
     revoked_by_user: Mapped[Optional["User"]] = relationship(
-        "User",
-        foreign_keys=[revoked_by_user_id],
-        doc="Admin ayant révoqué l'accès"
+        "User", foreign_keys=[revoked_by_user_id], doc="Admin ayant révoqué l'accès"
     )
 
     # === Propriétés ===
@@ -302,7 +270,9 @@ class UserTenantAssignment(TimestampMixin, Base):
 
     def __str__(self) -> str:
         status = "✓" if self.is_valid else "✗"
-        return f"{status} User {self.user_id} → Tenant {self.tenant_id} ({self.assignment_type_label})"
+        return (
+            f"{status} User {self.user_id} → Tenant {self.tenant_id} ({self.assignment_type_label})"
+        )
 
     def revoke(self, revoked_by: int, reason: str | None = None) -> None:
         """
@@ -313,7 +283,7 @@ class UserTenantAssignment(TimestampMixin, Base):
             reason: Raison de la révocation
         """
         self.is_active = False
-        self.revoked_at = datetime.now(timezone.utc)
+        self.revoked_at = datetime.now(UTC)
         self.revoked_by_user_id = revoked_by
         self.revoked_reason = reason
 
@@ -343,7 +313,7 @@ class UserTenantAssignment(TimestampMixin, Base):
             return True
         return permission in self.permissions
 
-    def get_effective_permissions(self, user_permissions: List[str]) -> List[str]:
+    def get_effective_permissions(self, user_permissions: list[str]) -> list[str]:
         """
         Calcule les permissions effectives pour ce tenant.
 
@@ -362,11 +332,10 @@ class UserTenantAssignment(TimestampMixin, Base):
 
 # === Fonctions utilitaires ===
 
+
 def get_user_tenant_access(
-        db_session,
-        user_id: int,
-        include_expired: bool = False
-) -> List[Dict[str, Any]]:
+    db_session, user_id: int, include_expired: bool = False
+) -> list[dict[str, Any]]:
     """
     Retourne tous les tenants accessibles par un utilisateur.
 
@@ -385,41 +354,39 @@ def get_user_tenant_access(
         return []
 
     # Tenant principal
-    tenants = [{
-        "tenant_id": user.tenant_id,
-        "type": "PRIMARY",
-        "is_primary": True,
-        "is_valid": True,
-        "start_date": None,
-        "end_date": None,
-    }]
+    tenants = [
+        {
+            "tenant_id": user.tenant_id,
+            "type": "PRIMARY",
+            "is_primary": True,
+            "is_valid": True,
+            "start_date": None,
+            "end_date": None,
+        }
+    ]
 
     # Rattachements supplémentaires
-    query = db_session.query(UserTenantAssignment).filter(
-        UserTenantAssignment.user_id == user_id
-    )
+    query = db_session.query(UserTenantAssignment).filter(UserTenantAssignment.user_id == user_id)
 
     if not include_expired:
         query = query.filter(UserTenantAssignment.is_active == True)
 
     for assignment in query.all():
-        tenants.append({
-            "tenant_id": assignment.tenant_id,
-            "type": assignment.assignment_type,
-            "is_primary": False,
-            "is_valid": assignment.is_valid,
-            "start_date": assignment.start_date,
-            "end_date": assignment.end_date,
-        })
+        tenants.append(
+            {
+                "tenant_id": assignment.tenant_id,
+                "type": assignment.assignment_type,
+                "is_primary": False,
+                "is_valid": assignment.is_valid,
+                "start_date": assignment.start_date,
+                "end_date": assignment.end_date,
+            }
+        )
 
     return tenants
 
 
-def check_user_tenant_access(
-        db_session,
-        user_id: int,
-        tenant_id: int
-) -> bool:
+def check_user_tenant_access(db_session, user_id: int, tenant_id: int) -> bool:
     """
     Vérifie si un utilisateur a accès à un tenant spécifique.
 
@@ -442,11 +409,15 @@ def check_user_tenant_access(
         return True
 
     # Rattachement supplémentaire valide
-    assignment = db_session.query(UserTenantAssignment).filter(
-        UserTenantAssignment.user_id == user_id,
-        UserTenantAssignment.tenant_id == tenant_id,
-        UserTenantAssignment.is_active == True
-    ).first()
+    assignment = (
+        db_session.query(UserTenantAssignment)
+        .filter(
+            UserTenantAssignment.user_id == user_id,
+            UserTenantAssignment.tenant_id == tenant_id,
+            UserTenantAssignment.is_active == True,
+        )
+        .first()
+    )
 
     if assignment and assignment.is_valid:
         return True

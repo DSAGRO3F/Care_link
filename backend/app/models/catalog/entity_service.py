@@ -16,15 +16,16 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Integer, Boolean, Text, ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
 
+
 if TYPE_CHECKING:
-    from app.models.organization.entity import Entity
     from app.models.catalog.service_template import ServiceTemplate
+    from app.models.organization.entity import Entity
 
 
 class EntityService(TimestampMixin, Base):
@@ -50,14 +51,14 @@ class EntityService(TimestampMixin, Base):
         ...     entity_id=ssiad.id,
         ...     service_template_id=toilette.id,
         ...     is_active=True,
-        ...     price_euros=Decimal("25.50")
+        ...     price_euros=Decimal("25.50"),
         ... )
     """
 
     __tablename__ = "entity_services"
     __table_args__ = (
         UniqueConstraint("entity_id", "service_template_id", name="uq_entity_service"),
-        {"comment": "Services proposés par chaque entité"}
+        {"comment": "Services proposés par chaque entité"},
     )
 
     # === Clé primaire ===
@@ -65,9 +66,7 @@ class EntityService(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'association entité-service",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Multi-tenant ===
@@ -76,7 +75,7 @@ class EntityService(TimestampMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # === Clés étrangères ===
@@ -86,10 +85,7 @@ class EntityService(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="Entité proposant ce service",
-        info={
-            "description": "FK vers entities. Suppression en cascade",
-            "example": 1
-        }
+        info={"description": "FK vers entities. Suppression en cascade", "example": 1},
     )
 
     service_template_id: Mapped[int] = mapped_column(
@@ -97,10 +93,7 @@ class EntityService(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="Service du catalogue national",
-        info={
-            "description": "FK vers service_templates. Suppression en cascade",
-            "example": 1
-        }
+        info={"description": "FK vers service_templates. Suppression en cascade", "example": 1},
     )
 
     # === Paramètres de l'offre ===
@@ -110,10 +103,7 @@ class EntityService(TimestampMixin, Base):
         nullable=False,
         default=True,
         doc="Service actuellement proposé par l'entité",
-        info={
-            "description": "True si l'entité propose activement ce service",
-            "default": True
-        }
+        info={"description": "True si l'entité propose activement ce service", "default": True},
     )
 
     price_euros: Mapped[Decimal | None] = mapped_column(
@@ -123,8 +113,8 @@ class EntityService(TimestampMixin, Base):
         info={
             "description": "Tarif horaire ou à l'acte. NULL = tarif standard",
             "unit": "EUR",
-            "example": "25.50"
-        }
+            "example": "25.50",
+        },
     )
 
     max_capacity_week: Mapped[int | None] = mapped_column(
@@ -134,8 +124,8 @@ class EntityService(TimestampMixin, Base):
         info={
             "description": "Nombre max d'interventions de ce type par semaine",
             "unit": "interventions/semaine",
-            "example": 50
-        }
+            "example": 50,
+        },
     )
 
     custom_duration_minutes: Mapped[int | None] = mapped_column(
@@ -145,31 +135,27 @@ class EntityService(TimestampMixin, Base):
         info={
             "description": "Durée en minutes. NULL = durée standard du template",
             "unit": "minutes",
-            "example": 45
-        }
+            "example": 45,
+        },
     )
 
     notes: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         doc="Conditions particulières",
-        info={
-            "description": "Notes sur les conditions de réalisation du service"
-        }
+        info={"description": "Notes sur les conditions de réalisation du service"},
     )
 
     # === Relations ===
 
-    entity: Mapped["Entity"] = relationship(
-        "Entity",
-        back_populates="entity_services",
-        doc="Entité proposant ce service"
+    entity: Mapped[Entity] = relationship(
+        "Entity", back_populates="entity_services", doc="Entité proposant ce service"
     )
 
-    service_template: Mapped["ServiceTemplate"] = relationship(
+    service_template: Mapped[ServiceTemplate] = relationship(
         "ServiceTemplate",
         back_populates="entity_services",
-        doc="Template du service (catalogue national)"
+        doc="Template du service (catalogue national)",
     )
 
     # === Méthodes ===
@@ -179,7 +165,11 @@ class EntityService(TimestampMixin, Base):
 
     def __str__(self) -> str:
         entity_name = self.entity.name if self.entity else f"Entity#{self.entity_id}"
-        service_name = self.service_template.name if self.service_template else f"Service#{self.service_template_id}"
+        service_name = (
+            self.service_template.name
+            if self.service_template
+            else f"Service#{self.service_template_id}"
+        )
         return f"{entity_name} - {service_name}"
 
     @property

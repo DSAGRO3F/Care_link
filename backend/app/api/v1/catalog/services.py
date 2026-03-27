@@ -7,14 +7,16 @@ Contient la logique CRUD pour :
 
 Version multi-tenant : EntityServiceService filtre par tenant_id.
 """
-from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.catalog.schemas import (
-    ServiceTemplateCreate, ServiceTemplateUpdate, ServiceTemplateFilters,
-    EntityServiceCreate, EntityServiceUpdate,
+    EntityServiceCreate,
+    EntityServiceUpdate,
+    ServiceTemplateCreate,
+    ServiceTemplateFilters,
+    ServiceTemplateUpdate,
 )
 from app.models.catalog.entity_service import EntityService
 from app.models.catalog.service_template import ServiceTemplate
@@ -26,39 +28,35 @@ from app.models.user.profession import Profession
 # EXCEPTIONS
 # =============================================================================
 
+
 class ServiceTemplateNotFoundError(Exception):
     """Service template non trouvé."""
-    pass
 
 
 class EntityServiceNotFoundError(Exception):
     """Service d'entité non trouvé."""
-    pass
 
 
 class EntityNotFoundError(Exception):
     """Entité non trouvée."""
-    pass
 
 
 class ProfessionNotFoundError(Exception):
     """Profession non trouvée."""
-    pass
 
 
 class DuplicateServiceCodeError(Exception):
     """Code de service déjà existant."""
-    pass
 
 
 class DuplicateEntityServiceError(Exception):
     """Service déjà activé pour cette entité."""
-    pass
 
 
 # =============================================================================
 # SERVICE TEMPLATE SERVICE (Catalogue national - Global, pas de tenant)
 # =============================================================================
+
 
 class ServiceTemplateService:
     """
@@ -71,13 +69,13 @@ class ServiceTemplateService:
 
     @staticmethod
     def get_all(
-            db: Session,
-            page: int = 1,
-            size: int = 50,
-            sort_by: str = "display_order",
-            sort_order: str = "asc",
-            filters: Optional[ServiceTemplateFilters] = None,
-    ) -> Tuple[List[ServiceTemplate], int]:
+        db: Session,
+        page: int = 1,
+        size: int = 50,
+        sort_by: str = "display_order",
+        sort_order: str = "asc",
+        filters: ServiceTemplateFilters | None = None,
+    ) -> tuple[list[ServiceTemplate], int]:
         """Liste les service templates avec pagination et filtres."""
         query = select(ServiceTemplate)
 
@@ -89,7 +87,9 @@ class ServiceTemplateService:
                 query = query.where(ServiceTemplate.is_medical_act == filters.is_medical_act)
 
             if filters.requires_prescription is not None:
-                query = query.where(ServiceTemplate.requires_prescription == filters.requires_prescription)
+                query = query.where(
+                    ServiceTemplate.requires_prescription == filters.requires_prescription
+                )
 
             if filters.apa_eligible is not None:
                 query = query.where(ServiceTemplate.apa_eligible == filters.apa_eligible)
@@ -131,7 +131,7 @@ class ServiceTemplateService:
         return template
 
     @staticmethod
-    def get_by_code(db: Session, code: str) -> Optional[ServiceTemplate]:
+    def get_by_code(db: Session, code: str) -> ServiceTemplate | None:
         """Récupère un service template par son code."""
         query = select(ServiceTemplate).where(ServiceTemplate.code == code.upper())
         return db.execute(query).scalar_one_or_none()
@@ -180,7 +180,7 @@ class ServiceTemplateService:
         update_data = data.model_dump(exclude_unset=True)
 
         # Vérifier la profession si modifiée
-        if "required_profession_id" in update_data and update_data["required_profession_id"]:
+        if update_data.get("required_profession_id"):
             profession = db.get(Profession, update_data["required_profession_id"])
             if not profession:
                 raise ProfessionNotFoundError(
@@ -202,12 +202,16 @@ class ServiceTemplateService:
         db.commit()
 
     @staticmethod
-    def get_by_category(db: Session, category: str) -> List[ServiceTemplate]:
+    def get_by_category(db: Session, category: str) -> list[ServiceTemplate]:
         """Récupère tous les services d'une catégorie."""
-        query = select(ServiceTemplate).where(
-            ServiceTemplate.category == category.upper(),
-            ServiceTemplate.status == "active",
-        ).order_by(ServiceTemplate.display_order)
+        query = (
+            select(ServiceTemplate)
+            .where(
+                ServiceTemplate.category == category.upper(),
+                ServiceTemplate.status == "active",
+            )
+            .order_by(ServiceTemplate.display_order)
+        )
 
         return list(db.execute(query).scalars().all())
 
@@ -215,6 +219,7 @@ class ServiceTemplateService:
 # =============================================================================
 # ENTITY SERVICE SERVICE (Multi-tenant)
 # =============================================================================
+
 
 class EntityServiceService:
     """
@@ -253,8 +258,7 @@ class EntityServiceService:
             EntityNotFoundError: Si l'entité n'existe pas ou n'appartient pas au tenant
         """
         entity_query = select(Entity).where(
-            Entity.id == entity_id,
-            Entity.tenant_id == self.tenant_id
+            Entity.id == entity_id, Entity.tenant_id == self.tenant_id
         )
         entity = self.db.execute(entity_query).scalar_one_or_none()
         if not entity:
@@ -262,18 +266,18 @@ class EntityServiceService:
         return entity
 
     def get_all_for_entity(
-            self,
-            entity_id: int,
-            active_only: bool = True,
-    ) -> List[EntityService]:
+        self,
+        entity_id: int,
+        active_only: bool = True,
+    ) -> list[EntityService]:
         """Liste les services activés pour une entité."""
         # Vérifier que l'entité appartient au tenant
         self._verify_entity_belongs_to_tenant(entity_id)
 
-        query = self._base_query().where(
-            EntityService.entity_id == entity_id
-        ).options(
-            selectinload(EntityService.service_template)
+        query = (
+            self._base_query()
+            .where(EntityService.entity_id == entity_id)
+            .options(selectinload(EntityService.service_template))
         )
 
         if active_only:
@@ -284,10 +288,10 @@ class EntityServiceService:
 
     def get_by_id(self, entity_service_id: int) -> EntityService:
         """Récupère un service d'entité par son ID."""
-        query = self._base_query().where(
-            EntityService.id == entity_service_id
-        ).options(
-            selectinload(EntityService.service_template)
+        query = (
+            self._base_query()
+            .where(EntityService.id == entity_service_id)
+            .options(selectinload(EntityService.service_template))
         )
         entity_service = self.db.execute(query).scalar_one_or_none()
         if not entity_service:
@@ -295,9 +299,9 @@ class EntityServiceService:
         return entity_service
 
     def create(
-            self,
-            entity_id: int,
-            data: EntityServiceCreate,
+        self,
+        entity_id: int,
+        data: EntityServiceCreate,
     ) -> EntityService:
         """Active un service pour une entité."""
         # Vérifier que l'entité existe et appartient au tenant
@@ -319,9 +323,7 @@ class EntityServiceService:
         ).scalar_one_or_none()
 
         if existing:
-            raise DuplicateEntityServiceError(
-                f"Ce service est déjà activé pour cette entité"
-            )
+            raise DuplicateEntityServiceError("Ce service est déjà activé pour cette entité")
 
         entity_service = EntityService(
             tenant_id=self.tenant_id,
@@ -340,9 +342,9 @@ class EntityServiceService:
         return entity_service
 
     def update(
-            self,
-            entity_service_id: int,
-            data: EntityServiceUpdate,
+        self,
+        entity_service_id: int,
+        data: EntityServiceUpdate,
     ) -> EntityService:
         """Met à jour un service d'entité."""
         entity_service = self.get_by_id(entity_service_id)
@@ -362,15 +364,15 @@ class EntityServiceService:
         self.db.commit()
 
     def get_entities_for_service(
-            self,
-            service_template_id: int,
-            active_only: bool = True,
-    ) -> List[EntityService]:
+        self,
+        service_template_id: int,
+        active_only: bool = True,
+    ) -> list[EntityService]:
         """Liste les entités du tenant proposant un service donné."""
-        query = self._base_query().where(
-            EntityService.service_template_id == service_template_id
-        ).options(
-            selectinload(EntityService.entity)
+        query = (
+            self._base_query()
+            .where(EntityService.service_template_id == service_template_id)
+            .options(selectinload(EntityService.entity))
         )
 
         if active_only:

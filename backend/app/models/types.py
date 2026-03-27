@@ -30,7 +30,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 #
 # ============================================================================
 
-JSONBCompatible = JSON().with_variant(JSONB(astext_type=Text()), 'postgresql')
+JSONBCompatible = JSON().with_variant(JSONB(astext_type=Text()), "postgresql")
 
 
 # ============================================================================

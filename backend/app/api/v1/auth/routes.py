@@ -16,37 +16,35 @@ Flux local:
     1. POST /auth/login → Email/mot de passe, retourne les tokens
 """
 
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth.schemas import (
-    LoginRequest,
-    LoginResponse,
-    TokenResponse,
-    RefreshTokenRequest,
-    PSCAuthorizationResponse,
     AuthenticatedUser,
-    AuthStatusResponse,
     AuthErrorResponse,
     AuthMethod,
+    AuthStatusResponse,
+    LoginRequest,
+    LoginResponse,
     PasswordChangeRequest,
+    PSCAuthorizationResponse,
+    RefreshTokenRequest,
+    TokenResponse,
 )
 from app.api.v1.auth.services import (
-    get_auth_service,
-    InvalidCredentialsError,
     InactiveUserError,
+    InvalidCredentialsError,
     PSCSessionError,
+    get_auth_service,
 )
-from app.core.auth.psc import PSCTokenError, PSCUserInfoError
-from app.core.auth.psc import get_psc_client
+from app.core.auth.psc import PSCTokenError, PSCUserInfoError, get_psc_client
 from app.core.auth.user_auth import get_current_user
 from app.core.config import settings
 from app.core.security.jwt import verify_token
 from app.database.session_rls import get_db
 from app.models.user.user import User
+
 
 router = APIRouter(
     prefix="/auth",
@@ -57,6 +55,7 @@ router = APIRouter(
 # =============================================================================
 # PRO SANTÉ CONNECT
 # =============================================================================
+
 
 @router.get(
     "/psc/login",
@@ -76,12 +75,11 @@ router = APIRouter(
     responses={
         302: {"description": "Redirection vers PSC"},
         503: {"description": "PSC non configuré"},
-    }
+    },
 )
 async def psc_login(
-    redirect_after: Optional[str] = Query(
-        None,
-        description="URL où rediriger après authentification réussie"
+    redirect_after: str | None = Query(
+        None, description="URL où rediriger après authentification réussie"
     ),
     db: Session = Depends(get_db),
 ):
@@ -97,7 +95,7 @@ async def psc_login(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Pro Santé Connect n'est pas configuré sur ce serveur. "
-                   "Vérifiez PSC_CLIENT_ID et PSC_CLIENT_SECRET dans .env"
+            "Vérifiez PSC_CLIENT_ID et PSC_CLIENT_SECRET dans .env",
         )
 
     # Créer la session PSC
@@ -120,12 +118,11 @@ async def psc_login(
     """,
     responses={
         503: {"description": "PSC non configuré"},
-    }
+    },
 )
 async def psc_login_url(
-    redirect_after: Optional[str] = Query(
-        None,
-        description="URL où rediriger après authentification réussie"
+    redirect_after: str | None = Query(
+        None, description="URL où rediriger après authentification réussie"
     ),
     db: Session = Depends(get_db),
 ) -> PSCAuthorizationResponse:
@@ -139,7 +136,7 @@ async def psc_login_url(
     if not psc_client.is_configured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Pro Santé Connect n'est pas configuré sur ce serveur"
+            detail="Pro Santé Connect n'est pas configuré sur ce serveur",
         )
 
     auth_service = get_auth_service(db)
@@ -174,13 +171,13 @@ async def psc_login_url(
         400: {"model": AuthErrorResponse, "description": "Erreur de callback"},
         401: {"model": AuthErrorResponse, "description": "Session invalide"},
         403: {"model": AuthErrorResponse, "description": "Compte inactif"},
-    }
+    },
 )
 async def psc_callback(
     code: str = Query(..., description="Code d'autorisation PSC"),
     state: str = Query(..., description="State pour validation CSRF"),
-    error: Optional[str] = Query(None, description="Code d'erreur PSC"),
-    error_description: Optional[str] = Query(None, description="Description erreur"),
+    error: str | None = Query(None, description="Code d'erreur PSC"),
+    error_description: str | None = Query(None, description="Description erreur"),
     db: Session = Depends(get_db),
 ) -> LoginResponse:
     """
@@ -192,51 +189,41 @@ async def psc_callback(
     if error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Erreur PSC: {error} - {error_description or 'Pas de description'}"
+            detail=f"Erreur PSC: {error} - {error_description or 'Pas de description'}",
         )
 
     auth_service = get_auth_service(db)
 
     try:
         # Terminer l'authentification PSC
-        user, psc_info = await auth_service.authenticate_with_psc(
-            code=code,
-            state=state
-        )
+        user, psc_info = await auth_service.authenticate_with_psc(code=code, state=state)
 
         # Construire et retourner la réponse
         return auth_service.build_login_response(user, auth_method=AuthMethod.PSC)
 
     except PSCSessionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
     except InactiveUserError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
     except PSCTokenError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Erreur d'échange de tokens: {str(e)}"
-        )
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Erreur d'échange de tokens: {e!s}"
+        ) from e
     except PSCUserInfoError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Erreur de récupération des informations: {str(e)}"
-        )
+            detail=f"Erreur de récupération des informations: {e!s}",
+        ) from e
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Données PSC invalides: {str(e)}"
-        )
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Données PSC invalides: {e!s}"
+        ) from e
 
 
 # =============================================================================
 # AUTHENTIFICATION LOCALE (EMAIL/MOT DE PASSE)
 # =============================================================================
+
 
 @router.post(
     "/login",
@@ -254,7 +241,7 @@ async def psc_callback(
     responses={
         401: {"model": AuthErrorResponse, "description": "Identifiants invalides"},
         403: {"model": AuthErrorResponse, "description": "Compte inactif"},
-    }
+    },
 )
 async def login(
     credentials: LoginRequest,
@@ -279,17 +266,15 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
     except InactiveUserError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
 
 
 # =============================================================================
 # CHANGEMENT DE MOT DE PASSE
 # =============================================================================
+
 
 @router.post(
     "/change-password",
@@ -303,12 +288,12 @@ async def login(
     """,
     responses={
         401: {"model": AuthErrorResponse, "description": "Mot de passe actuel incorrect"},
-    }
+    },
 )
 async def change_password(
-        request: PasswordChangeRequest,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db),
+    request: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> LoginResponse:
     """
     Change le mot de passe et retourne de nouveaux tokens.
@@ -329,34 +314,32 @@ async def change_password(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
-        )
+        ) from e
 
 
 # =============================================================================
 # REFRESH TOKEN
 # =============================================================================
 
+
 @router.post(
     "/refresh",
     response_model=TokenResponse,
     summary="Renouveler les tokens",
-    description="""
+    description=f"""
     Renouvelle l'access token à partir d'un refresh token valide.
     
     Utilisez cette route lorsque l'access token expire pour en obtenir
     un nouveau sans redemander les identifiants à l'utilisateur.
     
     **Durées de validité:**
-    - Access token: {access_minutes} minutes
-    - Refresh token: {refresh_days} jours
-    """.format(
-        access_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
-        refresh_days=settings.REFRESH_TOKEN_EXPIRE_DAYS
-    ),
+    - Access token: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes
+    - Refresh token: {settings.REFRESH_TOKEN_EXPIRE_DAYS} jours
+    """,
     responses={
         401: {"model": AuthErrorResponse, "description": "Refresh token invalide"},
         403: {"model": AuthErrorResponse, "description": "Compte inactif"},
-    }
+    },
 )
 async def refresh_token(
     request: RefreshTokenRequest,
@@ -375,14 +358,12 @@ async def refresh_token(
 
         if not user:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Utilisateur non trouvé"
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Utilisateur non trouvé"
             )
 
         if not user.is_active:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Ce compte a été désactivé"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Ce compte a été désactivé"
             )
 
         # Générer de nouveaux tokens
@@ -394,14 +375,15 @@ async def refresh_token(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Refresh token invalide: {str(e)}",
+            detail=f"Refresh token invalide: {e!s}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
 
 # =============================================================================
 # UTILISATEUR COURANT
 # =============================================================================
+
 
 @router.get(
     "/me",
@@ -448,6 +430,7 @@ async def auth_status() -> AuthStatusResponse:
 # =============================================================================
 # DÉCONNEXION
 # =============================================================================
+
 
 @router.post(
     "/logout",

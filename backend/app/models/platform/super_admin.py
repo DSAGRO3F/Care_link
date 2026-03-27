@@ -11,15 +11,16 @@ IMPORTANT :
 - Utilisés pour : gestion des tenants, support, audit, onboarding
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
+
 
 if TYPE_CHECKING:
     from app.models.platform.platform_audit_log import PlatformAuditLog
@@ -35,6 +36,7 @@ class SuperAdminRole(str, Enum):
     - PLATFORM_SUPPORT : Support technique, accès lecture
     - PLATFORM_SALES : Démos, onboarding nouveaux clients
     """
+
     PLATFORM_OWNER = "PLATFORM_OWNER"  # Accès total
     PLATFORM_ADMIN = "PLATFORM_ADMIN"  # Gestion tenants + support
     PLATFORM_SUPPORT = "PLATFORM_SUPPORT"  # Support, lecture seule
@@ -76,43 +78,28 @@ class SuperAdmin(TimestampMixin, Base):
     """
 
     __tablename__ = "super_admins"
-    __table_args__ = {
-        "comment": "Administrateurs de la plateforme CareLink (équipe interne)"
-    }
+    __table_args__ = {"comment": "Administrateurs de la plateforme CareLink (équipe interne)"}
 
     # === Colonnes d'identification ===
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique du super-admin"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique du super-admin")
 
     email: Mapped[str] = mapped_column(
         String(255),
         unique=True,
         nullable=False,
         index=True,
-        doc="Adresse email unique de connexion"
+        doc="Adresse email unique de connexion",
     )
 
-    first_name: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        doc="Prénom"
-    )
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False, doc="Prénom")
 
-    last_name: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        doc="Nom de famille"
-    )
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False, doc="Nom de famille")
 
     # === Authentification ===
 
     password_hash: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        doc="Hash bcrypt du mot de passe"
+        String(255), nullable=False, doc="Hash bcrypt du mot de passe"
     )
 
     # === Rôle ===
@@ -121,7 +108,7 @@ class SuperAdmin(TimestampMixin, Base):
         SQLEnum(SuperAdminRole, name="super_admin_role_enum", create_constraint=True),
         nullable=False,
         default=SuperAdminRole.PLATFORM_SUPPORT,
-        doc="Rôle du super-admin (niveau de permissions)"
+        doc="Rôle du super-admin (niveau de permissions)",
     )
 
     # === MFA (Multi-Factor Authentication) ===
@@ -129,64 +116,48 @@ class SuperAdmin(TimestampMixin, Base):
     mfa_secret: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
-        doc="Secret TOTP pour authentification MFA (chiffré AES-256-GCM)"
+        doc="Secret TOTP pour authentification MFA (chiffré AES-256-GCM)",
     )
 
     mfa_enabled: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        doc="MFA activé pour ce compte"
+        Boolean, default=False, nullable=False, doc="MFA activé pour ce compte"
     )
 
     mfa_backup_codes: Mapped[str | None] = mapped_column(
-        String(1000),
-        nullable=True,
-        doc="Codes de secours MFA (chiffrés, JSON array)"
+        String(1000), nullable=True, doc="Codes de secours MFA (chiffrés, JSON array)"
     )
 
     # === Statut ===
 
     is_active: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-        nullable=False,
-        doc="Compte actif"
+        Boolean, default=True, nullable=False, doc="Compte actif"
     )
 
     last_login: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Dernière connexion réussie"
+        DateTime(timezone=True), nullable=True, doc="Dernière connexion réussie"
     )
 
     # === Sécurité anti-brute-force ===
 
     failed_login_attempts: Mapped[int] = mapped_column(
-        default=0,
-        nullable=False,
-        doc="Nombre de tentatives de connexion échouées"
+        default=0, nullable=False, doc="Nombre de tentatives de connexion échouées"
     )
 
     locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Date jusqu'à laquelle le compte est verrouillé"
+        DateTime(timezone=True), nullable=True, doc="Date jusqu'à laquelle le compte est verrouillé"
     )
 
     last_password_change: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Date du dernier changement de mot de passe"
+        DateTime(timezone=True), nullable=True, doc="Date du dernier changement de mot de passe"
     )
 
     # === Relations ===
 
-    audit_logs: Mapped[List["PlatformAuditLog"]] = relationship(
+    audit_logs: Mapped[list["PlatformAuditLog"]] = relationship(
         "PlatformAuditLog",
         back_populates="super_admin",
         cascade="all, delete-orphan",
-        doc="Logs d'audit de ce super-admin"
+        doc="Logs d'audit de ce super-admin",
     )
 
     # === Propriétés ===
@@ -201,7 +172,7 @@ class SuperAdmin(TimestampMixin, Base):
         """Vérifie si le compte est actuellement verrouillé."""
         if not self.locked_until:
             return False
-        return datetime.now(timezone.utc) < self.locked_until
+        return datetime.now(UTC) < self.locked_until
 
     @property
     def is_owner(self) -> bool:
@@ -211,10 +182,7 @@ class SuperAdmin(TimestampMixin, Base):
     @property
     def can_manage_tenants(self) -> bool:
         """Vérifie si le super-admin peut gérer les tenants."""
-        return self.role in (
-            SuperAdminRole.PLATFORM_OWNER,
-            SuperAdminRole.PLATFORM_ADMIN
-        )
+        return self.role in (SuperAdminRole.PLATFORM_OWNER, SuperAdminRole.PLATFORM_ADMIN)
 
     @property
     def can_manage_super_admins(self) -> bool:
@@ -224,10 +192,7 @@ class SuperAdmin(TimestampMixin, Base):
     @property
     def can_view_audit_logs(self) -> bool:
         """Vérifie si le super-admin peut voir les logs d'audit."""
-        return self.role in (
-            SuperAdminRole.PLATFORM_OWNER,
-            SuperAdminRole.PLATFORM_ADMIN
-        )
+        return self.role in (SuperAdminRole.PLATFORM_OWNER, SuperAdminRole.PLATFORM_ADMIN)
 
     # === Méthodes ===
 
@@ -239,7 +204,7 @@ class SuperAdmin(TimestampMixin, Base):
 
     def record_login_success(self) -> None:
         """Enregistre une connexion réussie."""
-        self.last_login = datetime.now(timezone.utc)
+        self.last_login = datetime.now(UTC)
         self.failed_login_attempts = 0
         self.locked_until = None
 
@@ -255,7 +220,8 @@ class SuperAdmin(TimestampMixin, Base):
 
         if self.failed_login_attempts >= max_attempts:
             from datetime import timedelta
-            self.locked_until = datetime.now(timezone.utc) + timedelta(minutes=lock_duration_minutes)
+
+            self.locked_until = datetime.now(UTC) + timedelta(minutes=lock_duration_minutes)
 
     def has_role(self, role: SuperAdminRole) -> bool:
         """Vérifie si le super-admin a un rôle spécifique ou supérieur."""

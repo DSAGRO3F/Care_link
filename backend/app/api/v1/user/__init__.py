@@ -7,14 +7,15 @@ from app.api.v1.user.routes import router
 
 # Exporter les dépendances de sécurité
 from app.api.v1.user.tenant_users_security import (
-    get_current_tenant_id,
-    get_optional_tenant_id,
-    TenantContext,
-    verify_write_permission,
     CurrentTenantId,
     OptionalTenantId,
+    TenantContext,
     TenantCtx,
+    get_current_tenant_id,
+    get_optional_tenant_id,
+    verify_write_permission,
 )
+
 
 __all__ = [
     "router",

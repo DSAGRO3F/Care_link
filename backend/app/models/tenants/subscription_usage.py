@@ -7,13 +7,14 @@ la consommation mensuelle de chaque abonnement pour la facturation.
 """
 
 from datetime import date
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, String, Date, Boolean, UniqueConstraint
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
+
 
 # Imports conditionnels pour éviter les imports circulaires
 if TYPE_CHECKING:
@@ -58,20 +59,14 @@ class SubscriptionUsage(Base, TimestampMixin):
 
     __tablename__ = "subscription_usage"
     __table_args__ = (
-        UniqueConstraint(
-            "subscription_id", "period_start",
-            name="uq_subscription_usage_period"
-        ),
-        {"comment": "Suivi de consommation mensuelle des abonnements"}
+        UniqueConstraint("subscription_id", "period_start", name="uq_subscription_usage_period"),
+        {"comment": "Suivi de consommation mensuelle des abonnements"},
     )
 
     # ========================
     # Clé primaire
     # ========================
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        doc="Identifiant unique de l'enregistrement"
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, doc="Identifiant unique de l'enregistrement")
 
     # ========================
     # Clé étrangère
@@ -81,7 +76,7 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         index=True,
         doc="ID de l'abonnement concerné",
-        info={"description": "Référence vers l'abonnement"}
+        info={"description": "Référence vers l'abonnement"},
     )
 
     # ========================
@@ -91,20 +86,14 @@ class SubscriptionUsage(Base, TimestampMixin):
         Date,
         nullable=False,
         doc="Date de début de la période",
-        info={
-            "description": "Premier jour de la période de facturation",
-            "example": "2025-01-01"
-        }
+        info={"description": "Premier jour de la période de facturation", "example": "2025-01-01"},
     )
 
     period_end: Mapped[date] = mapped_column(
         Date,
         nullable=False,
         doc="Date de fin de la période",
-        info={
-            "description": "Dernier jour de la période de facturation",
-            "example": "2025-01-31"
-        }
+        info={"description": "Dernier jour de la période de facturation", "example": "2025-01-31"},
     )
 
     # ========================
@@ -115,10 +104,7 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         default=0,
         doc="Nombre de patients actifs sur la période",
-        info={
-            "description": "Nombre maximal ou moyen de patients actifs",
-            "example": 1650
-        }
+        info={"description": "Nombre maximal ou moyen de patients actifs", "example": 1650},
     )
 
     active_users_count: Mapped[int] = mapped_column(
@@ -126,10 +112,7 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         default=0,
         doc="Nombre d'utilisateurs actifs sur la période",
-        info={
-            "description": "Utilisateurs s'étant connectés au moins une fois",
-            "example": 45
-        }
+        info={"description": "Utilisateurs s'étant connectés au moins une fois", "example": 45},
     )
 
     storage_used_mb: Mapped[int] = mapped_column(
@@ -137,10 +120,7 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         default=0,
         doc="Stockage utilisé en Mo",
-        info={
-            "description": "Espace disque consommé (documents, etc.)",
-            "example": 12500
-        }
+        info={"description": "Espace disque consommé (documents, etc.)", "example": 12500},
     )
 
     api_calls_count: Mapped[int] = mapped_column(
@@ -148,23 +128,17 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         default=0,
         doc="Nombre d'appels API sur la période",
-        info={
-            "description": "Compteur d'appels API (pour monitoring)",
-            "example": 150000
-        }
+        info={"description": "Compteur d'appels API (pour monitoring)", "example": 150000},
     )
 
     # ========================
     # Calcul de facturation
     # ========================
-    base_amount_cents: Mapped[Optional[int]] = mapped_column(
+    base_amount_cents: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         doc="Montant de base du forfait en centimes",
-        info={
-            "description": "Prix du forfait pour cette période",
-            "example": 50000
-        }
+        info={"description": "Prix du forfait pour cette période", "example": 50000},
     )
 
     overage_amount_cents: Mapped[int] = mapped_column(
@@ -172,20 +146,14 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         default=0,
         doc="Montant des dépassements en centimes",
-        info={
-            "description": "Coût des patients au-delà du forfait",
-            "example": 7500
-        }
+        info={"description": "Coût des patients au-delà du forfait", "example": 7500},
     )
 
-    total_amount_cents: Mapped[Optional[int]] = mapped_column(
+    total_amount_cents: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         doc="Montant total facturé en centimes",
-        info={
-            "description": "base_amount_cents + overage_amount_cents",
-            "example": 57500
-        }
+        info={"description": "base_amount_cents + overage_amount_cents", "example": 57500},
     )
 
     # ========================
@@ -196,26 +164,24 @@ class SubscriptionUsage(Base, TimestampMixin):
         nullable=False,
         default=False,
         doc="La période a-t-elle été facturée ?",
-        info={"description": "True = facture émise"}
+        info={"description": "True = facture émise"},
     )
 
-    invoice_id: Mapped[Optional[str]] = mapped_column(
+    invoice_id: Mapped[str | None] = mapped_column(
         String(100),
         nullable=True,
         doc="Référence de la facture externe",
         info={
             "description": "ID dans le système de facturation (Stripe, etc.)",
-            "example": "inv_1234567890"
-        }
+            "example": "inv_1234567890",
+        },
     )
 
     # ========================
     # Relations
     # ========================
     subscription: Mapped["Subscription"] = relationship(
-        "Subscription",
-        back_populates="usage_records",
-        doc="Abonnement concerné"
+        "Subscription", back_populates="usage_records", doc="Abonnement concerné"
     )
 
     # ========================
@@ -230,7 +196,7 @@ class SubscriptionUsage(Base, TimestampMixin):
         )
 
     @property
-    def total_amount_euros(self) -> Optional[float]:
+    def total_amount_euros(self) -> float | None:
         """Montant total en euros."""
         if self.total_amount_cents is not None:
             return self.total_amount_cents / 100
@@ -242,7 +208,7 @@ class SubscriptionUsage(Base, TimestampMixin):
         return self.overage_amount_cents / 100
 
     @property
-    def base_amount_euros(self) -> Optional[float]:
+    def base_amount_euros(self) -> float | None:
         """Montant de base en euros."""
         if self.base_amount_cents is not None:
             return self.base_amount_cents / 100
@@ -257,8 +223,19 @@ class SubscriptionUsage(Base, TimestampMixin):
     def period_label(self) -> str:
         """Libellé de la période (ex: 'Janvier 2025')."""
         months_fr = [
-            "", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
-            "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+            "",
+            "Janvier",
+            "Février",
+            "Mars",
+            "Avril",
+            "Mai",
+            "Juin",
+            "Juillet",
+            "Août",
+            "Septembre",
+            "Octobre",
+            "Novembre",
+            "Décembre",
         ]
         return f"{months_fr[self.period_start.month]} {self.period_start.year}"
 

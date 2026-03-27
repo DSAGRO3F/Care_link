@@ -14,23 +14,23 @@ de services (service_templates).
 
 from __future__ import annotations
 
-from datetime import time, datetime, timezone
-from typing import TYPE_CHECKING, List, Optional
+from datetime import UTC, datetime, time
+from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON
-from sqlalchemy import String, Integer, Text, ForeignKey, Time, DateTime, Enum as SQLEnum
+from sqlalchemy import JSON, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.enums import FrequencyType, ServicePriority, AssignmentStatus
+from app.models.enums import AssignmentStatus, FrequencyType, ServicePriority
 from app.models.mixins import TimestampMixin
+
 
 if TYPE_CHECKING:
     from app.models.careplan.care_plan import CarePlan
     from app.models.catalog.service_template import ServiceTemplate
-    from app.models.user.user import User
     from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.user.user import User
 
 
 class CarePlanService(TimestampMixin, Base):
@@ -70,23 +70,19 @@ class CarePlanService(TimestampMixin, Base):
         ...     frequency_days=[1, 2, 3, 4, 5],  # Lun-Ven
         ...     preferred_time_start=time(7, 0),
         ...     preferred_time_end=time(9, 0),
-        ...     duration_minutes=45
+        ...     duration_minutes=45,
         ... )
     """
 
     __tablename__ = "care_plan_services"
-    __table_args__ = {
-        "comment": "Services individuels des plans d'aide"
-    }
+    __table_args__ = {"comment": "Services individuels des plans d'aide"}
 
     # === Clé primaire ===
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du service dans le plan",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Multi-tenant ===
@@ -95,7 +91,7 @@ class CarePlanService(TimestampMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # === Références ===
@@ -105,10 +101,7 @@ class CarePlanService(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="Plan d'aide parent",
-        info={
-            "description": "FK vers care_plans. Suppression en cascade",
-            "example": 1
-        }
+        info={"description": "FK vers care_plans. Suppression en cascade", "example": 1},
     )
 
     service_template_id: Mapped[int] = mapped_column(
@@ -118,8 +111,8 @@ class CarePlanService(TimestampMixin, Base):
         doc="Type de service du catalogue",
         info={
             "description": "FK vers service_templates. RESTRICT car le service doit exister",
-            "example": 1
-        }
+            "example": 1,
+        },
     )
 
     # === Fréquence ===
@@ -134,8 +127,8 @@ class CarePlanService(TimestampMixin, Base):
             "unit": "fois/semaine",
             "min": 1,
             "max": 21,
-            "example": 5
-        }
+            "example": 5,
+        },
     )
 
     frequency_type: Mapped[FrequencyType] = mapped_column(
@@ -146,8 +139,8 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "Mode de récurrence du service",
             "enum": [e.value for e in FrequencyType],
-            "default": "WEEKLY"
-        }
+            "default": "WEEKLY",
+        },
     )
 
     frequency_days: Mapped[list | None] = mapped_column(
@@ -157,8 +150,8 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "Liste des jours de la semaine (1=Lun, 7=Dim)",
             "example": [1, 2, 3, 4, 5],
-            "format": "array of integers 1-7"
-        }
+            "format": "array of integers 1-7",
+        },
     )
 
     # === Créneau horaire préféré ===
@@ -170,8 +163,8 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "Début du créneau horaire préféré",
             "format": "HH:MM",
-            "example": "07:00"
-        }
+            "example": "07:00",
+        },
     )
 
     preferred_time_end: Mapped[time | None] = mapped_column(
@@ -181,8 +174,8 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "Fin du créneau horaire préféré",
             "format": "HH:MM",
-            "example": "09:00"
-        }
+            "example": "09:00",
+        },
     )
 
     # === Durée ===
@@ -191,11 +184,7 @@ class CarePlanService(TimestampMixin, Base):
         Integer,
         nullable=False,
         doc="Durée prévue en minutes",
-        info={
-            "description": "Durée estimée de l'intervention",
-            "unit": "minutes",
-            "example": 45
-        }
+        info={"description": "Durée estimée de l'intervention", "unit": "minutes", "example": 45},
     )
 
     # === Priorité ===
@@ -208,8 +197,8 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "Niveau de priorité pour la planification",
             "enum": [e.value for e in ServicePriority],
-            "default": "MEDIUM"
-        }
+            "default": "MEDIUM",
+        },
     )
 
     # === Affectation ===
@@ -219,9 +208,7 @@ class CarePlanService(TimestampMixin, Base):
         nullable=True,
         index=True,
         doc="Professionnel affecté",
-        info={
-            "description": "FK vers users. Professionnel responsable de ce service"
-        }
+        info={"description": "FK vers users. Professionnel responsable de ce service"},
     )
 
     assignment_status: Mapped[AssignmentStatus] = mapped_column(
@@ -233,26 +220,22 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "État de l'affectation à un professionnel",
             "enum": [e.value for e in AssignmentStatus],
-            "default": "UNASSIGNED"
-        }
+            "default": "UNASSIGNED",
+        },
     )
 
     assigned_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         doc="Date et heure d'affectation",
-        info={
-            "description": "Timestamp de l'affectation au professionnel"
-        }
+        info={"description": "Timestamp de l'affectation au professionnel"},
     )
 
     assigned_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="Coordinateur ayant effectué l'affectation",
-        info={
-            "description": "FK vers users. Utilisateur ayant affecté le service"
-        }
+        info={"description": "FK vers users. Utilisateur ayant affecté le service"},
     )
 
     # === Instructions ===
@@ -261,9 +244,7 @@ class CarePlanService(TimestampMixin, Base):
         Text,
         nullable=True,
         doc="Instructions spécifiques pour ce service",
-        info={
-            "description": "Consignes particulières pour la réalisation du service"
-        }
+        info={"description": "Consignes particulières pour la réalisation du service"},
     )
 
     # === Statut ===
@@ -276,42 +257,38 @@ class CarePlanService(TimestampMixin, Base):
         info={
             "description": "État du service dans le plan",
             "values": ["active", "paused", "completed"],
-            "default": "active"
-        }
+            "default": "active",
+        },
     )
 
     # === Relations ===
 
-    care_plan: Mapped["CarePlan"] = relationship(
-        "CarePlan",
-        back_populates="services",
-        doc="Plan d'aide contenant ce service"
+    care_plan: Mapped[CarePlan] = relationship(
+        "CarePlan", back_populates="services", doc="Plan d'aide contenant ce service"
     )
 
-    service_template: Mapped["ServiceTemplate"] = relationship(
+    service_template: Mapped[ServiceTemplate] = relationship(
         "ServiceTemplate",
         back_populates="care_plan_services",
-        doc="Template du service (catalogue national)"
+        doc="Template du service (catalogue national)",
     )
 
-    assigned_user: Mapped[Optional["User"]] = relationship(
+    assigned_user: Mapped[User | None] = relationship(
         "User",
         foreign_keys=[assigned_user_id],
         back_populates="assigned_services",
-        doc="Professionnel affecté à ce service"
+        doc="Professionnel affecté à ce service",
     )
 
-    assigned_by: Mapped[Optional["User"]] = relationship(
-        "User",
-        foreign_keys=[assigned_by_id],
-        doc="Coordinateur ayant effectué l'affectation"
+    assigned_by: Mapped[User | None] = relationship(
+        "User", foreign_keys=[assigned_by_id], doc="Coordinateur ayant effectué l'affectation"
     )
 
-    scheduled_interventions: Mapped[List["ScheduledIntervention"]] = relationship(
+    scheduled_interventions: Mapped[list[ScheduledIntervention]] = relationship(
         "ScheduledIntervention",
         back_populates="care_plan_service",
         cascade="all, delete-orphan",
-        doc="Interventions planifiées pour ce service"
+        doc="Interventions planifiées pour ce service",
     )
 
     # === Méthodes ===
@@ -320,7 +297,11 @@ class CarePlanService(TimestampMixin, Base):
         return f"<CarePlanService(id={self.id}, template_id={self.service_template_id}, status='{self.assignment_status.value}')>"
 
     def __str__(self) -> str:
-        template_name = self.service_template.name if self.service_template else f"Service#{self.service_template_id}"
+        template_name = (
+            self.service_template.name
+            if self.service_template
+            else f"Service#{self.service_template_id}"
+        )
         freq = f"{self.quantity_per_week}x/sem"
         return f"{template_name} ({freq})"
 
@@ -358,7 +339,7 @@ class CarePlanService(TimestampMixin, Base):
         """Affiche le créneau horaire de manière lisible."""
         if self.preferred_time_start and self.preferred_time_end:
             return f"{self.preferred_time_start.strftime('%H:%M')}-{self.preferred_time_end.strftime('%H:%M')}"
-        elif self.preferred_time_start:
+        if self.preferred_time_start:
             return f"à partir de {self.preferred_time_start.strftime('%H:%M')}"
         return "Horaire flexible"
 
@@ -378,10 +359,9 @@ class CarePlanService(TimestampMixin, Base):
         """Affiche la fréquence de manière lisible."""
         if self.frequency_type == FrequencyType.DAILY:
             return "Quotidien"
-        elif self.frequency_type == FrequencyType.ON_DEMAND:
+        if self.frequency_type == FrequencyType.ON_DEMAND:
             return "À la demande"
-        else:
-            return f"{self.quantity_per_week}x/semaine ({self.days_display})"
+        return f"{self.quantity_per_week}x/semaine ({self.days_display})"
 
     @property
     def total_weekly_minutes(self) -> int:
@@ -395,7 +375,7 @@ class CarePlanService(TimestampMixin, Base):
 
     # === Méthodes d'affectation ===
 
-    def assign_to(self, user: "User", assigned_by: "User") -> None:
+    def assign_to(self, user: User, assigned_by: User) -> None:
         """
         Affecte le service à un professionnel.
 
@@ -405,10 +385,10 @@ class CarePlanService(TimestampMixin, Base):
         """
         self.assigned_user_id = user.id
         self.assigned_by_id = assigned_by.id
-        self.assigned_at = datetime.now(timezone.utc)
+        self.assigned_at = datetime.now(UTC)
         self.assignment_status = AssignmentStatus.ASSIGNED
 
-    def propose_to(self, user: "User", assigned_by: "User") -> None:
+    def propose_to(self, user: User, assigned_by: User) -> None:
         """
         Propose le service à un professionnel (en attente de confirmation).
 
@@ -418,7 +398,7 @@ class CarePlanService(TimestampMixin, Base):
         """
         self.assigned_user_id = user.id
         self.assigned_by_id = assigned_by.id
-        self.assigned_at = datetime.now(timezone.utc)
+        self.assigned_at = datetime.now(UTC)
         self.assignment_status = AssignmentStatus.PENDING
 
     def unassign(self) -> None:

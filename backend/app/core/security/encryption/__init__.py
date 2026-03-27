@@ -37,47 +37,42 @@ Note:
 # KEY MANAGEMENT
 # =============================================================================
 
-from app.core.security.encryption.key_manager import (
-    KeyManager,
-    EnvKeyManager,
-    get_key_manager,
-    reset_key_manager,
-)
-
 # =============================================================================
 # BLIND INDEXES
 # =============================================================================
-
 from app.core.security.encryption.blind_index import (
     create_blind_index,
     create_blind_index_for_search,
-    verify_blind_index,
     normalize_value,
+    verify_blind_index,
 )
 
 # =============================================================================
 # FIELD TYPES
 # =============================================================================
-
 from app.core.security.encryption.field_types import (
+    decrypt_date,
+    decrypt_datetime,
+    decrypt_dict_fields,
+    decrypt_json,
+    decrypt_jsonb_text_fields,
     # Dates
     encrypt_date,
-    decrypt_date,
     encrypt_datetime,
-    decrypt_datetime,
-
-    # JSON
-    encrypt_json,
-    decrypt_json,
-
     # Champs sélectifs
     encrypt_dict_fields,
-    decrypt_dict_fields,
-
+    # JSON
+    encrypt_json,
     # JSONB avec chiffrement partiel
     encrypt_jsonb_text_fields,
-    decrypt_jsonb_text_fields,
 )
+from app.core.security.encryption.key_manager import (
+    EnvKeyManager,
+    KeyManager,
+    get_key_manager,
+    reset_key_manager,
+)
+
 
 # =============================================================================
 # EXPORTS PUBLICS
@@ -89,27 +84,22 @@ __all__ = [
     "EnvKeyManager",
     "get_key_manager",
     "reset_key_manager",
-
     # Blind indexes
     "create_blind_index",
     "create_blind_index_for_search",
     "verify_blind_index",
     "normalize_value",
-
     # Dates
     "encrypt_date",
     "decrypt_date",
     "encrypt_datetime",
     "decrypt_datetime",
-
     # JSON
     "encrypt_json",
     "decrypt_json",
-
     # Dict fields
     "encrypt_dict_fields",
     "decrypt_dict_fields",
-
     # JSONB
     "encrypt_jsonb_text_fields",
     "decrypt_jsonb_text_fields",

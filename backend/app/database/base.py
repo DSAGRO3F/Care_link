@@ -2,6 +2,7 @@
 Base de données SQLAlchemy - Configuration centrale
 Importe tous les modèles pour que SQLAlchemy connaisse toutes les relations
 """
+
 from app.database.base_class import Base
 
 # === IMPORTS DES MODÈLES ===
@@ -9,82 +10,72 @@ from app.database.base_class import Base
 # 1. SQLAlchemy connaisse toutes les relations entre tables
 # 2. Alembic puisse détecter tous les modèles pour les migrations
 # 3. Les métadonnées soient complètes lors de create_all()
-
 # Import centralisé depuis app/models/__init__.py
 from app.models import (  # noqa: F401
-    # Enums
-    EntityType,
-    ProfessionCategory,
-    RoleName,
-    ContractType,
-    AccessType,
-    PatientStatus,
-    VitalType,
-    VitalStatus,
-    VitalSource,
-    DeviceType,
-    EvaluationSchemaType,
-
-    # Mixins
-    TimestampMixin,
-    AuditMixin,
-    VersionedMixin,
-    StatusMixin,
-
-    # Platform
-    SuperAdmin,
-    PlatformAuditLog,
-
-    # Tenant
-    Tenant,
-    Subscription,
-    SubscriptionUsage,
-
-    # Reference
-    Country,
-
-    # Organization
-    Entity,
-
-    # User
-    User,
-    Role,
-    Permission,
-    RolePermission,
-    Profession,
-    UserRole,
-    UserEntity,
-    UserAvailability,
-    UserTenantAssignment,
-    INITIAL_ROLES,
     INITIAL_PERMISSIONS,
-    INITIAL_ROLE_PERMISSIONS,
     INITIAL_PROFESSIONS,
-
-    # Patient
-    Patient,
-    PatientAccess,
-    PatientEvaluation,
-    PatientThreshold,
-    PatientVitals,
-    PatientDevice,
-    PatientDocument,
-
-    # Catalog
-    ServiceTemplate,
-    EntityService,
-
+    INITIAL_ROLE_PERMISSIONS,
+    INITIAL_ROLES,
+    AccessType,
+    AuditMixin,
     # CarePlan
     CarePlan,
     CarePlanService,
-
+    ContractType,
     # Coordination
     CoordinationEntry,
+    # Reference
+    Country,
+    DeviceType,
+    # Organization
+    Entity,
+    EntityService,
+    # Enums
+    EntityType,
+    EvaluationSchemaType,
+    # Patient
+    Patient,
+    PatientAccess,
+    PatientDevice,
+    PatientDocument,
+    PatientEvaluation,
+    PatientStatus,
+    PatientThreshold,
+    PatientVitals,
+    Permission,
+    PlatformAuditLog,
+    Profession,
+    ProfessionCategory,
+    Role,
+    RoleName,
+    RolePermission,
     ScheduledIntervention,
+    # Catalog
+    ServiceTemplate,
+    StatusMixin,
+    Subscription,
+    SubscriptionUsage,
+    # Platform
+    SuperAdmin,
+    # Tenant
+    Tenant,
+    # Mixins
+    TimestampMixin,
+    # User
+    User,
+    UserAvailability,
+    UserEntity,
+    UserRole,
+    UserTenantAssignment,
+    VersionedMixin,
+    VitalSource,
+    VitalStatus,
+    VitalType,
 )
 
 # Import EvaluationSession (manquant dans app/models/__init__.py)
 from app.models.patient import EvaluationSession  # noqa: F401
+
 
 # Note : Le noqa: F401 supprime l'avertissement "imported but unused"
 # Ces imports sont volontairement "inutilisés" ici mais essentiels pour SQLAlchemy
@@ -95,6 +86,7 @@ metadata = Base.metadata
 
 
 # === FONCTIONS UTILITAIRES ===
+
 
 def get_all_models() -> list:
     """Retourne la liste de tous les modèles SQLAlchemy enregistrés."""

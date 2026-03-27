@@ -4,66 +4,67 @@ Crée les tables, tenant par défaut, professions, rôles système, pays/entité
 """
 
 import logging
+
 from dotenv import load_dotenv
+
+
 load_dotenv()
 
 import os
 import sys
 from datetime import date, datetime
-from typing import Optional
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.database.base_class import Base
-from app.database.session import engine, db_session, check_database_connection
+from app.database.session import check_database_connection, db_session, engine
+
 # =============================================================================
 # IMPORTS DES MODÈLES (via le module centralisé)
 # =============================================================================
 from app.models import (
+    INITIAL_PROFESSIONS,
+    INITIAL_ROLE_PERMISSIONS,  # AJOUT S1 — fix seed permissions
+    INITIAL_ROLES,
+    BillingCycle,
+    ContractType,
     # Référence
     Country,
     # Organisation
     Entity,
-    # Utilisateurs
-    User,
-    Role,
-    INITIAL_ROLES,
-    Profession,
-    INITIAL_PROFESSIONS,
-    UserRole,
-    UserEntity,
+    # Enums
+    EntityType,
     Permission,  # AJOUT v4.3
+    PermissionCategory,  # AJOUT v4.3
+    Profession,
+    Role,
+    RoleName,
     RolePermission,  # AJOUT v4.3
-    INITIAL_ROLE_PERMISSIONS,  # AJOUT S1 — fix seed permissions
+    Subscription,
+    SubscriptionPlan,
+    SubscriptionStatus,
     # Tenant (nouveau v4.1)
     Tenant,
     TenantStatus,
     TenantType,
-    Subscription,
-    SubscriptionPlan,
-    SubscriptionStatus,
-    BillingCycle,
-    # Enums
-    EntityType,
-    ContractType,
-    RoleName,
-    PermissionCategory,  # AJOUT v4.3
+    # Utilisateurs
+    User,
+    UserEntity,
+    UserRole,
 )
+from app.services.encryption import get_user_search_blind, user_encryptor
 
-from app.services.encryption import user_encryptor, get_user_search_blind
 
 # Configuration du logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
 # 1. CRÉATION DES TABLES
 # =============================================================================
+
 
 def create_all_tables() -> bool:
     """
@@ -113,6 +114,7 @@ def drop_all_tables() -> bool:
 # 2. INITIALISATION DES PROFESSIONS
 # =============================================================================
 
+
 def init_professions(db: Session) -> list[Profession]:
     """
     Crée les professions de santé réglementées (S2).
@@ -144,9 +146,7 @@ def init_professions(db: Session) -> list[Profession]:
 
     for prof_data in INITIAL_PROFESSIONS:
         # Vérifier si la profession existe déjà
-        existing = db.query(Profession).filter(
-            Profession.name == prof_data["name"]
-        ).first()
+        existing = db.query(Profession).filter(Profession.name == prof_data["name"]).first()
 
         if existing:
             professions.append(existing)
@@ -175,6 +175,7 @@ def init_professions(db: Session) -> list[Profession]:
 # =============================================================================
 # 3. INITIALISATION DES RÔLES
 # =============================================================================
+
 
 def init_roles(db: Session) -> list[Role]:
     """
@@ -236,7 +237,7 @@ def init_roles(db: Session) -> list[Role]:
                 code=perm_code,
                 name=perm_code.replace("_", " ").title(),
                 description=f"Permission {perm_code}",
-                category=cat
+                category=cat,
             )
             db.add(perm)
             db.flush()
@@ -250,9 +251,7 @@ def init_roles(db: Session) -> list[Role]:
 
     for role_data in INITIAL_ROLES:
         # Vérifier si le rôle existe déjà
-        existing = db.query(Role).filter(
-            Role.name == role_data["name"]
-        ).first()
+        existing = db.query(Role).filter(Role.name == role_data["name"]).first()
 
         if existing:
             # Rôle existe - mettre à jour les permissions via RolePermission
@@ -274,7 +273,7 @@ def init_roles(db: Session) -> list[Role]:
             role = Role(
                 name=role_data["name"],
                 description=role_data.get("description"),
-                is_system_role=role_data.get("is_system_role", True)
+                is_system_role=role_data.get("is_system_role", True),
             )
             db.add(role)
             db.flush()  # Pour obtenir l'ID
@@ -300,6 +299,7 @@ def init_roles(db: Session) -> list[Role]:
 # 4. INITIALISATION DU PAYS PAR DÉFAUT
 # =============================================================================
 
+
 def init_default_country(db: Session) -> Country:
     """
     Crée le pays par défaut (France).
@@ -313,18 +313,12 @@ def init_default_country(db: Session) -> Country:
     logger.info("🌍 Initialisation du pays par défaut...")
 
     # Vérifier si France existe déjà
-    france = db.query(Country).filter(
-        Country.country_code == "FR"
-    ).first()
+    france = db.query(Country).filter(Country.country_code == "FR").first()
 
     if france:
         logger.info("   ℹ️ France existe déjà")
     else:
-        france = Country(
-            name="France",
-            country_code="FR",
-            status="active"
-        )
+        france = Country(name="France", country_code="FR", status="active")
         db.add(france)
         db.flush()
         logger.info("   ✅ France créé")
@@ -335,6 +329,7 @@ def init_default_country(db: Session) -> Country:
 # =============================================================================
 # 5. INITIALISATION DU TENANT PAR DÉFAUT (NOUVEAU v4.1)
 # =============================================================================
+
 
 def init_default_tenant(db: Session, country: Country) -> Tenant:
     """
@@ -353,9 +348,7 @@ def init_default_tenant(db: Session, country: Country) -> Tenant:
     logger.info("🏛️ Initialisation du tenant par défaut...")
 
     # Vérifier si le tenant par défaut existe déjà
-    tenant = db.query(Tenant).filter(
-        Tenant.code == "CARELINK-DEFAULT"
-    ).first()
+    tenant = db.query(Tenant).filter(Tenant.code == "CARELINK-DEFAULT").first()
 
     if tenant:
         logger.info("   ℹ️ Tenant CARELINK-DEFAULT existe déjà")
@@ -382,14 +375,11 @@ def init_default_tenant(db: Session, country: Country) -> Tenant:
                 "features": {
                     "aggir_evaluation": True,
                     "document_generation": True,
-                    "device_integration": False
+                    "device_integration": False,
                 },
-                "notifications": {
-                    "email": True,
-                    "sms": False
-                }
+                "notifications": {"email": True, "sms": False},
             },
-            activated_at=datetime.now()
+            activated_at=datetime.now(),
         )
         db.add(tenant)
         db.flush()
@@ -412,10 +402,13 @@ def init_default_subscription(db: Session, tenant: Tenant) -> Subscription:
     logger.info("💳 Initialisation de l'abonnement par défaut...")
 
     # Vérifier si un abonnement actif existe déjà
-    subscription = db.query(Subscription).filter(
-        Subscription.tenant_id == tenant.id,
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).first()
+    subscription = (
+        db.query(Subscription)
+        .filter(
+            Subscription.tenant_id == tenant.id, Subscription.status == SubscriptionStatus.ACTIVE
+        )
+        .first()
+    )
 
     if subscription:
         logger.info("   ℹ️ Abonnement actif existe déjà")
@@ -433,7 +426,7 @@ def init_default_subscription(db: Session, tenant: Tenant) -> Subscription:
             included_patients=1000,
             included_users=100,
             included_storage_gb=50,
-            notes="Abonnement de démonstration - usage interne uniquement"
+            notes="Abonnement de démonstration - usage interne uniquement",
         )
         db.add(subscription)
         db.flush()
@@ -445,6 +438,7 @@ def init_default_subscription(db: Session, tenant: Tenant) -> Subscription:
 # =============================================================================
 # 6. INITIALISATION DE L'ENTITÉ PAR DÉFAUT
 # =============================================================================
+
 
 def init_default_entity(db: Session, country: Country, tenant: Tenant) -> Entity:
     """
@@ -461,9 +455,7 @@ def init_default_entity(db: Session, country: Country, tenant: Tenant) -> Entity
     logger.info("🏢 Initialisation de l'entité par défaut...")
 
     # Vérifier si l'entité exemple existe déjà
-    entity = db.query(Entity).filter(
-        Entity.name == "SSIAD CareLink Paris"
-    ).first()
+    entity = db.query(Entity).filter(Entity.name == "SSIAD CareLink Paris").first()
 
     if entity:
         logger.info("   ℹ️ SSIAD CareLink Paris existe déjà")
@@ -489,7 +481,7 @@ def init_default_entity(db: Session, country: Country, tenant: Tenant) -> Entity
             latitude=48.8356,
             longitude=2.3539,
             default_intervention_radius_km=15,
-            status="active"
+            status="active",
         )
         db.add(entity)
         db.flush()
@@ -502,13 +494,14 @@ def init_default_entity(db: Session, country: Country, tenant: Tenant) -> Entity
 # 7. INITIALISATION DU COMPTE ADMIN
 # =============================================================================
 
+
 def init_default_admin(
     db: Session,
     entity: Entity,
     tenant: Tenant,
     email: str = "admin@carelink.fr",
-    rpps: str = "00000000001"
-) -> Optional[User]:
+    rpps: str = "00000000001",
+) -> User | None:
     """
     Crée le compte administrateur système.
 
@@ -529,10 +522,9 @@ def init_default_admin(
 
     # Vérifier si l'admin existe déjà (recherche par blind index)
     email_blind = get_user_search_blind(email, "email", tenant.id)
-    existing_admin = db.query(User).filter(
-        User.email_blind == email_blind,
-        User.tenant_id == tenant.id
-    ).first()
+    existing_admin = (
+        db.query(User).filter(User.email_blind == email_blind, User.tenant_id == tenant.id).first()
+    )
 
     if existing_admin:
         logger.info(f"   ℹ️ Admin {email} existe déjà")
@@ -549,17 +541,12 @@ def init_default_admin(
         return None
 
     # Récupérer la profession Administratif
-    admin_profession = db.query(Profession).filter(
-        Profession.name == "Administratif"
-    ).first()
+    admin_profession = db.query(Profession).filter(Profession.name == "Administratif").first()
     if not admin_profession:
         logger.warning("   ⚠️ Profession 'Administratif' non trouvée, admin créé sans profession")
 
     # Chiffrer email et rpps + générer blind indexes
-    encrypted_data = user_encryptor.encrypt_for_db(
-        {"email": email, "rpps": rpps},
-        tenant.id
-    )
+    encrypted_data = user_encryptor.encrypt_for_db({"email": email, "rpps": rpps}, tenant.id)
 
     # Créer l'utilisateur admin avec données chiffrées
     admin_user = User(
@@ -580,7 +567,7 @@ def init_default_admin(
         user_id=admin_user.id,
         role_id=admin_role.id,
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
-        assigned_by=admin_user.id  # Auto-assigné à la création
+        assigned_by=admin_user.id,  # Auto-assigné à la création
     )
     db.add(user_role)
 
@@ -591,7 +578,7 @@ def init_default_admin(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
         is_primary=True,
         contract_type=ContractType.SALARIE.value,
-        start_date=date.today()
+        start_date=date.today(),
     )
     db.add(user_entity)
 
@@ -602,7 +589,7 @@ def init_default_admin(
     logger.info(f"   🏥 RPPS : {rpps}")
     logger.info(f"   🏛️ Tenant : {tenant.name}")
     logger.info(f"   🏢 Entité : {entity.name}")
-    logger.info(f"   🎭 Rôle : ADMIN")
+    logger.info("   🎭 Rôle : ADMIN")
 
     return admin_user
 
@@ -611,10 +598,11 @@ def init_default_admin(
 # 8. FONCTION D'INITIALISATION COMPLÈTE
 # =============================================================================
 
+
 def init_database(
     drop_existing: bool = False,
     admin_email: str = "admin@carelink.fr",
-    admin_rpps: str = "00000000001"
+    admin_rpps: str = "00000000001",
 ) -> bool:
     """
     Initialise complètement la base de données CareLink.
@@ -716,11 +704,7 @@ def init_database(
 
             # 10. Admin
             init_default_admin(
-                db=db,
-                entity=entity,
-                tenant=tenant,
-                email=admin_email,
-                rpps=admin_rpps
+                db=db, entity=entity, tenant=tenant, email=admin_email, rpps=admin_rpps
             )
 
             # Commit final
@@ -729,6 +713,7 @@ def init_database(
     except Exception as e:
         logger.error(f"❌ Erreur lors de l'initialisation des données : {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -800,6 +785,7 @@ def init_database(
 # 9. POINT D'ENTRÉE CLI
 # =============================================================================
 
+
 def main():
     """
     Point d'entrée pour exécution en ligne de commande.
@@ -814,19 +800,19 @@ def main():
         description="Initialise la base de données CareLink v4.1 (Multi-tenant)"
     )
     parser.add_argument(
-        '--drop',
-        action='store_true',
-        help="Supprime les tables existantes avant création (ATTENTION !)"
+        "--drop",
+        action="store_true",
+        help="Supprime les tables existantes avant création (ATTENTION !)",
     )
     parser.add_argument(
-        '--admin-email',
+        "--admin-email",
         default="admin@carelink.fr",
-        help="Email du compte administrateur (défaut: admin@carelink.fr)"
+        help="Email du compte administrateur (défaut: admin@carelink.fr)",
     )
     parser.add_argument(
-        '--admin-rpps',
+        "--admin-rpps",
         default="00000000001",
-        help="RPPS du compte administrateur (défaut: 00000000001)"
+        help="RPPS du compte administrateur (défaut: 00000000001)",
     )
 
     args = parser.parse_args()
@@ -836,15 +822,13 @@ def main():
         print("\n⚠️  ATTENTION : Vous allez SUPPRIMER toutes les tables existantes !")
         print("   Toutes les données seront perdues.\n")
         response = input("Êtes-vous sûr ? (oui/non) : ")
-        if response.lower() != 'oui':
+        if response.lower() != "oui":
             print("Annulé.")
             sys.exit(0)
 
     # Lancer l'initialisation
     success = init_database(
-        drop_existing=args.drop,
-        admin_email=args.admin_email,
-        admin_rpps=args.admin_rpps
+        drop_existing=args.drop, admin_email=args.admin_email, admin_rpps=args.admin_rpps
     )
 
     sys.exit(0 if success else 1)

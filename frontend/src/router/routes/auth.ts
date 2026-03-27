@@ -2,7 +2,7 @@
  * Routes d'authentification
  * Login, callback PSC, logout
  */
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router';
 
 const authRoutes: RouteRecordRaw[] = [
   {
@@ -21,10 +21,10 @@ const authRoutes: RouteRecordRaw[] = [
     name: 'force-change-password',
     component: () => import('@/pages/auth/ForceChangePasswordPage.vue'),
     meta: {
-        layout: 'auth',
-        title: 'Changement de mot de passe',
-        // PAS public: true → nécessite un token valide
-        },
+      layout: 'auth',
+      title: 'Changement de mot de passe',
+      // PAS public: true → nécessite un token valide
+    },
   },
   {
     path: '/auth/callback',
@@ -46,6 +46,6 @@ const authRoutes: RouteRecordRaw[] = [
       title: 'Déconnexion',
     },
   },
-]
+];
 
-export default authRoutes
+export default authRoutes;

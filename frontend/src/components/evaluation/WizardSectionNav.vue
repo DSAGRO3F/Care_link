@@ -22,20 +22,17 @@
               <stop offset="100%" stop-color="#0d9488" />
             </linearGradient>
           </defs>
+          <circle class="wizard-progress-ring__track" cx="26" cy="26" r="20" />
           <circle
-            class="wizard-progress-ring__track"
-            cx="26" cy="26" r="20"
-          />
-          <circle
-            class="wizard-progress-ring__fill"
-            cx="26" cy="26" r="20"
             :stroke-dasharray="circumference"
             :stroke-dashoffset="progressOffset"
+            class="wizard-progress-ring__fill"
+            cx="26"
+            cy="26"
+            r="20"
           />
         </svg>
-        <div class="wizard-progress-ring__text">
-          {{ completionPercent }}%
-        </div>
+        <div class="wizard-progress-ring__text">{{ completionPercent }}%</div>
       </div>
 
       <div>
@@ -56,7 +53,7 @@
         :key="section.id"
         :class="[
           'wizard-section-item',
-          { 'wizard-section-item--active': section.id === activeSection }
+          { 'wizard-section-item--active': section.id === activeSection },
         ]"
         :aria-current="section.id === activeSection ? 'step' : undefined"
         @click="$emit('select', section.id)"
@@ -77,7 +74,20 @@
         </div>
 
         <!-- Indicateur de statut -->
-        <div :class="['wizard-status', `wizard-status--${sectionStates[section.id]?.status || 'empty'}`]">
+        <!-- En mode réévaluation, une section "confirmée inchangée" affiche CheckCheck en teal -->
+        <div
+          v-if="confirmedSections?.has(section.id)"
+          class="wizard-status wizard-status--confirmed"
+        >
+          <CheckCheck :size="14" :stroke-width="2" class="wizard-status__icon" />
+        </div>
+        <div
+          v-else
+          :class="[
+            'wizard-status',
+            `wizard-status--${sectionStates[section.id]?.status || 'empty'}`,
+          ]"
+        >
           <component
             :is="statusIconMap[sectionStates[section.id]?.status || 'empty']"
             :size="14"
@@ -100,82 +110,88 @@
 </template>
 
 <script setup lang="ts">
-/**
- * CareLink - WizardSectionNav
- * Chemin : frontend/src/components/evaluation/WizardSectionNav.vue
- */
-import {
-  User,
-  BookUser,
-  Grid3x3,
-  Home,
-  HeartPulse,
-  Armchair,
-  Cpu,
-  HandHeart,
-  Pill,
-  Target,
-  ChevronRight,
-  Circle,
-  Clock,
-  CheckCircle2,
-} from 'lucide-vue-next'
-import { computed, type Component } from 'vue'
-import type { WizardSectionConfig, SectionState } from '@/composables/useEvaluationWizard'
+  /**
+   * CareLink - WizardSectionNav
+   * Chemin : frontend/src/components/evaluation/WizardSectionNav.vue
+   */
+  import {
+    User,
+    BookUser,
+    Grid3x3,
+    Home,
+    HeartPulse,
+    Armchair,
+    Cpu,
+    HandHeart,
+    Pill,
+    Target,
+    ChevronRight,
+    Circle,
+    Clock,
+    CheckCircle2,
+    CheckCheck,
+  } from 'lucide-vue-next';
+  import { computed, type Component } from 'vue';
+  import type { WizardSectionConfig, SectionState } from '@/composables/useEvaluationWizard';
 
-// ── Props ──────────────────────────────────────────────────────────────
+  // ── Props ──────────────────────────────────────────────────────────────
 
-interface Props {
-  sections: readonly WizardSectionConfig[]
-  activeSection: string
-  sectionStates: Record<string, SectionState>
-  completionPercent: number
-  completedCount: number
-  partialCount: number
-}
+  interface Props {
+    sections: readonly WizardSectionConfig[];
+    activeSection: string;
+    sectionStates: Record<string, SectionState>;
+    completionPercent: number;
+    completedCount: number;
+    partialCount: number;
+    /** Mode courant du wizard (initial | reevaluation) */
+    evaluationMode?: 'initial' | 'reevaluation';
+    /** Sections confirmées inchangées (mode réévaluation) */
+    confirmedSections?: Set<string>;
+  }
 
-const props = defineProps<Props>()
+  const props = defineProps<Props>();
 
-defineEmits<{
-  (e: 'select', sectionId: string): void
-}>()
+  defineEmits<{
+    (e: 'select', sectionId: string): void;
+  }>();
 
-// ── Mapping icônes Lucide ──────────────────────────────────────────────
+  // ── Mapping icônes Lucide ──────────────────────────────────────────────
 
-const iconMap: Record<string, Component> = {
-  User,
-  BookUser,
-  Grid3x3,
-  Home,
-  HeartPulse,
-  Armchair,
-  Cpu,
-  HandHeart,
-  Pill,
-  Target,
-}
+  const iconMap: Record<string, Component> = {
+    User,
+    BookUser,
+    Grid3x3,
+    Home,
+    HeartPulse,
+    Armchair,
+    Cpu,
+    HandHeart,
+    Pill,
+    Target,
+  };
 
-const statusIconMap: Record<string, Component> = {
-  empty: Circle,
-  partial: Clock,
-  complete: CheckCircle2,
-}
+  const statusIconMap: Record<string, Component> = {
+    empty: Circle,
+    partial: Clock,
+    complete: CheckCircle2,
+    confirmed: CheckCheck,
+  };
 
-// ── Progress ring ──────────────────────────────────────────────────────
+  // ── Progress ring ──────────────────────────────────────────────────────
 
-const radius = 20
-const circumference = 2 * Math.PI * radius
-const progressOffset = computed(
-  () => circumference - (props.completionPercent / 100) * circumference
-)
+  const radius = 20;
+  const circumference = 2 * Math.PI * radius;
+  const progressOffset = computed(
+    () => circumference - (props.completionPercent / 100) * circumference,
+  );
 </script>
 
 <style scoped>
-/*
+  /*
  * Layout structurel uniquement.
  * L'identité visuelle (couleurs, ombres, états) est dans main.css (.wizard-*)
  */
-.wizard-section-text {
-  @apply flex-1 min-w-0;
-}
+  .wizard-section-text {
+    @apply flex-1 min-w-0;
+  }
 </style>

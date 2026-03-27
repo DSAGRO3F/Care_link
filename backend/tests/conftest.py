@@ -15,9 +15,9 @@ Changelog v4.3:
 - Suppression de l'argument permissions=[] dans les constructeurs Role
 """
 
-from datetime import date, time, datetime, timezone, timedelta
+from collections.abc import Generator
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,74 +26,75 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.core.security.jwt import create_access_token
+
 # Import de la Base et des modèles
 from app.database.base_class import Base
 from app.main import app
 from app.models import (
-    # Reference
-    Country,
-    # Tenant (Multi-tenant)
-    Tenant,
-    Subscription,
-    SubscriptionUsage,
-    # Organization
-    Entity,
-    # User
-    Profession,
-    Role,
-    Permission,  # AJOUT v4.3
-    RolePermission,  # AJOUT v4.3
-    User,
-    UserRole,
-    UserEntity,
-    UserAvailability,
-    # Patient
-    Patient,
-    PatientAccess,
-    PatientDocument,
-    PatientEvaluation,
-    PatientThreshold,
-    PatientVitals,
-    PatientDevice,
-    # Catalog
-    ServiceTemplate,
-    EntityService,
     # CarePlan
     CarePlan,
     CarePlanService,
     # Coordination
     CoordinationEntry,
+    # Reference
+    Country,
+    # Organization
+    Entity,
+    EntityService,
+    # Patient
+    Patient,
+    PatientAccess,
+    PatientDevice,
+    PatientDocument,
+    PatientEvaluation,
+    PatientThreshold,
+    PatientVitals,
+    Permission,  # AJOUT v4.3
+    # User
+    Profession,
+    Role,
+    RolePermission,  # AJOUT v4.3
     ScheduledIntervention,
     # Constants
+    # Catalog
+    ServiceTemplate,
+    Subscription,
+    SubscriptionUsage,
+    # Tenant (Multi-tenant)
+    Tenant,
+    User,
+    UserAvailability,
+    UserEntity,
+    UserRole,
 )
 from app.models.enums import (
-    # Tenant
-    TenantType,
-    TenantStatus,
-    SubscriptionPlan,
-    SubscriptionStatus,
-    BillingCycle,
-    # Organization
-    EntityType,
-    # User
-    RoleName,
-    ContractType,
-    PermissionCategory,  # AJOUT v4.3
     # Patient
     AccessType,
-    VitalType,
-    VitalSource,
-    EvaluationSchemaType,
-    # Catalog
-    ServiceCategory,
+    AssignmentStatus,
+    BillingCycle,
     # CarePlan
     CarePlanStatus,
+    ContractType,
+    CoordinationCategory,
+    # Organization
+    EntityType,
+    EvaluationSchemaType,
     FrequencyType,
-    ServicePriority,
-    AssignmentStatus,
     # Coordination
     InterventionStatus,
-    CoordinationCategory,
+    PermissionCategory,  # AJOUT v4.3
+    # User
+    RoleName,
+    # Catalog
+    ServiceCategory,
+    ServicePriority,
+    SubscriptionPlan,
+    SubscriptionStatus,
+    TenantStatus,
+    # Tenant
+    TenantType,
+    VitalSource,
+    VitalType,
 )
 
 
@@ -101,12 +102,13 @@ from app.models.enums import (
 # HELPER FUNCTION - Création des permissions pour les tests (v4.3)
 # =============================================================================
 
+
 def create_role_with_permissions(
     db_session: Session,
     role_name: str,
     description: str,
     permission_codes: list[str],
-    is_system_role: bool = True
+    is_system_role: bool = True,
 ) -> Role:
     """
     Helper pour créer un rôle avec ses permissions (architecture v4.3).
@@ -122,11 +124,7 @@ def create_role_with_permissions(
         Role créé avec ses permissions
     """
     # Créer le rôle
-    role = Role(
-        name=role_name,
-        description=description,
-        is_system_role=is_system_role
-    )
+    role = Role(name=role_name, description=description, is_system_role=is_system_role)
     db_session.add(role)
     db_session.flush()
 
@@ -139,7 +137,9 @@ def create_role_with_permissions(
                 code=code,
                 name=code.replace("_", " ").title(),
                 description=f"Permission {code}",
-                category=PermissionCategory.ADMIN if code.startswith("ADMIN") else PermissionCategory.PATIENT
+                category=PermissionCategory.ADMIN
+                if code.startswith("ADMIN")
+                else PermissionCategory.PATIENT,
             )
             db_session.add(perm)
             db_session.flush()
@@ -155,6 +155,7 @@ def create_role_with_permissions(
 # =============================================================================
 # DATABASE FIXTURES
 # =============================================================================
+
 
 @pytest.fixture(scope="function")
 def engine():
@@ -184,7 +185,7 @@ def engine():
 
 
 @pytest.fixture(scope="function")
-def db_session(engine) -> Generator[Session, None, None]:
+def db_session(engine) -> Generator[Session]:
     """
     Fournit une session de base de données isolée pour chaque test.
 
@@ -223,14 +224,11 @@ def db_session(engine) -> Generator[Session, None, None]:
 # MODEL FIXTURES - Données de base (Country)
 # =============================================================================
 
+
 @pytest.fixture
 def country(db_session: Session) -> Country:
     """Crée un pays de test (France)."""
-    country = Country(
-        name="France",
-        country_code="FR",
-        status="active"
-    )
+    country = Country(name="France", country_code="FR", status="active")
     db_session.add(country)
     db_session.flush()
     return country
@@ -239,6 +237,7 @@ def country(db_session: Session) -> Country:
 # =============================================================================
 # MODEL FIXTURES - Tenant (Multi-tenant)
 # =============================================================================
+
 
 @pytest.fixture
 def tenant(db_session: Session, country: Country) -> Tenant:
@@ -310,6 +309,7 @@ def tenant_suspended(db_session: Session, country: Country) -> Tenant:
 # MODEL FIXTURES - Organisation (Entity) - AVEC tenant_id
 # =============================================================================
 
+
 @pytest.fixture
 def entity(db_session: Session, country: Country, tenant: Tenant) -> Entity:
     """Crée une entité de test (SSIAD)."""
@@ -327,7 +327,7 @@ def entity(db_session: Session, country: Country, tenant: Tenant) -> Entity:
         latitude=Decimal("48.8566"),
         longitude=Decimal("2.3522"),
         default_intervention_radius_km=25,
-        status="active"
+        status="active",
     )
     db_session.add(entity)
     db_session.flush()
@@ -347,7 +347,7 @@ def entity_saad(db_session: Session, country: Country, tenant: Tenant) -> Entity
         address="2 rue du Service, 75002 Paris",
         phone="0100000002",
         email="test@saad-paris.fr",
-        status="active"
+        status="active",
     )
     db_session.add(entity)
     db_session.flush()
@@ -358,15 +358,11 @@ def entity_saad(db_session: Session, country: Country, tenant: Tenant) -> Entity
 # MODEL FIXTURES - Professions (PAS de tenant_id - données partagées)
 # =============================================================================
 
+
 @pytest.fixture
 def profession_medecin(db_session: Session) -> Profession:
     """Crée la profession Médecin."""
-    profession = Profession(
-        name="Médecin",
-        code="10",
-        category="MEDICAL",
-        requires_rpps=True
-    )
+    profession = Profession(name="Médecin", code="10", category="MEDICAL", requires_rpps=True)
     db_session.add(profession)
     db_session.flush()
     return profession
@@ -375,12 +371,7 @@ def profession_medecin(db_session: Session) -> Profession:
 @pytest.fixture
 def profession_infirmier(db_session: Session) -> Profession:
     """Crée la profession Infirmier."""
-    profession = Profession(
-        name="Infirmier",
-        code="60",
-        category="PARAMEDICAL",
-        requires_rpps=True
-    )
+    profession = Profession(name="Infirmier", code="60", category="PARAMEDICAL", requires_rpps=True)
     db_session.add(profession)
     db_session.flush()
     return profession
@@ -390,10 +381,7 @@ def profession_infirmier(db_session: Session) -> Profession:
 def profession_aide_soignant(db_session: Session) -> Profession:
     """Crée la profession Aide-soignant."""
     profession = Profession(
-        name="Aide-soignant",
-        code="93",
-        category="PARAMEDICAL",
-        requires_rpps=False
+        name="Aide-soignant", code="93", category="PARAMEDICAL", requires_rpps=False
     )
     db_session.add(profession)
     db_session.flush()
@@ -404,10 +392,7 @@ def profession_aide_soignant(db_session: Session) -> Profession:
 def profession_admin(db_session: Session) -> Profession:
     """Crée la profession Administratif."""
     profession = Profession(
-        name="Administratif",
-        code=None,
-        category="ADMINISTRATIVE",
-        requires_rpps=False
+        name="Administratif", code=None, category="ADMINISTRATIVE", requires_rpps=False
     )
     db_session.add(profession)
     db_session.flush()
@@ -418,6 +403,7 @@ def profession_admin(db_session: Session) -> Profession:
 # MODEL FIXTURES - Rôles (Architecture v4.3 - Permission + RolePermission)
 # =============================================================================
 
+
 @pytest.fixture
 def role_admin(db_session: Session) -> Role:
     """Crée le rôle ADMIN avec ses permissions (v4.3)."""
@@ -426,7 +412,7 @@ def role_admin(db_session: Session) -> Role:
         role_name=RoleName.ADMIN.value,
         description="Administrateur système",
         permission_codes=["ADMIN_FULL"],
-        is_system_role=True
+        is_system_role=True,
     )
 
 
@@ -438,11 +424,15 @@ def role_medecin(db_session: Session) -> Role:
         role_name=RoleName.MEDECIN_TRAITANT.value,
         description="Médecin traitant référent",
         permission_codes=[
-            "PATIENT_VIEW", "PATIENT_EDIT",
-            "EVALUATION_VIEW", "EVALUATION_CREATE", "EVALUATION_VALIDATE",
-            "VITALS_VIEW", "VITALS_CREATE"
+            "PATIENT_VIEW",
+            "PATIENT_EDIT",
+            "EVALUATION_VIEW",
+            "EVALUATION_CREATE",
+            "EVALUATION_VALIDATE",
+            "VITALS_VIEW",
+            "VITALS_CREATE",
         ],
-        is_system_role=True
+        is_system_role=True,
     )
 
 
@@ -454,11 +444,14 @@ def role_infirmier(db_session: Session) -> Role:
         role_name=RoleName.INFIRMIERE.value,
         description="Infirmier(ère)",
         permission_codes=[
-            "PATIENT_VIEW", "PATIENT_EDIT",
-            "EVALUATION_VIEW", "EVALUATION_CREATE",
-            "VITALS_VIEW", "VITALS_CREATE"
+            "PATIENT_VIEW",
+            "PATIENT_EDIT",
+            "EVALUATION_VIEW",
+            "EVALUATION_CREATE",
+            "VITALS_VIEW",
+            "VITALS_CREATE",
         ],
-        is_system_role=True
+        is_system_role=True,
     )
 
 
@@ -470,14 +463,21 @@ def role_coordinateur(db_session: Session) -> Role:
         role_name=RoleName.COORDINATEUR.value,
         description="Coordinateur de parcours de soins",
         permission_codes=[
-            "PATIENT_VIEW", "PATIENT_CREATE", "PATIENT_EDIT",
-            "EVALUATION_VIEW", "EVALUATION_CREATE",
-            "CARE_PLAN_VIEW", "CARE_PLAN_CREATE", "CARE_PLAN_VALIDATE",
-            "SCHEDULE_VIEW", "SCHEDULE_MANAGE",
+            "PATIENT_VIEW",
+            "PATIENT_CREATE",
+            "PATIENT_EDIT",
+            "EVALUATION_VIEW",
+            "EVALUATION_CREATE",
+            "CARE_PLAN_VIEW",
+            "CARE_PLAN_CREATE",
+            "CARE_PLAN_VALIDATE",
+            "SCHEDULE_VIEW",
+            "SCHEDULE_MANAGE",
             "USER_VIEW",
-            "ACCESS_GRANT", "ACCESS_REVOKE",
+            "ACCESS_GRANT",
+            "ACCESS_REVOKE",
         ],
-        is_system_role=True
+        is_system_role=True,
     )
 
 
@@ -485,8 +485,15 @@ def role_coordinateur(db_session: Session) -> Role:
 # MODEL FIXTURES - Utilisateurs (AVEC tenant_id)
 # =============================================================================
 
+
 @pytest.fixture
-def user_admin(db_session: Session, tenant: Tenant, entity: Entity, role_admin: Role, profession_admin: Profession) -> User:
+def user_admin(
+    db_session: Session,
+    tenant: Tenant,
+    entity: Entity,
+    role_admin: Role,
+    profession_admin: Profession,
+) -> User:
     """Crée un utilisateur admin de test."""
     user = User(
         tenant_id=tenant.id,  # MULTI-TENANT
@@ -496,7 +503,7 @@ def user_admin(db_session: Session, tenant: Tenant, entity: Entity, role_admin: 
         rpps="00000000001",
         profession_id=profession_admin.id,
         is_admin=True,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.flush()
@@ -506,7 +513,7 @@ def user_admin(db_session: Session, tenant: Tenant, entity: Entity, role_admin: 
         user_id=user.id,
         role_id=role_admin.id,
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
-        assigned_by=user.id
+        assigned_by=user.id,
     )
     db_session.add(user_role)
 
@@ -517,7 +524,7 @@ def user_admin(db_session: Session, tenant: Tenant, entity: Entity, role_admin: 
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
         is_primary=True,
         contract_type=ContractType.SALARIE.value,
-        start_date=date.today()
+        start_date=date.today(),
     )
     db_session.add(user_entity)
     db_session.flush()
@@ -526,7 +533,13 @@ def user_admin(db_session: Session, tenant: Tenant, entity: Entity, role_admin: 
 
 
 @pytest.fixture
-def user_medecin(db_session: Session, tenant: Tenant, entity: Entity, role_medecin: Role, profession_medecin: Profession) -> User:
+def user_medecin(
+    db_session: Session,
+    tenant: Tenant,
+    entity: Entity,
+    role_medecin: Role,
+    profession_medecin: Profession,
+) -> User:
     """Crée un utilisateur médecin de test."""
     user = User(
         tenant_id=tenant.id,  # MULTI-TENANT
@@ -536,7 +549,7 @@ def user_medecin(db_session: Session, tenant: Tenant, entity: Entity, role_medec
         rpps="12345678901",
         profession_id=profession_medecin.id,
         is_admin=False,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.flush()
@@ -545,7 +558,7 @@ def user_medecin(db_session: Session, tenant: Tenant, entity: Entity, role_medec
     user_role = UserRole(
         user_id=user.id,
         role_id=role_medecin.id,
-        tenant_id=tenant.id  # MULTI-TENANT v4.3
+        tenant_id=tenant.id,  # MULTI-TENANT v4.3
     )
     db_session.add(user_role)
 
@@ -556,7 +569,7 @@ def user_medecin(db_session: Session, tenant: Tenant, entity: Entity, role_medec
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
         is_primary=True,
         contract_type=ContractType.LIBERAL.value,
-        start_date=date.today()
+        start_date=date.today(),
     )
     db_session.add(user_entity)
     db_session.flush()
@@ -565,7 +578,13 @@ def user_medecin(db_session: Session, tenant: Tenant, entity: Entity, role_medec
 
 
 @pytest.fixture
-def user_infirmier(db_session: Session, tenant: Tenant, entity: Entity, role_infirmier: Role, profession_infirmier: Profession) -> User:
+def user_infirmier(
+    db_session: Session,
+    tenant: Tenant,
+    entity: Entity,
+    role_infirmier: Role,
+    profession_infirmier: Profession,
+) -> User:
     """Crée un utilisateur infirmier de test."""
     user = User(
         tenant_id=tenant.id,  # MULTI-TENANT
@@ -575,7 +594,7 @@ def user_infirmier(db_session: Session, tenant: Tenant, entity: Entity, role_inf
         rpps="98765432101",
         profession_id=profession_infirmier.id,
         is_admin=False,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.flush()
@@ -584,7 +603,7 @@ def user_infirmier(db_session: Session, tenant: Tenant, entity: Entity, role_inf
     user_role = UserRole(
         user_id=user.id,
         role_id=role_infirmier.id,
-        tenant_id=tenant.id  # MULTI-TENANT v4.3
+        tenant_id=tenant.id,  # MULTI-TENANT v4.3
     )
     db_session.add(user_role)
 
@@ -595,7 +614,7 @@ def user_infirmier(db_session: Session, tenant: Tenant, entity: Entity, role_inf
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
         is_primary=True,
         contract_type=ContractType.SALARIE.value,
-        start_date=date.today()
+        start_date=date.today(),
     )
     db_session.add(user_entity)
     db_session.flush()
@@ -604,7 +623,13 @@ def user_infirmier(db_session: Session, tenant: Tenant, entity: Entity, role_inf
 
 
 @pytest.fixture
-def user_coordinateur(db_session: Session, tenant: Tenant, entity: Entity, role_coordinateur: Role, profession_admin: Profession) -> User:
+def user_coordinateur(
+    db_session: Session,
+    tenant: Tenant,
+    entity: Entity,
+    role_coordinateur: Role,
+    profession_admin: Profession,
+) -> User:
     """Crée un utilisateur coordinateur de test."""
     user = User(
         tenant_id=tenant.id,  # MULTI-TENANT
@@ -614,7 +639,7 @@ def user_coordinateur(db_session: Session, tenant: Tenant, entity: Entity, role_
         rpps="11111111111",
         profession_id=profession_admin.id,
         is_admin=False,
-        is_active=True
+        is_active=True,
     )
     db_session.add(user)
     db_session.flush()
@@ -623,7 +648,7 @@ def user_coordinateur(db_session: Session, tenant: Tenant, entity: Entity, role_
     user_role = UserRole(
         user_id=user.id,
         role_id=role_coordinateur.id,
-        tenant_id=tenant.id  # MULTI-TENANT v4.3
+        tenant_id=tenant.id,  # MULTI-TENANT v4.3
     )
     db_session.add(user_role)
 
@@ -634,7 +659,7 @@ def user_coordinateur(db_session: Session, tenant: Tenant, entity: Entity, role_
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
         is_primary=True,
         contract_type=ContractType.SALARIE.value,
-        start_date=date.today()
+        start_date=date.today(),
     )
     db_session.add(user_entity)
     db_session.flush()
@@ -646,8 +671,11 @@ def user_coordinateur(db_session: Session, tenant: Tenant, entity: Entity, role_
 # MODEL FIXTURES - Patients (AVEC tenant_id)
 # =============================================================================
 
+
 @pytest.fixture
-def patient(db_session: Session, tenant: Tenant, entity: Entity, user_medecin: User, user_admin: User) -> Patient:
+def patient(
+    db_session: Session, tenant: Tenant, entity: Entity, user_medecin: User, user_admin: User
+) -> Patient:
     """Crée un patient de test."""
     patient = Patient(
         tenant_id=tenant.id,  # MULTI-TENANT
@@ -664,7 +692,7 @@ def patient(db_session: Session, tenant: Tenant, entity: Entity, user_medecin: U
         medecin_traitant_id=user_medecin.id,
         entity_id=entity.id,
         status="ACTIVE",
-        created_by=user_admin.id
+        created_by=user_admin.id,
     )
     db_session.add(patient)
     db_session.flush()
@@ -675,8 +703,11 @@ def patient(db_session: Session, tenant: Tenant, entity: Entity, user_medecin: U
 # PATIENT ACCESS
 # =============================================================================
 
+
 @pytest.fixture
-def patient_access(db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User, user_admin: User) -> PatientAccess:
+def patient_access(
+    db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User, user_admin: User
+) -> PatientAccess:
     """Crée un accès patient de test."""
     access = PatientAccess(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -685,7 +716,7 @@ def patient_access(db_session: Session, tenant: Tenant, patient: Patient, user_i
         access_type=AccessType.WRITE.value,
         reason="Prise en charge infirmière - soins quotidiens",
         granted_by=user_admin.id,
-        granted_at=datetime.now(timezone.utc)
+        granted_at=datetime.now(UTC),
     )
     db_session.add(access)
     db_session.flush()
@@ -696,6 +727,7 @@ def patient_access(db_session: Session, tenant: Tenant, patient: Patient, user_i
 # PATIENT DEVICE FIXTURE
 # =============================================================================
 
+
 @pytest.fixture
 def patient_device(db_session: Session, tenant: Tenant, patient: Patient) -> PatientDevice:
     """Crée un device patient de test."""
@@ -705,7 +737,7 @@ def patient_device(db_session: Session, tenant: Tenant, patient: Patient) -> Pat
         device_type="WITHINGS_SCALE",
         device_identifier="WS-123456",
         device_name="Balance Withings Body+",  # Nom personnalisé inclut marque/modèle
-        is_active=True
+        is_active=True,
         # Note: manufacturer et model n'existent pas dans le modèle
     )
     db_session.add(device)
@@ -717,8 +749,11 @@ def patient_device(db_session: Session, tenant: Tenant, patient: Patient) -> Pat
 # PATIENT EVALUATION FIXTURE
 # =============================================================================
 
+
 @pytest.fixture
-def patient_evaluation(db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User) -> PatientEvaluation:
+def patient_evaluation(
+    db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User
+) -> PatientEvaluation:
     """Crée une évaluation patient de test."""
     evaluation = PatientEvaluation(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -739,14 +774,11 @@ def patient_evaluation(db_session: Session, tenant: Tenant, patient: Patient, us
                 "deplacement_interieur": "B",
                 "deplacement_exterieur": "C",
                 "communication": "A",
-                "GIR": 4
+                "GIR": 4,
             },
-            "usager": {
-                "nom": "Durand",
-                "prenom": "Jean"
-            }
+            "usager": {"nom": "Durand", "prenom": "Jean"},
         },
-        gir_score=4  # Score GIR extrait pour requêtes rapides
+        gir_score=4,  # Score GIR extrait pour requêtes rapides
         # Note: is_validated est une @property, pas une colonne
         # Note: notes n'existe pas dans le modèle
     )
@@ -759,6 +791,7 @@ def patient_evaluation(db_session: Session, tenant: Tenant, patient: Patient, us
 # PATIENT THRESHOLD FIXTURE
 # =============================================================================
 
+
 @pytest.fixture
 def patient_threshold(db_session: Session, tenant: Tenant, patient: Patient) -> PatientThreshold:
     """Crée un seuil patient de test."""
@@ -769,7 +802,7 @@ def patient_threshold(db_session: Session, tenant: Tenant, patient: Patient) -> 
         min_value=Decimal("100"),  # Seuil bas
         max_value=Decimal("140"),  # Seuil haut
         unit="mmHg",
-        surveillance_frequency="1x/jour"  # Correct: pas notes
+        surveillance_frequency="1x/jour",  # Correct: pas notes
         # Note: critical_min, critical_max, set_by, is_active n'existent pas
     )
     db_session.add(threshold)
@@ -781,8 +814,11 @@ def patient_threshold(db_session: Session, tenant: Tenant, patient: Patient) -> 
 # PATIENT VITALS FIXTURE
 # =============================================================================
 
+
 @pytest.fixture
-def patient_vitals(db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User) -> PatientVitals:
+def patient_vitals(
+    db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User
+) -> PatientVitals:
     """Crée des constantes vitales de test."""
     vitals = PatientVitals(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -792,8 +828,8 @@ def patient_vitals(db_session: Session, tenant: Tenant, patient: Patient, user_i
         unit="mmHg",
         status="NORMAL",
         source=VitalSource.MANUAL.value,
-        measured_at=datetime.now(timezone.utc),
-        recorded_by=user_infirmier.id
+        measured_at=datetime.now(UTC),
+        recorded_by=user_infirmier.id,
     )
     db_session.add(vitals)
     db_session.flush()
@@ -804,8 +840,11 @@ def patient_vitals(db_session: Session, tenant: Tenant, patient: Patient, user_i
 # MODEL FIXTURES - Catalogue de services (PAS de tenant_id sur templates)
 # =============================================================================
 
+
 @pytest.fixture
-def service_template_toilette(db_session: Session, profession_aide_soignant: Profession) -> ServiceTemplate:
+def service_template_toilette(
+    db_session: Session, profession_aide_soignant: Profession
+) -> ServiceTemplate:
     """Crée un template de service Toilette."""
     template = ServiceTemplate(
         code="TOILETTE_COMPLETE",
@@ -818,7 +857,7 @@ def service_template_toilette(db_session: Session, profession_aide_soignant: Pro
         is_medical_act=False,
         apa_eligible=True,
         display_order=10,
-        status="active"
+        status="active",
     )
     db_session.add(template)
     db_session.flush()
@@ -826,7 +865,9 @@ def service_template_toilette(db_session: Session, profession_aide_soignant: Pro
 
 
 @pytest.fixture
-def service_template_injection(db_session: Session, profession_infirmier: Profession) -> ServiceTemplate:
+def service_template_injection(
+    db_session: Session, profession_infirmier: Profession
+) -> ServiceTemplate:
     """Crée un template de service Injection."""
     template = ServiceTemplate(
         code="INJECTION_SC",
@@ -839,7 +880,7 @@ def service_template_injection(db_session: Session, profession_infirmier: Profes
         is_medical_act=True,
         apa_eligible=False,
         display_order=20,
-        status="active"
+        status="active",
     )
     db_session.add(template)
     db_session.flush()
@@ -860,7 +901,7 @@ def service_template_courses(db_session: Session) -> ServiceTemplate:
         is_medical_act=False,
         apa_eligible=True,
         display_order=50,
-        status="active"
+        status="active",
     )
     db_session.add(template)
     db_session.flush()
@@ -868,7 +909,9 @@ def service_template_courses(db_session: Session) -> ServiceTemplate:
 
 
 @pytest.fixture
-def entity_service_toilette(db_session: Session, tenant: Tenant, entity: Entity, service_template_toilette: ServiceTemplate) -> EntityService:
+def entity_service_toilette(
+    db_session: Session, tenant: Tenant, entity: Entity, service_template_toilette: ServiceTemplate
+) -> EntityService:
     """Crée un service d'entité pour la toilette."""
     entity_service = EntityService(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -878,7 +921,7 @@ def entity_service_toilette(db_session: Session, tenant: Tenant, entity: Entity,
         price_euros=Decimal("28.50"),
         max_capacity_week=100,
         custom_duration_minutes=50,  # Durée personnalisée
-        notes="Service principal du SSIAD"
+        notes="Service principal du SSIAD",
     )
     db_session.add(entity_service)
     db_session.flush()
@@ -889,8 +932,16 @@ def entity_service_toilette(db_session: Session, tenant: Tenant, entity: Entity,
 # MODEL FIXTURES - Plans d'aide (PAS de tenant_id - hérite via patient/entity)
 # =============================================================================
 
+
 @pytest.fixture
-def care_plan(db_session: Session, tenant: Tenant, patient: Patient, entity: Entity, patient_evaluation: PatientEvaluation, user_coordinateur: User) -> CarePlan:
+def care_plan(
+    db_session: Session,
+    tenant: Tenant,
+    patient: Patient,
+    entity: Entity,
+    patient_evaluation: PatientEvaluation,
+    user_coordinateur: User,
+) -> CarePlan:
     """Crée un plan d'aide de test."""
     care_plan = CarePlan(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -905,7 +956,7 @@ def care_plan(db_session: Session, tenant: Tenant, patient: Patient, entity: Ent
         total_hours_week=Decimal("12.50"),
         gir_at_creation=4,
         notes="Plan initial suite à évaluation GIR 4",
-        created_by=user_coordinateur.id
+        created_by=user_coordinateur.id,
     )
     db_session.add(care_plan)
     db_session.flush()
@@ -913,7 +964,12 @@ def care_plan(db_session: Session, tenant: Tenant, patient: Patient, entity: Ent
 
 
 @pytest.fixture
-def care_plan_service(db_session: Session, tenant: Tenant, care_plan: CarePlan, service_template_toilette: ServiceTemplate) -> CarePlanService:
+def care_plan_service(
+    db_session: Session,
+    tenant: Tenant,
+    care_plan: CarePlan,
+    service_template_toilette: ServiceTemplate,
+) -> CarePlanService:
     """Crée un service de plan d'aide de test."""
     service = CarePlanService(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -928,7 +984,7 @@ def care_plan_service(db_session: Session, tenant: Tenant, care_plan: CarePlan, 
         priority=ServicePriority.HIGH,
         assignment_status=AssignmentStatus.UNASSIGNED,
         special_instructions="Patient préfère toilette au lavabo",
-        status="active"
+        status="active",
     )
     db_session.add(service)
     db_session.flush()
@@ -939,8 +995,11 @@ def care_plan_service(db_session: Session, tenant: Tenant, care_plan: CarePlan, 
 # MODEL FIXTURES - Disponibilités
 # =============================================================================
 
+
 @pytest.fixture
-def user_availability(db_session: Session, tenant: Tenant, user_infirmier: User, entity: Entity) -> UserAvailability:
+def user_availability(
+    db_session: Session, tenant: Tenant, user_infirmier: User, entity: Entity
+) -> UserAvailability:
     """Crée une disponibilité de test."""
     availability = UserAvailability(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -954,7 +1013,7 @@ def user_availability(db_session: Session, tenant: Tenant, user_infirmier: User,
         valid_until=None,
         max_patients=8,
         notes="Disponible le matin",
-        is_active=True
+        is_active=True,
     )
     db_session.add(availability)
     db_session.flush()
@@ -965,13 +1024,14 @@ def user_availability(db_session: Session, tenant: Tenant, user_infirmier: User,
 # MODEL FIXTURES - Interventions planifiées
 # =============================================================================
 
+
 @pytest.fixture
 def scheduled_intervention(
     db_session: Session,
     tenant: Tenant,
     care_plan_service: CarePlanService,
     patient: Patient,
-    user_infirmier: User
+    user_infirmier: User,
 ) -> ScheduledIntervention:
     """Crée une intervention planifiée de test."""
     intervention = ScheduledIntervention(
@@ -982,7 +1042,7 @@ def scheduled_intervention(
         scheduled_date=date.today(),
         scheduled_start_time=time(8, 0),
         scheduled_end_time=time(8, 45),
-        status=InterventionStatus.SCHEDULED
+        status=InterventionStatus.SCHEDULED,
     )
     db_session.add(intervention)
     db_session.flush()
@@ -993,8 +1053,11 @@ def scheduled_intervention(
 # MODEL FIXTURES - Coordination
 # =============================================================================
 
+
 @pytest.fixture
-def coordination_entry(db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User) -> CoordinationEntry:
+def coordination_entry(
+    db_session: Session, tenant: Tenant, patient: Patient, user_infirmier: User
+) -> CoordinationEntry:
     """Crée une entrée de coordination de test."""
     entry = CoordinationEntry(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -1005,8 +1068,8 @@ def coordination_entry(db_session: Session, tenant: Tenant, patient: Patient, us
         description="Aide à la toilette complète réalisée",
         observations="RAS, patient en forme",
         next_actions="Continuer le protocole habituel",
-        performed_at=datetime.now(timezone.utc),
-        duration_minutes=45
+        performed_at=datetime.now(UTC),
+        duration_minutes=45,
     )
     db_session.add(entry)
     db_session.flush()
@@ -1016,6 +1079,7 @@ def coordination_entry(db_session: Session, tenant: Tenant, patient: Patient, us
 # =============================================================================
 # SUBSCRIPTION FIXTURES
 # =============================================================================
+
 
 @pytest.fixture
 def subscription(db_session: Session, tenant: Tenant) -> Subscription:
@@ -1091,7 +1155,9 @@ def subscription_usage(db_session: Session, subscription: Subscription) -> Subsc
 
 
 @pytest.fixture
-def subscription_usage_with_overage(db_session: Session, subscription: Subscription) -> SubscriptionUsage:
+def subscription_usage_with_overage(
+    db_session: Session, subscription: Subscription
+) -> SubscriptionUsage:
     """Crée un usage avec dépassement."""
     today = date.today()
     # Mois précédent
@@ -1124,8 +1190,9 @@ def subscription_usage_with_overage(db_session: Session, subscription: Subscript
 # API TEST FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
-def client(db_session: Session, user_admin: User, tenant: Tenant) -> Generator[TestClient, None, None]:
+def client(db_session: Session, user_admin: User, tenant: Tenant) -> Generator[TestClient]:
     """
     Client de test FastAPI avec authentification mockée.
 
@@ -1134,9 +1201,9 @@ def client(db_session: Session, user_admin: User, tenant: Tenant) -> Generator[T
     2. Override get_current_user pour bypasser l'authentification JWT
     3. Override get_current_tenant_id pour fournir le tenant de test
     """
-    from app.database.session_rls import get_db, get_db_no_rls
-    from app.core.auth.user_auth import get_current_user
     from app.api.v1.user.tenant_users_security import get_current_tenant_id
+    from app.core.auth.user_auth import get_current_user
+    from app.database.session_rls import get_db, get_db_no_rls
 
     def override_get_db():
         try:
@@ -1165,15 +1232,17 @@ def client(db_session: Session, user_admin: User, tenant: Tenant) -> Generator[T
 
 
 @pytest.fixture
-def client_as_user(db_session: Session, user_infirmier: User, tenant: Tenant) -> Generator[TestClient, None, None]:
+def client_as_user(
+    db_session: Session, user_infirmier: User, tenant: Tenant
+) -> Generator[TestClient]:
     """
     Client de test authentifié en tant qu'utilisateur standard (infirmier).
 
     Utile pour tester les permissions et restrictions d'accès.
     """
-    from app.database.session_rls import get_db, get_db_no_rls
-    from app.core.auth.user_auth import get_current_user
     from app.api.v1.user.tenant_users_security import get_current_tenant_id
+    from app.core.auth.user_auth import get_current_user
+    from app.database.session_rls import get_db, get_db_no_rls
 
     def override_get_db():
         try:
@@ -1201,15 +1270,18 @@ def client_as_user(db_session: Session, user_infirmier: User, tenant: Tenant) ->
 # Les fixtures de token ne sont plus nécessaires pour les tests API
 # mais on les garde pour la rétrocompatibilité avec d'autres tests
 
+
 @pytest.fixture
 def admin_token(user_admin: User) -> str:
     """Token JWT pour l'admin (pour tests spécifiques JWT)."""
-    return create_access_token(data={
-        "sub": str(user_admin.id),
-        "email": user_admin.email,
-        "is_admin": user_admin.is_admin,
-        "tenant_id": user_admin.tenant_id,
-    })
+    return create_access_token(
+        data={
+            "sub": str(user_admin.id),
+            "email": user_admin.email,
+            "is_admin": user_admin.is_admin,
+            "tenant_id": user_admin.tenant_id,
+        }
+    )
 
 
 @pytest.fixture
@@ -1221,18 +1293,21 @@ def admin_token_headers(admin_token: str) -> dict:
 @pytest.fixture
 def user_token(user_infirmier: User) -> str:
     """Token JWT pour utilisateur standard."""
-    return create_access_token(data={
-        "sub": str(user_infirmier.id),
-        "email": user_infirmier.email,
-        "is_admin": user_infirmier.is_admin,
-        "tenant_id": user_infirmier.tenant_id,
-    })
+    return create_access_token(
+        data={
+            "sub": str(user_infirmier.id),
+            "email": user_infirmier.email,
+            "is_admin": user_infirmier.is_admin,
+            "tenant_id": user_infirmier.tenant_id,
+        }
+    )
 
 
 @pytest.fixture
 def user_token_headers(user_token: str) -> dict:
     """Headers avec token utilisateur."""
     return {"Authorization": f"Bearer {user_token}"}
+
 
 # --- Instructions de lancement des tests --- #
 """
@@ -1242,12 +1317,16 @@ Pour lancer les tests :
    pytest tests/ -v
 """
 
+
 @pytest.fixture
-def patient_document(db_session: Session, tenant: Tenant, patient: Patient, user_admin: User) -> "PatientDocument":
+def patient_document(
+    db_session: Session, tenant: Tenant, patient: Patient, user_admin: User
+) -> "PatientDocument":
     """Crée un document patient de test."""
-    from datetime import datetime, timezone
+    from datetime import datetime
+
+    from app.models.enums import DocumentFormat, DocumentType
     from app.models.patient.patient_document import PatientDocument
-    from app.models.enums import DocumentType, DocumentFormat
 
     document = PatientDocument(
         tenant_id=tenant.id,  # MULTI-TENANT v4.3
@@ -1259,7 +1338,7 @@ def patient_document(db_session: Session, tenant: Tenant, patient: Patient, user
         file_format=DocumentFormat.PDF.value,
         file_size_bytes=125000,
         generated_by=user_admin.id,
-        generated_at=datetime.now(timezone.utc),
+        generated_at=datetime.now(UTC),
     )
     db_session.add(document)
     db_session.flush()
@@ -1270,7 +1349,13 @@ def patient_document(db_session: Session, tenant: Tenant, patient: Patient, user
 def subscription_enterprise(db_session: Session, tenant: Tenant) -> "Subscription":
     """Crée un abonnement Enterprise avec date d'expiration."""
     from datetime import date, timedelta
-    from app.models.tenants.subscription import Subscription, SubscriptionPlan, SubscriptionStatus, BillingCycle
+
+    from app.models.tenants.subscription import (
+        BillingCycle,
+        Subscription,
+        SubscriptionPlan,
+        SubscriptionStatus,
+    )
 
     subscription = Subscription(
         tenant_id=tenant.id,

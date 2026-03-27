@@ -29,10 +29,8 @@ Note:
     )
 """
 
-from typing import Optional
-
-from fastapi import Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
@@ -40,6 +38,7 @@ from app.core.security.jwt import verify_token
 from app.core.session.tenant_context import set_tenant_context
 from app.database.session_rls import get_db_no_rls
 from app.models.user.user import User
+
 
 # Security scheme pour le token Bearer
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -49,9 +48,10 @@ bearer_scheme = HTTPBearer(auto_error=False)
 # AUTHENTIFICATION UTILISATEUR (PROFESSIONNELS DE SANTÉ)
 # =============================================================================
 
+
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db_no_rls),  # Pas de RLS pour charger l'utilisateur
 ) -> User:
     """
@@ -95,9 +95,9 @@ async def get_current_user(
     except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token invalide: {str(e)}",
+            detail=f"Token invalide: {e!s}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
     # Charger l'utilisateur depuis la DB
     user = db.query(User).filter(User.id == user_id).first()
@@ -122,11 +122,7 @@ async def get_current_user(
         )
 
     # Configurer le contexte tenant pour RLS
-    set_tenant_context(
-        tenant_id=user.tenant_id,
-        user_id=user.id,
-        super_admin=False
-    )
+    set_tenant_context(tenant_id=user.tenant_id, user_id=user.id, super_admin=False)
 
     # Stocker aussi dans request.state pour le middleware
     request.state.tenant_id = user.tenant_id
@@ -138,9 +134,9 @@ async def get_current_user(
 
 async def get_current_user_optional(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db_no_rls),
-) -> Optional[User]:
+) -> User | None:
     """
     Comme get_current_user mais retourne None si pas authentifié.
 
@@ -160,6 +156,7 @@ async def get_current_user_optional(
 # VÉRIFICATION DES PERMISSIONS UTILISATEUR
 # =============================================================================
 
+
 def require_permission(permission: str):
     """
     Factory de dépendance pour vérifier une permission utilisateur.
@@ -171,6 +168,7 @@ def require_permission(permission: str):
         ):
             ...
     """
+
     async def permission_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
@@ -195,6 +193,7 @@ def require_role(role_name: str):
         ):
             ...
     """
+
     async def role_checker(
         current_user: User = Depends(get_current_user),
     ) -> User:
@@ -223,6 +222,7 @@ def require_tenant_access(tenant_id_param: str = "tenant_id"):
         ):
             ...
     """
+
     async def tenant_access_checker(
         request: Request,
         current_user: User = Depends(get_current_user),
@@ -246,11 +246,7 @@ def require_tenant_access(tenant_id_param: str = "tenant_id"):
             )
 
         # Mettre à jour le contexte avec le tenant cible
-        set_tenant_context(
-            tenant_id=target_tenant_id,
-            user_id=current_user.id,
-            super_admin=False
-        )
+        set_tenant_context(tenant_id=target_tenant_id, user_id=current_user.id, super_admin=False)
 
         return current_user
 

@@ -9,6 +9,7 @@ Ce module contient :
 from app.models.careplan.care_plan import CarePlan
 from app.models.careplan.care_plan_service import CarePlanService
 
+
 __all__ = [
     "CarePlan",
     "CarePlanService",

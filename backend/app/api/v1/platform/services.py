@@ -8,25 +8,32 @@ Gestion au niveau plateforme (SuperAdmin) :
 - UserTenantAssignmentService : Gestion des accès cross-tenant
 - PlatformStatsService : Statistiques globales
 """
-import uuid
-from datetime import datetime, timezone, date, timedelta
-from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func, or_, and_
+import uuid
+from datetime import UTC, date, datetime, timedelta
+
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.platform.schemas import (
-    TenantCreate, TenantUpdate, TenantFilters, SuperAdminCreate, SuperAdminUpdate, SuperAdminPasswordChange,
     AuditLogFilters,
-    UserTenantAssignmentCreate, UserTenantAssignmentUpdate, UserTenantAssignmentFilters,
+    SuperAdminCreate,
+    SuperAdminPasswordChange,
+    SuperAdminUpdate,
+    TenantCreate,
+    TenantFilters,
+    TenantUpdate,
+    UserTenantAssignmentCreate,
+    UserTenantAssignmentFilters,
+    UserTenantAssignmentUpdate,
 )
 from app.core.security.hashing import hash_password, verify_password
+from app.models.enums import TenantStatus, TenantType
 from app.models.organization.entity import Entity
 from app.models.patient.patient import Patient
 from app.models.platform.platform_audit_log import PlatformAuditLog
 from app.models.platform.super_admin import SuperAdmin, SuperAdminRole
 from app.models.tenants.tenant import Tenant
-from app.models.enums import TenantStatus, TenantType
 from app.models.user.user import User
 from app.models.user.user_tenant_assignment import UserTenantAssignment
 
@@ -35,54 +42,47 @@ from app.models.user.user_tenant_assignment import UserTenantAssignment
 # EXCEPTIONS
 # =============================================================================
 
+
 class TenantNotFoundError(Exception):
     """Tenant non trouvé."""
-    pass
 
 
 class TenantCodeExistsError(Exception):
     """Code de tenant déjà utilisé."""
-    pass
 
 
 class SuperAdminNotFoundError(Exception):
     """SuperAdmin non trouvé."""
-    pass
 
 
 class SuperAdminEmailExistsError(Exception):
     """Email de SuperAdmin déjà utilisé."""
-    pass
 
 
 class InvalidPasswordError(Exception):
     """Mot de passe invalide."""
-    pass
 
 
 class UserTenantAssignmentNotFoundError(Exception):
     """Affectation cross-tenant non trouvée."""
-    pass
 
 
 class UserNotFoundError(Exception):
     """Utilisateur non trouvé."""
-    pass
 
 
 class DuplicateAssignmentError(Exception):
     """Affectation déjà existante."""
-    pass
 
 
 class InvalidAssignmentError(Exception):
     """Affectation invalide."""
-    pass
 
 
 # =============================================================================
 # TENANT SERVICE
 # =============================================================================
+
 
 class TenantService:
     """Service pour la gestion des tenants."""
@@ -91,13 +91,13 @@ class TenantService:
         self.db = db
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            sort_by: str = "created_at",
-            sort_order: str = "desc",
-            filters: Optional[TenantFilters] = None,
-    ) -> Tuple[List[Tenant], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+        filters: TenantFilters | None = None,
+    ) -> tuple[list[Tenant], int]:
         """Liste les tenants avec pagination et filtres."""
         query = select(Tenant)
 
@@ -147,15 +147,15 @@ class TenantService:
             raise TenantNotFoundError(f"Tenant {tenant_id} non trouvé")
         return tenant
 
-    def get_by_code(self, code: str) -> Optional[Tenant]:
+    def get_by_code(self, code: str) -> Tenant | None:
         """Récupère un tenant par son code."""
         query = select(Tenant).where(Tenant.code == code.upper())
         return self.db.execute(query).scalar_one_or_none()
 
     def create(
-            self,
-            data: TenantCreate,
-            created_by_id: Optional[int] = None,
+        self,
+        data: TenantCreate,
+        created_by_id: int | None = None,
     ) -> Tenant:
         """Crée un nouveau tenant."""
         # Vérifier unicité du code
@@ -205,7 +205,7 @@ class TenantService:
                 "tenant_code": tenant.code,
                 "tenant_name": tenant.name,
                 "tenant_type": tenant.tenant_type.value,
-            }
+            },
         )
 
         self.db.commit()
@@ -213,10 +213,7 @@ class TenantService:
         return tenant
 
     def update(
-            self,
-            tenant_id: int,
-            data: TenantUpdate,
-            updated_by_id: Optional[int] = None
+        self, tenant_id: int, data: TenantUpdate, updated_by_id: int | None = None
     ) -> Tenant:
         """Met à jour un tenant."""
         tenant = self.get_by_id(tenant_id)
@@ -230,9 +227,9 @@ class TenantService:
 
                 # Conversion des enums API vers enums modèle
                 if field == "status" and value:
-                    value = TenantStatus(value.value if hasattr(value, 'value') else value)
+                    value = TenantStatus(value.value if hasattr(value, "value") else value)
                 elif field == "tenant_type" and value:
-                    value = TenantType(value.value if hasattr(value, 'value') else value)
+                    value = TenantType(value.value if hasattr(value, "value") else value)
 
                 if old_value != value:
                     changes[field] = {"old": str(old_value), "new": str(value)}
@@ -245,14 +242,14 @@ class TenantService:
                 resource_id=str(tenant_id),
                 super_admin_id=updated_by_id,
                 tenant_id=tenant_id,
-                details={"changes": changes}
+                details={"changes": changes},
             )
 
         self.db.commit()
         self.db.refresh(tenant)
         return tenant
 
-    def delete(self, tenant_id: int, deleted_by_id: Optional[int] = None) -> bool:
+    def delete(self, tenant_id: int, deleted_by_id: int | None = None) -> bool:
         """
         Supprime un tenant (soft delete via status TERMINATED).
 
@@ -261,7 +258,7 @@ class TenantService:
         tenant = self.get_by_id(tenant_id)
 
         tenant.status = TenantStatus.TERMINATED
-        tenant.terminated_at = datetime.now(timezone.utc)
+        tenant.terminated_at = datetime.now(UTC)
 
         self._log_action(
             action="tenant.delete",
@@ -272,13 +269,13 @@ class TenantService:
             details={
                 "tenant_code": tenant.code,
                 "tenant_name": tenant.name,
-            }
+            },
         )
 
         self.db.commit()
         return True
 
-    def suspend(self, tenant_id: int, reason: str, suspended_by_id: Optional[int] = None) -> Tenant:
+    def suspend(self, tenant_id: int, reason: str, suspended_by_id: int | None = None) -> Tenant:
         """Suspend un tenant."""
         tenant = self.get_by_id(tenant_id)
 
@@ -293,14 +290,14 @@ class TenantService:
             resource_id=str(tenant_id),
             super_admin_id=suspended_by_id,
             tenant_id=tenant_id,
-            details={"reason": reason}
+            details={"reason": reason},
         )
 
         self.db.commit()
         self.db.refresh(tenant)
         return tenant
 
-    def reactivate(self, tenant_id: int, reactivated_by_id: Optional[int] = None) -> Tenant:
+    def reactivate(self, tenant_id: int, reactivated_by_id: int | None = None) -> Tenant:
         """Réactive un tenant suspendu."""
         tenant = self.get_by_id(tenant_id)
 
@@ -308,7 +305,7 @@ class TenantService:
             raise InvalidAssignmentError("Impossible de réactiver un tenant terminé")
 
         tenant.status = TenantStatus.ACTIVE
-        tenant.activated_at = datetime.now(timezone.utc)
+        tenant.activated_at = datetime.now(UTC)
 
         self._log_action(
             action="tenant.reactivate",
@@ -316,7 +313,7 @@ class TenantService:
             resource_id=str(tenant_id),
             super_admin_id=reactivated_by_id,
             tenant_id=tenant_id,
-            details={}
+            details={},
         )
 
         self.db.commit()
@@ -328,19 +325,26 @@ class TenantService:
         tenant = self.get_by_id(tenant_id)
 
         # Compter les entités
-        entities_count = self.db.execute(
-            select(func.count(Entity.id)).where(Entity.tenant_id == tenant_id)
-        ).scalar() or 0
+        entities_count = (
+            self.db.execute(
+                select(func.count(Entity.id)).where(Entity.tenant_id == tenant_id)
+            ).scalar()
+            or 0
+        )
 
         # Compter les utilisateurs
-        users_count = self.db.execute(
-            select(func.count(User.id)).where(User.tenant_id == tenant_id)
-        ).scalar() or 0
+        users_count = (
+            self.db.execute(select(func.count(User.id)).where(User.tenant_id == tenant_id)).scalar()
+            or 0
+        )
 
         # Compter les patients
-        patients_count = self.db.execute(
-            select(func.count(Patient.id)).where(Patient.tenant_id == tenant_id)
-        ).scalar() or 0
+        patients_count = (
+            self.db.execute(
+                select(func.count(Patient.id)).where(Patient.tenant_id == tenant_id)
+            ).scalar()
+            or 0
+        )
 
         # Calculer les pourcentages d'utilisation
         users_usage_percent = None
@@ -365,15 +369,15 @@ class TenantService:
         }
 
     def _log_action(
-            self,
-            action: str,
-            resource_type: str,
-            resource_id: str,
-            super_admin_id: Optional[int],
-            tenant_id: Optional[int] = None,
-            details: Optional[dict] = None,
-            ip_address: Optional[str] = None,
-            user_agent: Optional[str] = None,
+        self,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        super_admin_id: int | None,
+        tenant_id: int | None = None,
+        details: dict | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ):
         """Crée une entrée dans le log d'audit."""
         log = PlatformAuditLog(
@@ -393,6 +397,7 @@ class TenantService:
 # SUPER ADMIN SERVICE
 # =============================================================================
 
+
 class SuperAdminService:
     """Service pour la gestion des super admins."""
 
@@ -400,11 +405,11 @@ class SuperAdminService:
         self.db = db
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            include_inactive: bool = False,
-    ) -> Tuple[List[SuperAdmin], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        include_inactive: bool = False,
+    ) -> tuple[list[SuperAdmin], int]:
         """Liste les super admins avec pagination."""
         query = select(SuperAdmin)
 
@@ -429,15 +434,15 @@ class SuperAdminService:
             raise SuperAdminNotFoundError(f"SuperAdmin {admin_id} non trouvé")
         return admin
 
-    def get_by_email(self, email: str) -> Optional[SuperAdmin]:
+    def get_by_email(self, email: str) -> SuperAdmin | None:
         """Récupère un super admin par son email."""
         query = select(SuperAdmin).where(SuperAdmin.email == email.lower())
         return self.db.execute(query).scalar_one_or_none()
 
     def create(
-            self,
-            data: SuperAdminCreate,
-            created_by_id: Optional[int] = None,
+        self,
+        data: SuperAdminCreate,
+        created_by_id: int | None = None,
     ) -> SuperAdmin:
         """Crée un nouveau super admin."""
         # Vérifier unicité de l'email
@@ -463,7 +468,7 @@ class SuperAdminService:
             resource_type="SuperAdmin",
             resource_id=str(admin.id),
             super_admin_id=created_by_id,
-            details={"email": admin.email, "role": admin.role.value}
+            details={"email": admin.email, "role": admin.role.value},
         )
 
         self.db.commit()
@@ -471,10 +476,10 @@ class SuperAdminService:
         return admin
 
     def update(
-            self,
-            admin_id: int,
-            data: SuperAdminUpdate,
-            updated_by_id: Optional[int] = None,
+        self,
+        admin_id: int,
+        data: SuperAdminUpdate,
+        updated_by_id: int | None = None,
     ) -> SuperAdmin:
         """Met à jour un super admin."""
         admin = self.get_by_id(admin_id)
@@ -483,7 +488,7 @@ class SuperAdminService:
         changes = {}
 
         # Vérifier unicité de l'email si modifié
-        if "email" in update_data and update_data["email"]:
+        if update_data.get("email"):
             new_email = update_data["email"].lower()
             if new_email != admin.email:
                 existing = self.get_by_email(new_email)
@@ -500,8 +505,8 @@ class SuperAdminService:
                 old_value = getattr(admin, field)
                 if old_value != value:
                     # Pour les enums, afficher la valeur
-                    old_display = old_value.value if hasattr(old_value, 'value') else str(old_value)
-                    new_display = value.value if hasattr(value, 'value') else str(value)
+                    old_display = old_value.value if hasattr(old_value, "value") else str(old_value)
+                    new_display = value.value if hasattr(value, "value") else str(value)
                     changes[field] = {"old": old_display, "new": new_display}
                     setattr(admin, field, value)
 
@@ -511,14 +516,14 @@ class SuperAdminService:
                 resource_type="SuperAdmin",
                 resource_id=str(admin_id),
                 super_admin_id=updated_by_id,
-                details={"changes": changes}
+                details={"changes": changes},
             )
 
         self.db.commit()
         self.db.refresh(admin)
         return admin
 
-    def delete(self, admin_id: int, deleted_by_id: Optional[int] = None) -> bool:
+    def delete(self, admin_id: int, deleted_by_id: int | None = None) -> bool:
         """Désactive un super admin (soft delete)."""
         admin = self.get_by_id(admin_id)
 
@@ -533,16 +538,16 @@ class SuperAdminService:
             resource_type="SuperAdmin",
             resource_id=str(admin_id),
             super_admin_id=deleted_by_id,
-            details={"email": admin.email}
+            details={"email": admin.email},
         )
 
         self.db.commit()
         return True
 
     def change_password(
-            self,
-            admin_id: int,
-            data: SuperAdminPasswordChange,
+        self,
+        admin_id: int,
+        data: SuperAdminPasswordChange,
     ) -> bool:
         """Change le mot de passe d'un super admin."""
         admin = self.get_by_id(admin_id)
@@ -557,13 +562,13 @@ class SuperAdminService:
             resource_type="SuperAdmin",
             resource_id=str(admin_id),
             super_admin_id=admin_id,
-            details={}
+            details={},
         )
 
         self.db.commit()
         return True
 
-    def authenticate(self, email: str, password: str) -> Optional[SuperAdmin]:
+    def authenticate(self, email: str, password: str) -> SuperAdmin | None:
         """
         Authentifie un super admin.
 
@@ -593,12 +598,12 @@ class SuperAdminService:
         return admin
 
     def _log_action(
-            self,
-            action: str,
-            resource_type: str,
-            resource_id: str,
-            super_admin_id: Optional[int],
-            details: Optional[dict] = None,
+        self,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        super_admin_id: int | None,
+        details: dict | None = None,
     ):
         """Crée une entrée dans le log d'audit."""
         log = PlatformAuditLog(
@@ -615,6 +620,7 @@ class SuperAdminService:
 # PLATFORM AUDIT LOG SERVICE
 # =============================================================================
 
+
 class PlatformAuditLogService:
     """Service pour la consultation des logs d'audit."""
 
@@ -622,11 +628,11 @@ class PlatformAuditLogService:
         self.db = db
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 50,
-            filters: Optional[AuditLogFilters] = None,
-    ) -> Tuple[List[PlatformAuditLog], int]:
+        self,
+        page: int = 1,
+        size: int = 50,
+        filters: AuditLogFilters | None = None,
+    ) -> tuple[list[PlatformAuditLog], int]:
         """Liste les logs d'audit avec pagination et filtres."""
         query = select(PlatformAuditLog).options(
             selectinload(PlatformAuditLog.super_admin),
@@ -667,10 +673,14 @@ class PlatformAuditLogService:
 
     def get_by_id(self, log_id: int) -> PlatformAuditLog:
         """Récupère un log d'audit par son ID."""
-        query = select(PlatformAuditLog).options(
-            selectinload(PlatformAuditLog.super_admin),
-            selectinload(PlatformAuditLog.tenant),
-        ).where(PlatformAuditLog.id == log_id)
+        query = (
+            select(PlatformAuditLog)
+            .options(
+                selectinload(PlatformAuditLog.super_admin),
+                selectinload(PlatformAuditLog.tenant),
+            )
+            .where(PlatformAuditLog.id == log_id)
+        )
 
         log = self.db.execute(query).scalar_one_or_none()
         if not log:
@@ -682,6 +692,7 @@ class PlatformAuditLogService:
 # USER TENANT ASSIGNMENT SERVICE
 # =============================================================================
 
+
 class UserTenantAssignmentService:
     """Service pour la gestion des affectations cross-tenant."""
 
@@ -689,11 +700,11 @@ class UserTenantAssignmentService:
         self.db = db
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            filters: Optional[UserTenantAssignmentFilters] = None,
-    ) -> Tuple[List[UserTenantAssignment], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        filters: UserTenantAssignmentFilters | None = None,
+    ) -> tuple[list[UserTenantAssignment], int]:
         """Liste les affectations avec pagination et filtres."""
         query = select(UserTenantAssignment).options(
             selectinload(UserTenantAssignment.user),
@@ -708,7 +719,9 @@ class UserTenantAssignmentService:
                 query = query.where(UserTenantAssignment.tenant_id == filters.tenant_id)
 
             if filters.assignment_type:
-                query = query.where(UserTenantAssignment.assignment_type == filters.assignment_type.value)
+                query = query.where(
+                    UserTenantAssignment.assignment_type == filters.assignment_type.value
+                )
 
             if filters.is_active is not None:
                 query = query.where(UserTenantAssignment.is_active == filters.is_active)
@@ -718,7 +731,7 @@ class UserTenantAssignmentService:
                 query = query.where(
                     or_(
                         UserTenantAssignment.end_date.is_(None),
-                        UserTenantAssignment.end_date >= today
+                        UserTenantAssignment.end_date >= today,
                     )
                 )
 
@@ -737,10 +750,14 @@ class UserTenantAssignmentService:
 
     def get_by_id(self, assignment_id: int) -> UserTenantAssignment:
         """Récupère une affectation par son ID."""
-        query = select(UserTenantAssignment).options(
-            selectinload(UserTenantAssignment.user),
-            selectinload(UserTenantAssignment.tenant),
-        ).where(UserTenantAssignment.id == assignment_id)
+        query = (
+            select(UserTenantAssignment)
+            .options(
+                selectinload(UserTenantAssignment.user),
+                selectinload(UserTenantAssignment.tenant),
+            )
+            .where(UserTenantAssignment.id == assignment_id)
+        )
 
         assignment = self.db.execute(query).scalar_one_or_none()
         if not assignment:
@@ -748,9 +765,9 @@ class UserTenantAssignmentService:
         return assignment
 
     def create(
-            self,
-            data: UserTenantAssignmentCreate,
-            created_by_id: Optional[int] = None,
+        self,
+        data: UserTenantAssignmentCreate,
+        created_by_id: int | None = None,
     ) -> UserTenantAssignment:
         """Crée une nouvelle affectation cross-tenant."""
         # Vérifier que l'utilisateur existe
@@ -778,8 +795,8 @@ class UserTenantAssignmentService:
                     UserTenantAssignment.is_active == True,
                     or_(
                         UserTenantAssignment.end_date.is_(None),
-                        UserTenantAssignment.end_date >= date.today()
-                    )
+                        UserTenantAssignment.end_date >= date.today(),
+                    ),
                 )
             )
         ).scalar_one_or_none()
@@ -815,7 +832,7 @@ class UserTenantAssignmentService:
                 "user_id": data.user_id,
                 "tenant_id": data.tenant_id,
                 "assignment_type": data.assignment_type.value,
-            }
+            },
         )
 
         self.db.commit()
@@ -823,10 +840,10 @@ class UserTenantAssignmentService:
         return assignment
 
     def update(
-            self,
-            assignment_id: int,
-            data: UserTenantAssignmentUpdate,
-            updated_by_id: Optional[int] = None,
+        self,
+        assignment_id: int,
+        data: UserTenantAssignmentUpdate,
+        updated_by_id: int | None = None,
     ) -> UserTenantAssignment:
         """Met à jour une affectation."""
         assignment = self.get_by_id(assignment_id)
@@ -840,7 +857,7 @@ class UserTenantAssignmentService:
 
                 # Conversion enum
                 if field == "assignment_type" and value:
-                    value = value.value if hasattr(value, 'value') else value
+                    value = value.value if hasattr(value, "value") else value
 
                 if old_value != value:
                     changes[field] = {"old": str(old_value), "new": str(value)}
@@ -853,14 +870,14 @@ class UserTenantAssignmentService:
                 resource_id=str(assignment_id),
                 super_admin_id=updated_by_id,
                 target_tenant_id=assignment.tenant_id,
-                details={"changes": changes}
+                details={"changes": changes},
             )
 
         self.db.commit()
         self.db.refresh(assignment)
         return assignment
 
-    def delete(self, assignment_id: int, deleted_by_id: Optional[int] = None) -> bool:
+    def delete(self, assignment_id: int, deleted_by_id: int | None = None) -> bool:
         """Désactive une affectation (soft delete)."""
         assignment = self.get_by_id(assignment_id)
 
@@ -873,20 +890,20 @@ class UserTenantAssignmentService:
             resource_id=str(assignment_id),
             super_admin_id=deleted_by_id,
             target_tenant_id=assignment.tenant_id,
-            details={"user_id": assignment.user_id}
+            details={"user_id": assignment.user_id},
         )
 
         self.db.commit()
         return True
 
     def _log_action(
-            self,
-            action: str,
-            resource_type: str,
-            resource_id: str,
-            super_admin_id: Optional[int],
-            target_tenant_id: Optional[int] = None,
-            details: Optional[dict] = None,
+        self,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        super_admin_id: int | None,
+        target_tenant_id: int | None = None,
+        details: dict | None = None,
     ):
         """Crée une entrée dans le log d'audit."""
         log = PlatformAuditLog(
@@ -904,6 +921,7 @@ class UserTenantAssignmentService:
 # PLATFORM STATS SERVICE
 # =============================================================================
 
+
 class PlatformStatsService:
     """Service pour les statistiques globales de la plateforme."""
 
@@ -912,13 +930,12 @@ class PlatformStatsService:
 
     def get_platform_stats(self) -> dict:
         """Récupère les statistiques globales de la plateforme."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         thirty_days_ago = now - timedelta(days=30)
 
         # Tenants par statut
         tenant_stats = self.db.execute(
-            select(Tenant.status, func.count(Tenant.id))
-            .group_by(Tenant.status)
+            select(Tenant.status, func.count(Tenant.id)).group_by(Tenant.status)
         ).all()
 
         tenant_counts = {status.value: count for status, count in tenant_stats}
@@ -930,33 +947,45 @@ class PlatformStatsService:
         total_entities = self.db.execute(select(func.count(Entity.id))).scalar() or 0
 
         # Affectations actives
-        active_assignments = self.db.execute(
-            select(func.count(UserTenantAssignment.id)).where(
-                and_(
-                    UserTenantAssignment.is_active == True,
-                    or_(
-                        UserTenantAssignment.end_date.is_(None),
-                        UserTenantAssignment.end_date >= date.today()
+        active_assignments = (
+            self.db.execute(
+                select(func.count(UserTenantAssignment.id)).where(
+                    and_(
+                        UserTenantAssignment.is_active == True,
+                        or_(
+                            UserTenantAssignment.end_date.is_(None),
+                            UserTenantAssignment.end_date >= date.today(),
+                        ),
                     )
                 )
-            )
-        ).scalar() or 0
+            ).scalar()
+            or 0
+        )
 
         # Tenants créés les 30 derniers jours
-        tenants_last_30 = self.db.execute(
-            select(func.count(Tenant.id)).where(Tenant.created_at >= thirty_days_ago)
-        ).scalar() or 0
+        tenants_last_30 = (
+            self.db.execute(
+                select(func.count(Tenant.id)).where(Tenant.created_at >= thirty_days_ago)
+            ).scalar()
+            or 0
+        )
 
         # Users créés les 30 derniers jours
-        users_last_30 = self.db.execute(
-            select(func.count(User.id)).where(User.created_at >= thirty_days_ago)
-        ).scalar() or 0
+        users_last_30 = (
+            self.db.execute(
+                select(func.count(User.id)).where(User.created_at >= thirty_days_ago)
+            ).scalar()
+            or 0
+        )
 
         # Super admins
         total_super_admins = self.db.execute(select(func.count(SuperAdmin.id))).scalar() or 0
-        active_super_admins = self.db.execute(
-            select(func.count(SuperAdmin.id)).where(SuperAdmin.is_active == True)
-        ).scalar() or 0
+        active_super_admins = (
+            self.db.execute(
+                select(func.count(SuperAdmin.id)).where(SuperAdmin.is_active == True)
+            ).scalar()
+            or 0
+        )
 
         return {
             "total_tenants": total_tenants,

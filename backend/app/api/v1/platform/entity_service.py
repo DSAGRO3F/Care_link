@@ -8,28 +8,27 @@ les validations spécifiques au contexte SuperAdmin :
 - Protection contre la suppression de racines avec enfants
 - Pas de RLS (session sans Row-Level Security)
 """
-from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.organization.entity import Entity
-from app.models.tenants.tenant import Tenant
-from app.models.reference.country import Country
-
 from app.api.v1.organization.schemas import (
-    EntityUpdate,
     EntityFilters,
+    EntityUpdate,
 )
 from app.api.v1.platform.schemas import (
-    PlatformEntityCreate,
     ROOT_ENTITY_TYPES,
+    PlatformEntityCreate,
 )
+from app.models.organization.entity import Entity
+from app.models.reference.country import Country
+from app.models.tenants.tenant import Tenant
 
 
 # =============================================================================
 # EXCEPTIONS MÉTIER (pattern Platform : exceptions classiques)
 # =============================================================================
+
 
 class TenantNotFoundForEntityError(Exception):
     """Tenant introuvable pour opération sur entité."""
@@ -45,9 +44,7 @@ class EntityNotFoundError(Exception):
     def __init__(self, entity_id: int, tenant_id: int):
         self.entity_id = entity_id
         self.tenant_id = tenant_id
-        super().__init__(
-            f"Entité {entity_id} introuvable dans le tenant {tenant_id}"
-        )
+        super().__init__(f"Entité {entity_id} introuvable dans le tenant {tenant_id}")
 
 
 class RootAlreadyExistsError(Exception):
@@ -56,10 +53,7 @@ class RootAlreadyExistsError(Exception):
     def __init__(self, tenant_id: int, existing_root_name: str):
         self.tenant_id = tenant_id
         self.existing_root_name = existing_root_name
-        super().__init__(
-            f"Le tenant {tenant_id} a déjà une entité racine : "
-            f"'{existing_root_name}'"
-        )
+        super().__init__(f"Le tenant {tenant_id} a déjà une entité racine : '{existing_root_name}'")
 
 
 class CannotDeleteRootWithChildrenError(Exception):
@@ -80,9 +74,7 @@ class DuplicateFINESSError(Exception):
 
     def __init__(self, finess: str):
         self.finess = finess
-        super().__init__(
-            f"Le numéro FINESS {finess} est déjà utilisé par une autre entité"
-        )
+        super().__init__(f"Le numéro FINESS {finess} est déjà utilisé par une autre entité")
 
 
 class DuplicateSIRETError(Exception):
@@ -90,9 +82,7 @@ class DuplicateSIRETError(Exception):
 
     def __init__(self, siret: str):
         self.siret = siret
-        super().__init__(
-            f"Le numéro SIRET {siret} est déjà utilisé par une autre entité"
-        )
+        super().__init__(f"Le numéro SIRET {siret} est déjà utilisé par une autre entité")
 
 
 class CountryNotFoundError(Exception):
@@ -116,6 +106,7 @@ class CircularHierarchyError(Exception):
 # =============================================================================
 # SERVICE
 # =============================================================================
+
 
 class PlatformEntityService:
     """
@@ -153,7 +144,7 @@ class PlatformEntityService:
         """Requête de base filtrée par tenant_id."""
         return select(Entity).where(Entity.tenant_id == self.tenant_id)
 
-    def _get_root_entity(self) -> Optional[Entity]:
+    def _get_root_entity(self) -> Entity | None:
         """
         Récupère l'entité racine du tenant (si elle existe).
 
@@ -167,9 +158,7 @@ class PlatformEntityService:
         )
         return self.db.execute(query).scalar_one_or_none()
 
-    def _check_finess_unique(
-        self, finess_et: str, *, exclude_id: Optional[int] = None
-    ) -> None:
+    def _check_finess_unique(self, finess_et: str, *, exclude_id: int | None = None) -> None:
         """Vérifie l'unicité du FINESS ET (global, pas juste dans le tenant)."""
         query = select(Entity).where(Entity.finess_et == finess_et)
         if exclude_id:
@@ -178,9 +167,7 @@ class PlatformEntityService:
         if existing:
             raise DuplicateFINESSError(finess_et)
 
-    def _check_siret_unique(
-        self, siret: str, *, exclude_id: Optional[int] = None
-    ) -> None:
+    def _check_siret_unique(self, siret: str, *, exclude_id: int | None = None) -> None:
         """Vérifie l'unicité du SIRET (global)."""
         query = select(Entity).where(Entity.siret == siret)
         if exclude_id:
@@ -214,10 +201,10 @@ class PlatformEntityService:
         *,
         page: int = 1,
         size: int = 20,
-        sort_by: Optional[str] = "name",
+        sort_by: str | None = "name",
         sort_order: str = "asc",
-        filters: Optional[EntityFilters] = None,
-    ) -> Tuple[List[Entity], int]:
+        filters: EntityFilters | None = None,
+    ) -> tuple[list[Entity], int]:
         """
         Liste paginée des entités du tenant avec filtres.
 
@@ -233,21 +220,15 @@ class PlatformEntityService:
             if filters.entity_type:
                 query = query.where(Entity.entity_type == filters.entity_type)
             if filters.integration_type:
-                query = query.where(
-                    Entity.integration_type == filters.integration_type
-                )
+                query = query.where(Entity.integration_type == filters.integration_type)
             if filters.parent_entity_id:
-                query = query.where(
-                    Entity.parent_entity_id == filters.parent_entity_id
-                )
+                query = query.where(Entity.parent_entity_id == filters.parent_entity_id)
             if filters.country_id:
                 query = query.where(Entity.country_id == filters.country_id)
             if filters.city:
                 query = query.where(Entity.city.ilike(f"%{filters.city}%"))
             if filters.postal_code:
-                query = query.where(
-                    Entity.postal_code.startswith(filters.postal_code)
-                )
+                query = query.where(Entity.postal_code.startswith(filters.postal_code))
             if filters.is_active is not None:
                 query = query.where(Entity.is_active == filters.is_active)
             if filters.search:
@@ -299,16 +280,12 @@ class PlatformEntityService:
             raise EntityNotFoundError(entity_id, self.tenant_id)
         return entity
 
-    def get_children(self, entity_id: int) -> List[Entity]:
+    def get_children(self, entity_id: int) -> list[Entity]:
         """Récupère les enfants directs d'une entité."""
         # Vérifier que le parent existe dans ce tenant
         self.get_by_id(entity_id)
 
-        query = (
-            self._base_query()
-            .where(Entity.parent_entity_id == entity_id)
-            .order_by(Entity.name)
-        )
+        query = self._base_query().where(Entity.parent_entity_id == entity_id).order_by(Entity.name)
         return list(self.db.execute(query).scalars().all())
 
     # =========================================================================
@@ -331,9 +308,7 @@ class PlatformEntityService:
         if is_root:
             existing_root = self._get_root_entity()
             if existing_root:
-                raise RootAlreadyExistsError(
-                    self.tenant_id, existing_root.name
-                )
+                raise RootAlreadyExistsError(self.tenant_id, existing_root.name)
 
         # --- Auto-rattachement à la racine pour les enfants ---
         parent_entity_id = data.parent_entity_id
@@ -393,16 +368,12 @@ class PlatformEntityService:
                     )
 
         # --- Vérifier unicité FINESS si modifié ---
-        if "finess_et" in update_data and update_data["finess_et"]:
-            self._check_finess_unique(
-                update_data["finess_et"], exclude_id=entity_id
-            )
+        if update_data.get("finess_et"):
+            self._check_finess_unique(update_data["finess_et"], exclude_id=entity_id)
 
         # --- Vérifier unicité SIRET si modifié ---
-        if "siret" in update_data and update_data["siret"]:
-            self._check_siret_unique(
-                update_data["siret"], exclude_id=entity_id
-            )
+        if update_data.get("siret"):
+            self._check_siret_unique(update_data["siret"], exclude_id=entity_id)
 
         # --- Vérifier hiérarchie circulaire ---
         if "parent_entity_id" in update_data:
@@ -412,7 +383,7 @@ class PlatformEntityService:
                 self.get_by_id(update_data["parent_entity_id"])
 
         # --- Vérifier pays si modifié ---
-        if "country_id" in update_data and update_data["country_id"]:
+        if update_data.get("country_id"):
             self._check_country_exists(update_data["country_id"])
 
         # --- Appliquer les modifications ---
@@ -442,9 +413,7 @@ class PlatformEntityService:
         if entity.entity_type in ROOT_ENTITY_TYPES:
             children_count = self._count_children(entity_id)
             if children_count > 0:
-                raise CannotDeleteRootWithChildrenError(
-                    entity_id, children_count
-                )
+                raise CannotDeleteRootWithChildrenError(entity_id, children_count)
 
         entity.is_active = False
         self.db.commit()

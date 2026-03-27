@@ -10,17 +10,17 @@ Conventions :
 """
 
 from datetime import date, datetime
-from typing import Optional, Dict, Any, List
+from typing import Any, Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.models.enums import (
+    BillingCycle,
     IntegrationType,
     SubscriptionPlan,
     SubscriptionStatus,
-    BillingCycle,
-    TenantType,
     TenantStatus,
+    TenantType,
 )
 
 
@@ -35,6 +35,7 @@ FEDERATION_PARENT_TYPES = {TenantType.GCSMS, TenantType.GTSMS}
 # TENANT SCHEMAS
 # =============================================================================
 
+
 class TenantCreate(BaseModel):
     """Données requises pour créer un tenant."""
 
@@ -45,45 +46,40 @@ class TenantCreate(BaseModel):
     contact_email: EmailStr
 
     # Identification (optionnel)
-    legal_name: Optional[str] = Field(None, max_length=255)
-    siret: Optional[str] = Field(None, pattern=r"^\d{14}$")
+    legal_name: str | None = Field(None, max_length=255)
+    siret: str | None = Field(None, pattern=r"^\d{14}$")
 
     # Fédération (optionnel)
-    parent_tenant_id: Optional[int] = Field(
-        None,
-        description="ID du groupement fédérateur (GCSMS/GTSMS) de rattachement"
+    parent_tenant_id: int | None = Field(
+        None, description="ID du groupement fédérateur (GCSMS/GTSMS) de rattachement"
     )
-    integration_type: Optional[IntegrationType] = Field(
-        None,
-        description="Type de rattachement : MANAGED, FEDERATED, CONVENTION"
+    integration_type: IntegrationType | None = Field(
+        None, description="Type de rattachement : MANAGED, FEDERATED, CONVENTION"
     )
-    federation_date: Optional[date] = Field(
-        None,
-        description="Date de rattachement au groupement"
-    )
+    federation_date: date | None = Field(None, description="Date de rattachement au groupement")
 
     # Contact (optionnel)
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    billing_email: Optional[EmailStr] = None
+    contact_phone: str | None = Field(None, max_length=20)
+    billing_email: EmailStr | None = None
 
     # Adresse (optionnel)
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
-    postal_code: Optional[str] = None
-    city: Optional[str] = None
-    country_id: Optional[int] = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    country_id: int | None = None
 
     # Configuration (avec défauts)
     timezone: str = "Europe/Paris"
     locale: str = "fr_FR"
 
     # Limites (optionnel, NULL = illimité)
-    max_patients: Optional[int] = None
-    max_users: Optional[int] = None
+    max_patients: int | None = None
+    max_users: int | None = None
     max_storage_gb: int = 50
 
     # Paramètres personnalisés
-    settings: Dict[str, Any] = Field(default_factory=dict)
+    settings: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_federation(self) -> "TenantCreate":
@@ -119,46 +115,47 @@ class TenantCreate(BaseModel):
 class TenantUpdate(BaseModel):
     """Données modifiables d'un tenant (tous champs optionnels)."""
 
-    name: Optional[str] = Field(None, min_length=2, max_length=255)
-    legal_name: Optional[str] = None
-    siret: Optional[str] = Field(None, pattern=r"^\d{14}$")
+    name: str | None = Field(None, min_length=2, max_length=255)
+    legal_name: str | None = None
+    siret: str | None = Field(None, pattern=r"^\d{14}$")
 
     # Fédération (rattacher / détacher / modifier le lien)
-    parent_tenant_id: Optional[int] = Field(
-        None,
-        description="ID du groupement fédérateur. Envoyer null pour détacher."
+    parent_tenant_id: int | None = Field(
+        None, description="ID du groupement fédérateur. Envoyer null pour détacher."
     )
-    integration_type: Optional[IntegrationType] = None
-    federation_date: Optional[date] = None
+    integration_type: IntegrationType | None = None
+    federation_date: date | None = None
 
-    contact_email: Optional[EmailStr] = None
-    contact_phone: Optional[str] = None
-    billing_email: Optional[EmailStr] = None
+    contact_email: EmailStr | None = None
+    contact_phone: str | None = None
+    billing_email: EmailStr | None = None
 
-    address_line1: Optional[str] = None
-    address_line2: Optional[str] = None
-    postal_code: Optional[str] = None
-    city: Optional[str] = None
-    country_id: Optional[int] = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    postal_code: str | None = None
+    city: str | None = None
+    country_id: int | None = None
 
-    timezone: Optional[str] = None
-    locale: Optional[str] = None
+    timezone: str | None = None
+    locale: str | None = None
 
-    max_patients: Optional[int] = None
-    max_users: Optional[int] = None
-    max_storage_gb: Optional[int] = None
+    max_patients: int | None = None
+    max_users: int | None = None
+    max_storage_gb: int | None = None
 
-    settings: Optional[Dict[str, Any]] = None
+    settings: dict[str, Any] | None = None
 
 
 class TenantStatusUpdate(BaseModel):
     """Changement de statut d'un tenant (action spécifique)."""
+
     status: TenantStatus
-    reason: Optional[str] = Field(None, max_length=500, description="Motif du changement")
+    reason: str | None = Field(None, max_length=500, description="Motif du changement")
 
 
 class TenantSummary(BaseModel):
     """Version allégée pour les listes."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -167,16 +164,17 @@ class TenantSummary(BaseModel):
     tenant_type: TenantType
     status: TenantStatus
     contact_email: str
-    city: Optional[str]
+    city: str | None
     created_at: datetime
 
     # Fédération (aperçu)
-    parent_tenant_id: Optional[int] = None
-    integration_type: Optional[IntegrationType] = None
+    parent_tenant_id: int | None = None
+    integration_type: IntegrationType | None = None
 
 
 class ParentTenantInfo(BaseModel):
     """Info minimale sur le groupement fédérateur (pour affichage dans la réponse)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -187,6 +185,7 @@ class ParentTenantInfo(BaseModel):
 
 class MemberTenantInfo(BaseModel):
     """Info minimale sur un tenant membre (pour affichage dans la réponse d'un GCSMS/GTSMS)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -194,19 +193,20 @@ class MemberTenantInfo(BaseModel):
     name: str
     tenant_type: TenantType
     status: TenantStatus
-    integration_type: Optional[IntegrationType] = None
-    federation_date: Optional[date] = None
+    integration_type: IntegrationType | None = None
+    federation_date: date | None = None
 
 
 class FederationView(BaseModel):
     """Vue arborescente d'un groupement fédérateur et ses membres."""
+
     model_config = ConfigDict(from_attributes=True)
 
     # Le groupement
     parent: ParentTenantInfo
 
     # Ses membres
-    members: List[MemberTenantInfo] = []
+    members: list[MemberTenantInfo] = []
 
     # Stats agrégées
     total_members: int = 0
@@ -217,47 +217,48 @@ class FederationView(BaseModel):
 
 class TenantResponse(BaseModel):
     """Réponse complète pour un tenant."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     code: str
     name: str
-    legal_name: Optional[str]
-    siret: Optional[str]
+    legal_name: str | None
+    siret: str | None
 
     tenant_type: TenantType
     status: TenantStatus
 
     # Fédération
-    parent_tenant_id: Optional[int] = None
-    integration_type: Optional[IntegrationType] = None
-    federation_date: Optional[date] = None
-    parent_tenant: Optional[ParentTenantInfo] = None
-    member_tenants: Optional[List[MemberTenantInfo]] = None
+    parent_tenant_id: int | None = None
+    integration_type: IntegrationType | None = None
+    federation_date: date | None = None
+    parent_tenant: ParentTenantInfo | None = None
+    member_tenants: list[MemberTenantInfo] | None = None
 
     contact_email: str
-    contact_phone: Optional[str]
-    billing_email: Optional[str]
+    contact_phone: str | None
+    billing_email: str | None
 
-    address_line1: Optional[str]
-    address_line2: Optional[str]
-    postal_code: Optional[str]
-    city: Optional[str]
-    country_id: Optional[int]
+    address_line1: str | None
+    address_line2: str | None
+    postal_code: str | None
+    city: str | None
+    country_id: int | None
 
     timezone: str
     locale: str
 
-    max_patients: Optional[int]
-    max_users: Optional[int]
+    max_patients: int | None
+    max_users: int | None
     max_storage_gb: int
 
-    settings: Dict[str, Any]
+    settings: dict[str, Any]
 
-    activated_at: Optional[datetime]
-    terminated_at: Optional[datetime]
+    activated_at: datetime | None
+    terminated_at: datetime | None
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
 
 
 class TenantWithStats(TenantResponse):
@@ -281,99 +282,103 @@ class TenantWithStats(TenantResponse):
 # SUBSCRIPTION SCHEMAS
 # =============================================================================
 
+
 class SubscriptionCreate(BaseModel):
     """Données requises pour créer un abonnement."""
 
     plan_code: SubscriptionPlan
-    plan_name: Optional[str] = None
+    plan_name: str | None = None
 
     started_at: date
-    expires_at: Optional[date] = None
-    trial_ends_at: Optional[date] = None
+    expires_at: date | None = None
+    trial_ends_at: date | None = None
 
     status: SubscriptionStatus = SubscriptionStatus.ACTIVE
 
     # Tarification
     base_price_cents: int = Field(..., ge=0)
-    price_per_extra_patient_cents: Optional[int] = Field(None, ge=0)
+    price_per_extra_patient_cents: int | None = Field(None, ge=0)
     currency: str = "EUR"
     billing_cycle: BillingCycle = BillingCycle.MONTHLY
 
     # Limites
     included_patients: int = Field(..., ge=0)
-    included_users: Optional[int] = Field(None, ge=0)
-    included_storage_gb: Optional[int] = Field(None, ge=0)
+    included_users: int | None = Field(None, ge=0)
+    included_storage_gb: int | None = Field(None, ge=0)
 
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class SubscriptionUpdate(BaseModel):
     """Données modifiables d'un abonnement."""
 
-    plan_code: Optional[SubscriptionPlan] = None
-    plan_name: Optional[str] = None
+    plan_code: SubscriptionPlan | None = None
+    plan_name: str | None = None
 
-    expires_at: Optional[date] = None
-    trial_ends_at: Optional[date] = None
+    expires_at: date | None = None
+    trial_ends_at: date | None = None
 
-    base_price_cents: Optional[int] = Field(None, ge=0)
-    price_per_extra_patient_cents: Optional[int] = Field(None, ge=0)
-    billing_cycle: Optional[BillingCycle] = None
+    base_price_cents: int | None = Field(None, ge=0)
+    price_per_extra_patient_cents: int | None = Field(None, ge=0)
+    billing_cycle: BillingCycle | None = None
 
-    included_patients: Optional[int] = Field(None, ge=0)
-    included_users: Optional[int] = Field(None, ge=0)
-    included_storage_gb: Optional[int] = Field(None, ge=0)
+    included_patients: int | None = Field(None, ge=0)
+    included_users: int | None = Field(None, ge=0)
+    included_storage_gb: int | None = Field(None, ge=0)
 
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class SubscriptionStatusUpdate(BaseModel):
     """Changement de statut d'un abonnement."""
+
     status: SubscriptionStatus
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class SubscriptionSummary(BaseModel):
     """Version allégée pour les listes."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     plan_code: SubscriptionPlan
     status: SubscriptionStatus
     started_at: date
-    expires_at: Optional[date]
+    expires_at: date | None
     base_price_cents: int
     included_patients: int
 
 
 class SubscriptionResponse(BaseModel):
     """Réponse complète pour un abonnement."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     tenant_id: int
 
     plan_code: SubscriptionPlan
-    plan_name: Optional[str]
+    plan_name: str | None
     status: SubscriptionStatus
 
     started_at: date
-    expires_at: Optional[date]
-    trial_ends_at: Optional[date]
+    expires_at: date | None
+    trial_ends_at: date | None
 
     base_price_cents: int
-    price_per_extra_patient_cents: Optional[int]
+    price_per_extra_patient_cents: int | None
     currency: str
     billing_cycle: BillingCycle
 
     included_patients: int
-    included_users: Optional[int]
-    included_storage_gb: Optional[int]
+    included_users: int | None
+    included_storage_gb: int | None
 
-    notes: Optional[str]
+    notes: str | None
 
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: datetime | None
 
     # Propriétés calculées
     @property
@@ -396,8 +401,10 @@ class SubscriptionResponse(BaseModel):
 # SUBSCRIPTION USAGE SCHEMAS
 # =============================================================================
 
+
 class UsageResponse(BaseModel):
     """Réponse pour un enregistrement de consommation."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -414,17 +421,17 @@ class UsageResponse(BaseModel):
     api_calls_count: int
 
     # Facturation
-    base_amount_cents: Optional[int]
+    base_amount_cents: int | None
     overage_amount_cents: int
-    total_amount_cents: Optional[int]
+    total_amount_cents: int | None
 
     # Statut
     invoiced: bool
-    invoice_id: Optional[str]
+    invoice_id: str | None
 
     # Propriétés calculées
     @property
-    def total_amount_euros(self) -> Optional[float]:
+    def total_amount_euros(self) -> float | None:
         """Montant total en euros."""
         if self.total_amount_cents is not None:
             return self.total_amount_cents / 100
@@ -438,11 +445,12 @@ class UsageResponse(BaseModel):
 
 class UsageSummary(BaseModel):
     """Résumé de consommation pour dashboard."""
+
     model_config = ConfigDict(from_attributes=True)
 
     period_label: str
     active_patients_count: int
-    total_amount_euros: Optional[float]
+    total_amount_euros: float | None
     invoiced: bool
 
 
@@ -454,8 +462,8 @@ class CurrentUsageResponse(BaseModel):
 
     # Limites du plan
     included_patients: int
-    included_users: Optional[int]
-    included_storage_gb: Optional[int]
+    included_users: int | None
+    included_storage_gb: int | None
 
     # Consommation actuelle
     current_patients: int
@@ -464,8 +472,8 @@ class CurrentUsageResponse(BaseModel):
 
     # Pourcentages
     patients_usage_percent: float
-    users_usage_percent: Optional[float]
-    storage_usage_percent: Optional[float]
+    users_usage_percent: float | None
+    storage_usage_percent: float | None
 
     # Alertes
     is_over_patient_limit: bool
@@ -477,9 +485,11 @@ class CurrentUsageResponse(BaseModel):
 # PAGINATION
 # =============================================================================
 
+
 class PaginatedTenants(BaseModel):
     """Liste paginée de tenants."""
-    items: List[TenantSummary]
+
+    items: list[TenantSummary]
     total: int
     page: int
     size: int
@@ -488,7 +498,8 @@ class PaginatedTenants(BaseModel):
 
 class PaginatedSubscriptions(BaseModel):
     """Liste paginée d'abonnements."""
-    items: List[SubscriptionSummary]
+
+    items: list[SubscriptionSummary]
     total: int
     page: int
     size: int
@@ -497,7 +508,8 @@ class PaginatedSubscriptions(BaseModel):
 
 class PaginatedUsage(BaseModel):
     """Liste paginée d'enregistrements de consommation."""
-    items: List[UsageResponse]
+
+    items: list[UsageResponse]
     total: int
     page: int
     size: int

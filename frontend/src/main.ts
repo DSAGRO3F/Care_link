@@ -9,24 +9,24 @@
  * PrimeVue 4 — Thème teal CareLink (04/03/2026)
  * definePreset remplace la palette primaire bleue d'Aura par le teal #0d9488 de CareLink.
  */
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 
 // Composant racine
-import App from './App.vue'
+import App from './App.vue';
 
 // Router
-import router from './router'
+import router from './router';
 
 // PrimeVue et son thème
-import PrimeVue from 'primevue/config'
-import Aura from '@primevue/themes/aura'
-import { definePreset } from '@primevue/themes'
-import ToastService from 'primevue/toastservice'
-import ConfirmationService from 'primevue/confirmationservice'
+import PrimeVue from 'primevue/config';
+import Aura from '@primevue/themes/aura';
+import { definePreset } from '@primevue/themes';
+import ToastService from 'primevue/toastservice';
+import ConfirmationService from 'primevue/confirmationservice';
 
 // Styles globaux
-import './assets/styles/main.css'
+import './assets/styles/main.css';
 
 // =============================================================================
 // THÈME CARELINK — Palette primaire teal (04/03/2026)
@@ -39,7 +39,7 @@ import './assets/styles/main.css'
 const CareTheme = definePreset(Aura, {
   semantic: {
     primary: {
-      50:  '{teal.50}',
+      50: '{teal.50}',
       100: '{teal.100}',
       200: '{teal.200}',
       300: '{teal.300}',
@@ -50,26 +50,26 @@ const CareTheme = definePreset(Aura, {
       800: '{teal.800}',
       900: '{teal.900}',
       950: '{teal.950}',
-    }
-  }
-})
+    },
+  },
+});
 
 // Création de l'application Vue
-const app = createApp(App)
+const app = createApp(App);
 
-import Tooltip from 'primevue/tooltip'
-app.directive('tooltip', Tooltip)
+import Tooltip from 'primevue/tooltip';
+app.directive('tooltip', Tooltip);
 
 // =============================================================================
 // PLUGINS
 // =============================================================================
 
 // Pinia - Gestion d'état (stores)
-const pinia = createPinia()
-app.use(pinia)
+const pinia = createPinia();
+app.use(pinia);
 
 // Vue Router - Navigation
-app.use(router)
+app.use(router);
 
 // PrimeVue - Composants UI
 app.use(PrimeVue, {
@@ -112,8 +112,34 @@ app.use(PrimeVue, {
     dayNames: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'],
     dayNamesShort: ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'],
     dayNamesMin: ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'],
-    monthNames: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
-    monthNamesShort: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'],
+    monthNames: [
+      'Janvier',
+      'Février',
+      'Mars',
+      'Avril',
+      'Mai',
+      'Juin',
+      'Juillet',
+      'Août',
+      'Septembre',
+      'Octobre',
+      'Novembre',
+      'Décembre',
+    ],
+    monthNamesShort: [
+      'Jan',
+      'Fév',
+      'Mar',
+      'Avr',
+      'Mai',
+      'Jun',
+      'Jul',
+      'Aoû',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Déc',
+    ],
     today: "Aujourd'hui",
     weekHeader: 'Sem',
     firstDayOfWeek: 1,
@@ -125,29 +151,29 @@ app.use(PrimeVue, {
     emptyFilterMessage: 'Aucun résultat trouvé',
     emptyMessage: 'Aucune option disponible',
   },
-})
+});
 
 // Services PrimeVue pour les toasts et confirmations
-app.use(ToastService)
-app.use(ConfirmationService)
+app.use(ToastService);
+app.use(ConfirmationService);
 
 // =============================================================================
 // INITIALISATION
 // =============================================================================
 
 // Initialiser les stores au démarrage
-import { useAuthStore } from './stores/auth.store'
+import { useAuthStore } from './stores/auth.store';
 
 // Fonction d'initialisation asynchrone
 async function initializeApp() {
-  const authStore = useAuthStore()
+  const authStore = useAuthStore();
 
   // Restaurer la session depuis localStorage si elle existe
-  await authStore.initialize()
+  await authStore.initialize();
 
   // Monter l'application
-  app.mount('#app')
+  app.mount('#app');
 }
 
 // Lancer l'initialisation
-initializeApp()
+initializeApp();

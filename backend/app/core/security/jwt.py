@@ -1,10 +1,10 @@
 """Gestion des tokens JWT avec ES256 pour conformité e-santé."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 
 from app.core.config import settings
 
@@ -31,7 +31,7 @@ def _load_public_key() -> str:
     return key_path.read_text()
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """
     Crée un token JWT d'accès signé avec ES256.
 
@@ -49,18 +49,18 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
 
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # Claims standards JWT
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
-        "iss": "carelink",
-    })
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": datetime.now(UTC),
+            "iss": "carelink",
+        }
+    )
     if "type" not in to_encode:
         to_encode["type"] = "access"
 
@@ -69,7 +69,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(
         to_encode,
         private_key,
-        algorithm=settings.ALGORITHM  # ES256
+        algorithm=settings.ALGORITHM,  # ES256
     )
 
     return encoded_jwt
@@ -86,28 +86,26 @@ def create_refresh_token(data: dict) -> str:
         Refresh token JWT signé avec ES256
     """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.now(timezone.utc),
-        "iss": "carelink",
-    })
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": datetime.now(UTC),
+            "iss": "carelink",
+        }
+    )
     # Ne pas écraser le type s'il est déjà défini
     if "type" not in to_encode:
         to_encode["type"] = "refresh"
 
     private_key = _load_private_key()
-    encoded_jwt = jwt.encode(
-        to_encode,
-        private_key,
-        algorithm=settings.ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, private_key, algorithm=settings.ALGORITHM)
 
     return encoded_jwt
 
 
-def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
+def verify_token(token: str, token_type: str = "access") -> dict[str, Any]:
     """
     Vérifie et décode un token JWT signé avec ES256.
 
@@ -136,8 +134,8 @@ def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
                 "verify_exp": True,
                 "verify_iat": True,
                 "require_exp": True,
-                "require_iat": True
-            }
+                "require_iat": True,
+            },
         )
 
         # Vérifier le type de token
@@ -151,10 +149,10 @@ def verify_token(token: str, token_type: str = "access") -> Dict[str, Any]:
         return payload
 
     except JWTError as e:
-        raise JWTError(f"Token validation failed: {str(e)}")
+        raise JWTError(f"Token validation failed: {e!s}") from e
 
 
-def decode_token_without_verification(token: str) -> Dict[str, Any]:
+def decode_token_without_verification(token: str) -> dict[str, Any]:
     """
     Décode un token sans vérifier sa signature (pour debug/audit uniquement).
 
@@ -167,7 +165,4 @@ def decode_token_without_verification(token: str) -> Dict[str, Any]:
     Returns:
         Payload décodé (non vérifié)
     """
-    return jwt.decode(
-        token,
-        options={"verify_signature": False, "verify_exp": False}
-    )
+    return jwt.decode(token, options={"verify_signature": False, "verify_exp": False})

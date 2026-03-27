@@ -33,7 +33,7 @@
  *
  * Destination : src/services/user.service.ts
  */
-import api, { getErrorMessage } from './api'
+import api, { getErrorMessage } from './api';
 import type {
   UserResponse,
   UserList,
@@ -47,9 +47,9 @@ import type {
   UserAvailabilityCreate,
   UserAvailabilityList,
   RoleResponse,
-} from '@/types/user'
+} from '@/types';
 
-const BASE = '/users'
+const BASE = '/users';
 
 // =============================================================================
 // CRUD UTILISATEUR
@@ -59,16 +59,16 @@ const BASE = '/users'
  * Liste paginée des utilisateurs du tenant courant
  */
 export async function listUsers(params?: UserQueryParams): Promise<UserList> {
-  const response = await api.get(BASE, { params })
-  return response.data
+  const response = await api.get(BASE, { params });
+  return response.data;
 }
 
 /**
  * Récupère un utilisateur par son ID
  */
 export async function getUser(userId: number): Promise<UserResponse> {
-  const response = await api.get(`${BASE}/${userId}`)
-  return response.data
+  const response = await api.get(`${BASE}/${userId}`);
+  return response.data;
 }
 
 /**
@@ -77,34 +77,31 @@ export async function getUser(userId: number): Promise<UserResponse> {
 export async function getUserWithEntities(userId: number): Promise<UserWithEntities> {
   const response = await api.get(`${BASE}/${userId}`, {
     params: { include_entities: true },
-  })
-  return response.data
+  });
+  return response.data;
 }
 
 /**
  * Crée un nouvel utilisateur
  */
 export async function createUser(data: UserCreate): Promise<UserResponse> {
-  const response = await api.post(BASE, data)
-  return response.data
+  const response = await api.post(BASE, data);
+  return response.data;
 }
 
 /**
  * Met à jour un utilisateur
  */
-export async function updateUser(
-  userId: number,
-  data: UserUpdate
-): Promise<UserResponse> {
-  const response = await api.patch(`${BASE}/${userId}`, data)
-  return response.data
+export async function updateUser(userId: number, data: UserUpdate): Promise<UserResponse> {
+  const response = await api.patch(`${BASE}/${userId}`, data);
+  return response.data;
 }
 
 /**
  * Désactive un utilisateur (soft delete)
  */
 export async function deleteUser(userId: number): Promise<void> {
-  await api.delete(`${BASE}/${userId}`)
+  await api.delete(`${BASE}/${userId}`);
 }
 
 // =============================================================================
@@ -115,28 +112,22 @@ export async function deleteUser(userId: number): Promise<void> {
  * Récupère les rôles d'un utilisateur
  */
 export async function getUserRoles(userId: number): Promise<RoleResponse[]> {
-  const response = await api.get(`${BASE}/${userId}/roles`)
-  return response.data.items ?? response.data
+  const response = await api.get(`${BASE}/${userId}/roles`);
+  return response.data.items ?? response.data;
 }
 
 /**
  * Assigne un rôle à un utilisateur
  */
-export async function addUserRole(
-  userId: number,
-  roleId: number
-): Promise<void> {
-  await api.post(`${BASE}/${userId}/roles`, { role_id: roleId })
+export async function addUserRole(userId: number, roleId: number): Promise<void> {
+  await api.post(`${BASE}/${userId}/roles`, { role_id: roleId });
 }
 
 /**
  * Retire un rôle d'un utilisateur
  */
-export async function removeUserRole(
-  userId: number,
-  roleId: number
-): Promise<void> {
-  await api.delete(`${BASE}/${userId}/roles/${roleId}`)
+export async function removeUserRole(userId: number, roleId: number): Promise<void> {
+  await api.delete(`${BASE}/${userId}/roles/${roleId}`);
 }
 
 // =============================================================================
@@ -151,8 +142,8 @@ export async function removeUserRole(
  * Chaque rôle contient son tableau permissions: string[].
  */
 export async function listRoles(): Promise<RoleResponse[]> {
-  const response = await api.get('/roles')
-  return response.data.items ?? response.data
+  const response = await api.get('/roles');
+  return response.data.items ?? response.data;
 }
 
 // =============================================================================
@@ -162,11 +153,9 @@ export async function listRoles(): Promise<RoleResponse[]> {
 /**
  * Récupère les entités rattachées à un utilisateur
  */
-export async function getUserEntities(
-  userId: number
-): Promise<UserEntityResponse[]> {
-  const response = await api.get(`${BASE}/${userId}/entities`)
-  return response.data.items ?? response.data
+export async function getUserEntities(userId: number): Promise<UserEntityResponse[]> {
+  const response = await api.get(`${BASE}/${userId}/entities`);
+  return response.data.items ?? response.data;
 }
 
 /**
@@ -174,20 +163,17 @@ export async function getUserEntities(
  */
 export async function attachUserEntity(
   userId: number,
-  data: UserEntityCreate
+  data: UserEntityCreate,
 ): Promise<UserEntityResponse> {
-  const response = await api.post(`${BASE}/${userId}/entities`, data)
-  return response.data
+  const response = await api.post(`${BASE}/${userId}/entities`, data);
+  return response.data;
 }
 
 /**
  * Détache un utilisateur d'une entité
  */
-export async function detachUserEntity(
-  userId: number,
-  entityAssociationId: number
-): Promise<void> {
-  await api.delete(`${BASE}/${userId}/entities/${entityAssociationId}`)
+export async function detachUserEntity(userId: number, entityAssociationId: number): Promise<void> {
+  await api.delete(`${BASE}/${userId}/entities/${entityAssociationId}`);
 }
 
 // =============================================================================
@@ -197,11 +183,9 @@ export async function detachUserEntity(
 /**
  * Récupère les disponibilités d'un utilisateur
  */
-export async function getUserAvailabilities(
-  userId: number
-): Promise<UserAvailabilityList> {
-  const response = await api.get(`${BASE}/${userId}/availabilities`)
-  return response.data
+export async function getUserAvailabilities(userId: number): Promise<UserAvailabilityList> {
+  const response = await api.get(`${BASE}/${userId}/availabilities`);
+  return response.data;
 }
 
 /**
@@ -209,10 +193,10 @@ export async function getUserAvailabilities(
  */
 export async function createUserAvailability(
   userId: number,
-  data: UserAvailabilityCreate
+  data: UserAvailabilityCreate,
 ): Promise<UserAvailabilityResponse> {
-  const response = await api.post(`${BASE}/${userId}/availabilities`, data)
-  return response.data
+  const response = await api.post(`${BASE}/${userId}/availabilities`, data);
+  return response.data;
 }
 
 /**
@@ -221,13 +205,10 @@ export async function createUserAvailability(
 export async function updateUserAvailability(
   userId: number,
   availabilityId: number,
-  data: Partial<UserAvailabilityCreate>
+  data: Partial<UserAvailabilityCreate>,
 ): Promise<UserAvailabilityResponse> {
-  const response = await api.patch(
-    `${BASE}/${userId}/availabilities/${availabilityId}`,
-    data
-  )
-  return response.data
+  const response = await api.patch(`${BASE}/${userId}/availabilities/${availabilityId}`, data);
+  return response.data;
 }
 
 /**
@@ -235,9 +216,9 @@ export async function updateUserAvailability(
  */
 export async function deleteUserAvailability(
   userId: number,
-  availabilityId: number
+  availabilityId: number,
 ): Promise<void> {
-  await api.delete(`${BASE}/${userId}/availabilities/${availabilityId}`)
+  await api.delete(`${BASE}/${userId}/availabilities/${availabilityId}`);
 }
 
 // =============================================================================
@@ -279,7 +260,7 @@ export const userService = {
     update: updateUserAvailability,
     delete: deleteUserAvailability,
   },
-}
+};
 
-export default userService
-export { getErrorMessage }
+export default userService;
+export { getErrorMessage };

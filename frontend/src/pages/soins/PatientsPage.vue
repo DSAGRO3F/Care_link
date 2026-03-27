@@ -1,63 +1,63 @@
 <script setup lang="ts">
-/**
- * Liste des patients
- * Affiche les patients en cards avec recherche et filtres
- */
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { patientService } from '@/services'
-import type { PatientSummary } from '@/types'
-import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
-import Skeleton from 'primevue/skeleton'
+  /**
+   * Liste des patients
+   * Affiche les patients en cards avec recherche et filtres
+   */
+  import { ref, onMounted } from 'vue';
+  import { useRouter } from 'vue-router';
+  import { patientService } from '@/services';
+  import type { PatientSummary } from '@/types';
+  import InputText from 'primevue/inputtext';
+  import Tag from 'primevue/tag';
+  import Skeleton from 'primevue/skeleton';
 
-const router = useRouter()
+  const router = useRouter();
 
-// État
-const patients = ref<PatientSummary[]>([])
-const total = ref(0)
-const isLoading = ref(true)
-const searchQuery = ref('')
+  // État
+  const patients = ref<PatientSummary[]>([]);
+  const total = ref(0);
+  const isLoading = ref(true);
+  const searchQuery = ref('');
 
-// Charger les patients
-const loadPatients = async () => {
-  isLoading.value = true
-  try {
-    const response = await patientService.getAll({
-      page: 1,
-      size: 20,
-      search: searchQuery.value || undefined,
-    })
-    patients.value = response.items
-    total.value = response.total
-  } catch (error) {
-    console.error('Erreur chargement patients:', error)
-  } finally {
-    isLoading.value = false
-  }
-}
+  // Charger les patients
+  const loadPatients = async () => {
+    isLoading.value = true;
+    try {
+      const response = await patientService.getAll({
+        page: 1,
+        size: 20,
+        search: searchQuery.value || undefined,
+      });
+      patients.value = response.items;
+      total.value = response.total;
+    } catch (error) {
+      console.error('Erreur chargement patients:', error);
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
-onMounted(loadPatients)
+  onMounted(loadPatients);
 
-// Recherche avec debounce
-let searchTimeout: ReturnType<typeof setTimeout>
-const onSearch = () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(loadPatients, 300)
-}
+  // Recherche avec debounce
+  let searchTimeout: ReturnType<typeof setTimeout>;
+  const onSearch = () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(loadPatients, 300);
+  };
 
-// Navigation vers le dossier patient
-const goToPatient = (id: number) => {
-  router.push(`/soins/patients/${id}`)
-}
+  // Navigation vers le dossier patient
+  const goToPatient = (id: number) => {
+    router.push(`/soins/patients/${id}`);
+  };
 
-// Couleur du badge GIR
-const getGirClass = (gir: number | undefined) => {
-  if (!gir) return 'badge-neutral'
-  if (gir <= 2) return 'gir-1'
-  if (gir <= 4) return 'gir-3'
-  return 'gir-5'
-}
+  // Couleur du badge GIR
+  const getGirClass = (gir: number | undefined) => {
+    if (!gir) return 'badge-neutral';
+    if (gir <= 2) return 'gir-1';
+    if (gir <= 4) return 'gir-3';
+    return 'gir-5';
+  };
 </script>
 
 <template>
@@ -97,30 +97,36 @@ const getGirClass = (gir: number | undefined) => {
       >
         <div class="flex items-start gap-4">
           <!-- Avatar -->
-          <div class="w-12 h-12 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-semibold">
+          <div
+            class="w-12 h-12 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-semibold"
+          >
             {{ (patient.first_name?.[0] || '') + (patient.last_name?.[0] || '') }}
           </div>
-          
+
           <!-- Infos -->
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-neutral-900">
               {{ patient.first_name }} {{ patient.last_name }}
             </div>
             <div class="text-sm text-neutral-600">
-              {{ patient.birth_date ? new Date(patient.birth_date).toLocaleDateString('fr-FR') : 'Date inconnue' }}
+              {{
+                patient.birth_date
+                  ? new Date(patient.birth_date).toLocaleDateString('fr-FR')
+                  : 'Date inconnue'
+              }}
             </div>
           </div>
-          
+
           <!-- Badge GIR -->
           <div
             v-if="patient.current_gir"
-            class="gir-badge"
             :class="getGirClass(patient.current_gir)"
+            class="gir-badge"
           >
             {{ patient.current_gir }}
           </div>
         </div>
-        
+
         <!-- Statut -->
         <div class="mt-3 flex items-center justify-between">
           <Tag

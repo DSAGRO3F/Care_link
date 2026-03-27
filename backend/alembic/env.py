@@ -36,6 +36,7 @@ target_metadata = Base.metadata
 
 # === Helpers ===
 
+
 def get_url() -> str:
     """
     Retourne l'URL de la base de données depuis les settings.

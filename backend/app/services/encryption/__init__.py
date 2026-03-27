@@ -69,40 +69,38 @@ Usage Evaluation (JSONB):
 from app.services.encryption.base_encryptor import BaseEncryptor
 
 # =============================================================================
+# EVALUATION
+# =============================================================================
+from app.services.encryption.evaluation_encryptor import (
+    EvaluationEncryptor,
+    decrypt_evaluation_data,
+    encrypt_evaluation_data,
+    evaluation_encryptor,
+    get_evaluation_encrypted_paths,
+)
+
+# =============================================================================
 # PATIENT
 # =============================================================================
-
 from app.services.encryption.patient_encryptor import (
     PatientEncryptor,
-    patient_encryptor,
-    encrypt_patient_data,
     decrypt_patient_data,
+    encrypt_patient_data,
     get_patient_search_blind,
+    patient_encryptor,
 )
 
 # =============================================================================
 # USER
 # =============================================================================
-
 from app.services.encryption.user_encryptor import (
     UserEncryptor,
-    user_encryptor,
-    encrypt_user_data,
     decrypt_user_data,
+    encrypt_user_data,
     get_user_search_blind,
+    user_encryptor,
 )
 
-# =============================================================================
-# EVALUATION
-# =============================================================================
-
-from app.services.encryption.evaluation_encryptor import (
-    EvaluationEncryptor,
-    evaluation_encryptor,
-    encrypt_evaluation_data,
-    decrypt_evaluation_data,
-    get_evaluation_encrypted_paths,
-)
 
 # =============================================================================
 # EXPORTS PUBLICS
@@ -111,21 +109,18 @@ from app.services.encryption.evaluation_encryptor import (
 __all__ = [
     # Base
     "BaseEncryptor",
-
     # Patient
     "PatientEncryptor",
     "patient_encryptor",
     "encrypt_patient_data",
     "decrypt_patient_data",
     "get_patient_search_blind",
-
     # User
     "UserEncryptor",
     "user_encryptor",
     "encrypt_user_data",
     "decrypt_user_data",
     "get_user_search_blind",
-
     # Evaluation
     "EvaluationEncryptor",
     "evaluation_encryptor",

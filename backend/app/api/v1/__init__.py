@@ -9,11 +9,13 @@ Usage:
     app = FastAPI()
     app.include_router(api_router)
 """
-from .dependencies import PaginationParams, Pagination
+
+from .dependencies import Pagination, PaginationParams
 from .router import api_router
 
+
 __all__ = [
-    "api_router",
-    "PaginationParams",
     "Pagination",
+    "PaginationParams",
+    "api_router",
 ]

@@ -7,12 +7,13 @@ from app.api.v1.platform.routes import router
 
 # Exporter les dépendances de sécurité SuperAdmin
 from app.api.v1.platform.super_admin_security import (
+    SuperAdminPermissions,
     get_current_super_admin,
     get_optional_super_admin,
     require_role,
     require_super_admin_permission,
-    SuperAdminPermissions,
 )
+
 
 __all__ = [
     "router",

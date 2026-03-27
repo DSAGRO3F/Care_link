@@ -9,33 +9,33 @@
  *
  * Destination : src/utils/routing.ts
  */
-import type { AuthenticatedUser } from '@/types'
+import type { AuthenticatedUser } from '@/types';
 
 /**
  * Retourne la route par défaut pour un utilisateur authentifié.
  */
 export function getDefaultRoute(user: AuthenticatedUser | null): string {
-  if (!user) return '/login'
+  if (!user) return '/login';
 
   // Admin client (provisionné par SuperAdmin) → espace admin
   if (user.is_admin) {
-    return '/admin'
+    return '/admin';
   }
 
   // Professionnel de santé (avec ou sans RPPS) → espace soins
   // C'est aussi le fallback par défaut
-  return '/soins'
+  return '/soins';
 }
 
 /**
  * Retourne le nom de route par défaut (pour router.push({ name: ... }))
  */
 export function getDefaultRouteName(user: AuthenticatedUser | null): string {
-  if (!user) return 'login'
+  if (!user) return 'login';
 
   if (user.is_admin) {
-    return 'admin-dashboard'
+    return 'admin-dashboard';
   }
 
-  return 'soins-dashboard'
+  return 'soins-dashboard';
 }

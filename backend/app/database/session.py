@@ -2,14 +2,15 @@
 Configuration de la session SQLAlchemy - Connexion PostgreSQL
 Fournit l'engine, la factory de sessions, et la dependency FastAPI
 """
+
 import logging
-from typing import Optional
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from app.core.config import settings
+
 
 # Logger pour debugging des connexions
 logger = logging.getLogger(__name__)
@@ -22,24 +23,21 @@ logger = logging.getLogger(__name__)
 
 engine = create_engine(
     settings.DATABASE_URL,
-
     # === Pool de connexions ===
-    poolclass=QueuePool,      # Type de pool (file d'attente)
-    pool_size=5,              # Nombre de connexions permanentes
-    max_overflow=10,          # Connexions supplémentaires si besoin (temporaires)
-    pool_timeout=30,          # Timeout pour obtenir une connexion (secondes)
-    pool_recycle=1800,        # Recycler les connexions après 30 min (évite déconnexions)
-    pool_pre_ping=True,       # Vérifier que la connexion est vivante avant utilisation
-
+    poolclass=QueuePool,  # Type de pool (file d'attente)
+    pool_size=5,  # Nombre de connexions permanentes
+    max_overflow=10,  # Connexions supplémentaires si besoin (temporaires)
+    pool_timeout=30,  # Timeout pour obtenir une connexion (secondes)
+    pool_recycle=1800,  # Recycler les connexions après 30 min (évite déconnexions)
+    pool_pre_ping=True,  # Vérifier que la connexion est vivante avant utilisation
     # === Options de connexion ===
     echo=settings.ENVIRONMENT == "development",  # Log SQL en dev uniquement
-    echo_pool=False,          # Ne pas logger les événements du pool
-
+    echo_pool=False,  # Ne pas logger les événements du pool
     # === Paramètres PostgreSQL ===
     connect_args={
         "application_name": "carelink",  # Identifie l'app dans pg_stat_activity
-        "options": "-c timezone=UTC",    # Forcer timezone UTC
-    }
+        "options": "-c timezone=UTC",  # Forcer timezone UTC
+    },
 )
 
 
@@ -49,14 +47,15 @@ engine = create_engine(
 # Chaque session = une transaction avec la base de données.
 
 SessionLocal = sessionmaker(
-    bind=engine,              # Connecté à notre engine
-    autocommit=False,         # Pas de commit automatique (on contrôle explicitement)
-    autoflush=False,          # Pas de flush automatique (meilleur contrôle)
-    expire_on_commit=False,   # Garder les objets accessibles après commit
+    bind=engine,  # Connecté à notre engine
+    autocommit=False,  # Pas de commit automatique (on contrôle explicitement)
+    autoflush=False,  # Pas de flush automatique (meilleur contrôle)
+    expire_on_commit=False,  # Garder les objets accessibles après commit
 )
 
 
 # === 3. FONCTIONS UTILITAIRES ===
+
 
 def get_db_session() -> Session:
     """
@@ -103,7 +102,7 @@ class db_session:
         Args:
             commit_on_exit: Si True, commit automatiquement à la sortie (si pas d'erreur)
         """
-        self.db: Optional[Session] = None
+        self.db: Session | None = None
         self.commit_on_exit = commit_on_exit
 
     def __enter__(self) -> Session:
@@ -126,6 +125,7 @@ class db_session:
 
 
 # === 4. VÉRIFICATION DE CONNEXION ===
+
 
 def check_database_connection() -> bool:
     """
@@ -176,17 +176,18 @@ def get_database_info() -> dict:
     url = engine.url
 
     return {
-        'database': url.database,
-        'host': url.host,
-        'port': url.port or 5432,
-        'connected': check_database_connection(),
-        'pool_status': engine.pool.status(),  # Retourne un string avec toutes les infos
+        "database": url.database,
+        "host": url.host,
+        "port": url.port or 5432,
+        "connected": check_database_connection(),
+        "pool_status": engine.pool.status(),  # Retourne un string avec toutes les infos
     }
 
 
 # === 5. EVENT LISTENERS (Optionnel - Debugging) ===
 
 if settings.ENVIRONMENT == "development":
+
     @event.listens_for(engine, "connect")
     def on_connect(dbapi_connection, connection_record):
         """Log quand une nouvelle connexion est créée"""

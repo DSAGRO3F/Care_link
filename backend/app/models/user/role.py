@@ -21,21 +21,22 @@ Changelog :
          professions (S2) + permissions par profession (S4).
 """
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, Integer, ForeignKey
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import RoleName
 from app.models.mixins import TimestampMixin
 
+
 if TYPE_CHECKING:
-    from app.models.user.user import User
-    from app.models.user.user_associations import UserRole
+    from app.models.tenants.tenant import Tenant
     from app.models.user.permission import Permission
     from app.models.user.role_permission import RolePermission
-    from app.models.tenants.tenant import Tenant
+    from app.models.user.user import User
+    from app.models.user.user_associations import UserRole
 
 
 class Role(TimestampMixin, Base):
@@ -65,16 +66,14 @@ class Role(TimestampMixin, Base):
     """
 
     __tablename__ = "roles"
-    __table_args__ = {
-        "comment": "Table des rôles fonctionnels"
-    }
+    __table_args__ = {"comment": "Table des rôles fonctionnels"}
 
     # === Colonnes ===
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du rôle",
-        info={"description": "Clé primaire auto-incrémentée"}
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # Multi-tenant: NULL pour les rôles système, défini pour les rôles personnalisés
@@ -84,7 +83,7 @@ class Role(TimestampMixin, Base):
         nullable=True,
         index=True,
         doc="ID du tenant (NULL = rôle système partagé)",
-        info={"description": "Clé étrangère vers le tenant propriétaire du rôle"}
+        info={"description": "Clé étrangère vers le tenant propriétaire du rôle"},
     )
 
     name: Mapped[str] = mapped_column(
@@ -94,8 +93,8 @@ class Role(TimestampMixin, Base):
         info={
             "description": "Identifiant du rôle (unique par tenant)",
             "enum": [e.value for e in RoleName],
-            "example": "COORDINATEUR"
-        }
+            "example": "COORDINATEUR",
+        },
     )
 
     description: Mapped[str | None] = mapped_column(
@@ -104,8 +103,8 @@ class Role(TimestampMixin, Base):
         doc="Description lisible du rôle",
         info={
             "description": "Description pour l'interface utilisateur",
-            "example": "Coordinateur de parcours de soins"
-        }
+            "example": "Coordinateur de parcours de soins",
+        },
     )
 
     is_system_role: Mapped[bool] = mapped_column(
@@ -113,48 +112,43 @@ class Role(TimestampMixin, Base):
         default=False,
         nullable=False,
         doc="Rôle système protégé contre les modifications",
-        info={
-            "description": "True = rôle créé par le système, non modifiable",
-            "default": False
-        }
+        info={"description": "True = rôle créé par le système, non modifiable", "default": False},
     )
 
     # === Relations ===
 
     tenant: Mapped["Tenant | None"] = relationship(
-        "Tenant",
-        back_populates="roles",
-        doc="Tenant propriétaire du rôle (None = rôle système)"
+        "Tenant", back_populates="roles", doc="Tenant propriétaire du rôle (None = rôle système)"
     )
 
-    user_associations: Mapped[List["UserRole"]] = relationship(
+    user_associations: Mapped[list["UserRole"]] = relationship(
         "UserRole",
         back_populates="role",
         cascade="all, delete-orphan",
-        doc="Associations avec les utilisateurs (via table de jonction)"
+        doc="Associations avec les utilisateurs (via table de jonction)",
     )
 
-    permission_associations: Mapped[List["RolePermission"]] = relationship(
+    permission_associations: Mapped[list["RolePermission"]] = relationship(
         "RolePermission",
         back_populates="role",
         cascade="all, delete-orphan",
-        doc="Associations avec les permissions (via table de jonction)"
+        doc="Associations avec les permissions (via table de jonction)",
     )
 
     # === Propriétés ===
 
     @property
-    def users(self) -> List["User"]:
+    def users(self) -> list["User"]:
         """Liste des utilisateurs ayant ce rôle."""
         return [ua.user for ua in self.user_associations]
 
     @property
-    def permissions(self) -> List["Permission"]:
+    def permissions(self) -> list["Permission"]:
         """Liste des permissions de ce rôle."""
         return [pa.permission for pa in self.permission_associations]
 
     @property
-    def permission_codes(self) -> List[str]:
+    def permission_codes(self) -> list[str]:
         """Liste des codes de permissions de ce rôle."""
         return [p.code for p in self.permissions]
 
@@ -187,7 +181,7 @@ class Role(TimestampMixin, Base):
 
         return permission_code in self.permission_codes
 
-    def has_any_permission(self, permission_codes: List[str]) -> bool:
+    def has_any_permission(self, permission_codes: list[str]) -> bool:
         """
         Vérifie si le rôle possède au moins une des permissions.
 
@@ -202,7 +196,7 @@ class Role(TimestampMixin, Base):
 
         return any(code in self.permission_codes for code in permission_codes)
 
-    def has_all_permissions(self, permission_codes: List[str]) -> bool:
+    def has_all_permissions(self, permission_codes: list[str]) -> bool:
         """
         Vérifie si le rôle possède toutes les permissions.
 
@@ -226,29 +220,17 @@ class Role(TimestampMixin, Base):
 # Note: Les permissions sont dans INITIAL_ROLE_PERMISSIONS (role_permission.py)
 
 INITIAL_ROLES = [
-    {
-        "name": "ADMIN",
-        "description": "Administrateur du tenant",
-        "is_system_role": True
-    },
+    {"name": "ADMIN", "description": "Administrateur du tenant", "is_system_role": True},
     {
         "name": "COORDINATEUR",
         "description": "Coordinateur de parcours de soins",
-        "is_system_role": True
+        "is_system_role": True,
     },
-    {
-        "name": "REFERENT",
-        "description": "Référent patient désigné",
-        "is_system_role": True
-    },
-    {
-        "name": "EVALUATEUR",
-        "description": "Habilité aux évaluations AGGIR",
-        "is_system_role": True
-    },
+    {"name": "REFERENT", "description": "Référent patient désigné", "is_system_role": True},
+    {"name": "EVALUATEUR", "description": "Habilité aux évaluations AGGIR", "is_system_role": True},
     {
         "name": "INTERVENANT",
         "description": "Intervenant ponctuel (lecture seule)",
-        "is_system_role": True
+        "is_system_role": True,
     },
 ]

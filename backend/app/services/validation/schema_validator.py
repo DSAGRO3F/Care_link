@@ -8,7 +8,7 @@ Supporte la validation complète et partielle (pendant la saisie).
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 from jsonschema import Draft202012Validator
 
@@ -17,14 +17,15 @@ from jsonschema import Draft202012Validator
 # EXCEPTIONS
 # =============================================================================
 
+
 class SchemaValidationError(Exception):
     """Erreur de validation JSON Schema."""
 
     def __init__(
-            self,
-            message: str,
-            path: Optional[str] = None,
-            errors: Optional[List[Dict[str, Any]]] = None
+        self,
+        message: str,
+        path: str | None = None,
+        errors: list[dict[str, Any]] | None = None,
     ):
         self.message = message
         self.path = path  # Ex: "aggir.AggirVariable[0].Resultat"
@@ -34,12 +35,12 @@ class SchemaValidationError(Exception):
 
 class SchemaNotFoundError(Exception):
     """Schema JSON non trouvé."""
-    pass
 
 
 # =============================================================================
 # SERVICE
 # =============================================================================
+
 
 class EvaluationSchemaValidator:
     """
@@ -70,7 +71,7 @@ class EvaluationSchemaValidator:
     }
 
     @lru_cache(maxsize=10)
-    def _load_schema(self, schema_type: str, version: str) -> Dict[str, Any]:
+    def _load_schema(self, schema_type: str, version: str) -> dict[str, Any]:
         """
         Charge et cache un schema JSON.
 
@@ -100,12 +101,7 @@ class EvaluationSchemaValidator:
         with open(schema_path, encoding="utf-8") as f:
             return json.load(f)
 
-    def validate_full(
-            self,
-            schema_type: str,
-            version: str,
-            data: Dict[str, Any]
-    ) -> bool:
+    def validate_full(self, schema_type: str, version: str, data: dict[str, Any]) -> bool:
         """
         Validation COMPLÈTE contre le schema.
 
@@ -147,11 +143,8 @@ class EvaluationSchemaValidator:
         return True
 
     def validate_partial(
-            self,
-            schema_type: str,
-            version: str,
-            data: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, schema_type: str, version: str, data: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """
         Validation PARTIELLE - retourne la liste des erreurs sans lever d'exception.
 
@@ -177,10 +170,10 @@ class EvaluationSchemaValidator:
         ]
 
     def validate_aggir_variable(
-            self,
-            variable_data: Dict[str, Any],
-            schema_type: str = "evaluation_complete",
-            version: str = "v1",
+        self,
+        variable_data: dict[str, Any],
+        schema_type: str = "evaluation_complete",
+        version: str = "v1",
     ) -> bool:
         """
         Valide une seule variable AGGIR.
@@ -219,11 +212,11 @@ class EvaluationSchemaValidator:
         return True
 
     def get_completion_status(
-            self,
-            schema_type: str,
-            version: str,
-            data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        self,
+        schema_type: str,
+        version: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Calcule le statut de complétion basé sur les champs requis.
 
@@ -238,9 +231,7 @@ class EvaluationSchemaValidator:
 
         # Filtrer les erreurs de type "required"
         missing = [
-            err["path"] or err["message"]
-            for err in errors
-            if "required" in err["message"].lower()
+            err["path"] or err["message"] for err in errors if "required" in err["message"].lower()
         ]
 
         # Calcul simplifié du pourcentage
@@ -261,7 +252,7 @@ class EvaluationSchemaValidator:
 # =============================================================================
 
 # Instance globale pour éviter de recharger les schemas
-_validator_instance: Optional[EvaluationSchemaValidator] = None
+_validator_instance: EvaluationSchemaValidator | None = None
 
 
 def get_schema_validator() -> EvaluationSchemaValidator:

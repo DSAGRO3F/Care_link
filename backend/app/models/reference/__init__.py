@@ -8,6 +8,7 @@ Ce module contient les modèles de référence :
 
 from app.models.reference.country import Country
 
+
 __all__ = [
     "Country",
 ]

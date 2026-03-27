@@ -17,26 +17,27 @@ Architecture de chiffrement:
 
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, ForeignKey, Numeric, DateTime, Index
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import PatientStatus
-from app.models.mixins import TimestampMixin, AuditMixin, VersionedMixin
+from app.models.mixins import AuditMixin, TimestampMixin, VersionedMixin
+
 
 if TYPE_CHECKING:
-    from app.models.user.user import User
+    from app.models.careplan.care_plan import CarePlan
+    from app.models.coordination.coordination_entry import CoordinationEntry
+    from app.models.coordination.scheduled_intervention import ScheduledIntervention
     from app.models.organization.entity import Entity
     from app.models.patient.patient_access import PatientAccess
-    from app.models.patient.patient_evaluation import PatientEvaluation
-    from app.models.patient.patient_vitals import PatientThreshold, PatientVitals, PatientDevice
     from app.models.patient.patient_document import PatientDocument
-    from app.models.coordination.coordination_entry import CoordinationEntry
-    from app.models.careplan.care_plan import CarePlan
-    from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.patient.patient_evaluation import PatientEvaluation
+    from app.models.patient.patient_vitals import PatientDevice, PatientThreshold, PatientVitals
     from app.models.tenants.tenant import Tenant
+    from app.models.user.user import User
 
 
 class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
@@ -60,15 +61,15 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
     __tablename__ = "patients"
     __table_args__ = (
         # Index sur les blind indexes pour recherche performante
-        Index('ix_patients_nir_blind', 'nir_blind'),
-        Index('ix_patients_ins_blind', 'ins_blind'),
-        Index('ix_patients_last_name_blind', 'last_name_blind'),
-        Index('ix_patients_first_name_blind', 'first_name_blind'),
+        Index("ix_patients_nir_blind", "nir_blind"),
+        Index("ix_patients_ins_blind", "ins_blind"),
+        Index("ix_patients_last_name_blind", "last_name_blind"),
+        Index("ix_patients_first_name_blind", "first_name_blind"),
         # Index composé pour recherche nom + prénom
-        Index('ix_patients_name_blind', 'last_name_blind', 'first_name_blind'),
+        Index("ix_patients_name_blind", "last_name_blind", "first_name_blind"),
         {
             "comment": "Table des patients (données chiffrées AES-256-GCM, blind indexes HMAC-SHA256)"
-        }
+        },
     )
 
     # === Colonnes ===
@@ -76,7 +77,7 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique du patient",
-        info={"description": "Clé primaire auto-incrémentée"}
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # =========================================================================
@@ -87,56 +88,70 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         String(500),
         nullable=True,
         doc="Numéro NIR chiffré (N° Sécurité Sociale)",
-        info={"description": "NIR chiffré AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "NIR chiffré AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     ins_encrypted: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         doc="Identifiant National de Santé chiffré",
-        info={"description": "INS chiffré AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "INS chiffré AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     first_name_encrypted: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         doc="Prénom du patient chiffré",
-        info={"description": "Prénom chiffré AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "Prénom chiffré AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     last_name_encrypted: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         doc="Nom de famille du patient chiffré",
-        info={"description": "Nom chiffré AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "Nom chiffré AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     birth_date_encrypted: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         doc="Date de naissance du patient chiffrée",
-        info={"description": "Date naissance chiffrée AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "Date naissance chiffrée AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     address_encrypted: Mapped[str | None] = mapped_column(
         String(1000),
         nullable=True,
         doc="Adresse postale du patient chiffrée",
-        info={"description": "Adresse chiffrée AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "Adresse chiffrée AES-256-GCM", "encrypted": True, "pii": True},
+    )
+
+    postal_code_encrypted: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        doc="Code postal du patient chiffré",
+        info={"description": "Code postal chiffré AES-256-GCM", "encrypted": True, "pii": True},
+    )
+
+    city_encrypted: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        doc="Ville du patient chiffrée",
+        info={"description": "Ville chiffrée AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     phone_encrypted: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         doc="Numéro de téléphone du patient chiffré",
-        info={"description": "Téléphone chiffré AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "Téléphone chiffré AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     email_encrypted: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         doc="Adresse email du patient chiffrée",
-        info={"description": "Email chiffré AES-256-GCM", "encrypted": True, "pii": True}
+        info={"description": "Email chiffré AES-256-GCM", "encrypted": True, "pii": True},
     )
 
     # =========================================================================
@@ -152,8 +167,8 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={
             "description": "HMAC-SHA256 du NIR normalisé",
             "blind_index": True,
-            "searchable": True
-        }
+            "searchable": True,
+        },
     )
 
     ins_blind: Mapped[str | None] = mapped_column(
@@ -163,8 +178,8 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={
             "description": "HMAC-SHA256 de l'INS normalisé",
             "blind_index": True,
-            "searchable": True
-        }
+            "searchable": True,
+        },
     )
 
     first_name_blind: Mapped[str | None] = mapped_column(
@@ -174,8 +189,8 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={
             "description": "HMAC-SHA256 du prénom normalisé (minuscules, sans accents)",
             "blind_index": True,
-            "searchable": True
-        }
+            "searchable": True,
+        },
     )
 
     last_name_blind: Mapped[str | None] = mapped_column(
@@ -185,8 +200,8 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         info={
             "description": "HMAC-SHA256 du nom normalisé (minuscules, sans accents)",
             "blind_index": True,
-            "searchable": True
-        }
+            "searchable": True,
+        },
     )
 
     # =========================================================================
@@ -197,7 +212,7 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         String(20),
         default=PatientStatus.ACTIVE.value,
         doc="Statut du dossier patient",
-        info={"description": "Statut actuel du dossier", "enum": [e.value for e in PatientStatus]}
+        info={"description": "Statut actuel du dossier", "enum": [e.value for e in PatientStatus]},
     )
 
     # === Clés étrangères ===
@@ -206,7 +221,7 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID du médecin traitant référent",
-        info={"description": "Référence vers le médecin traitant"}
+        info={"description": "Référence vers le médecin traitant"},
     )
 
     tenant_id: Mapped[int] = mapped_column(
@@ -214,9 +229,7 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         nullable=False,
         index=True,
         doc="ID du tenant propriétaire",
-        info={
-            "description": "Référence vers le tenant (client) propriétaire de cette entité"
-        }
+        info={"description": "Référence vers le tenant (client) propriétaire de cette entité"},
     )
 
     entity_id: Mapped[int] = mapped_column(
@@ -224,7 +237,15 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         nullable=False,
         index=True,
         doc="ID de l'entité de rattachement",
-        info={"description": "Entité responsable du suivi"}
+        info={"description": "Entité responsable du suivi"},
+    )
+
+    # --- Score GIR courant (mis à jour au submit/validate) ---
+    current_gir: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Score GIR actuel du patient (1-6), mis à jour à chaque soumission d'évaluation",
+        info={"description": "GIR courant pour affichage sidebar et filtres SQL"},
     )
 
     # === Relations ===
@@ -235,88 +256,84 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         "User",
         back_populates="patients_as_medecin",
         foreign_keys="[Patient.medecin_traitant_id]",
-        doc="Médecin traitant référent du patient"
+        doc="Médecin traitant référent du patient",
     )
 
     tenant: Mapped["Tenant"] = relationship(
-        "Tenant",
-        back_populates="patients",
-        doc="Tenant propriétaire de ce patient"
+        "Tenant", back_populates="patients", doc="Tenant propriétaire de ce patient"
     )
 
     entity: Mapped["Entity"] = relationship(
-        "Entity",
-        back_populates="patients",
-        doc="Entité de soins responsable du patient"
+        "Entity", back_populates="patients", doc="Entité de soins responsable du patient"
     )
 
-    access_records: Mapped[List["PatientAccess"]] = relationship(
+    access_records: Mapped[list["PatientAccess"]] = relationship(
         "PatientAccess",
         back_populates="patient",
         cascade="all, delete-orphan",
-        doc="Historique des accès au dossier (RGPD)"
+        doc="Historique des accès au dossier (RGPD)",
     )
 
-    evaluations: Mapped[List["PatientEvaluation"]] = relationship(
+    evaluations: Mapped[list["PatientEvaluation"]] = relationship(
         "PatientEvaluation",
         back_populates="patient",
         cascade="all, delete-orphan",
         order_by="desc(PatientEvaluation.evaluation_date)",
-        doc="Évaluations du patient"
+        doc="Évaluations du patient",
     )
 
-    care_plans: Mapped[List["CarePlan"]] = relationship(
+    care_plans: Mapped[list["CarePlan"]] = relationship(
         "CarePlan",
         back_populates="patient",
         cascade="all, delete-orphan",
-        doc="Plans d'aide du patient"
+        doc="Plans d'aide du patient",
     )
 
-    scheduled_interventions: Mapped[List["ScheduledIntervention"]] = relationship(
+    scheduled_interventions: Mapped[list["ScheduledIntervention"]] = relationship(
         "ScheduledIntervention",
         back_populates="patient",
         cascade="all, delete-orphan",
-        doc="Interventions planifiées pour ce patient"
+        doc="Interventions planifiées pour ce patient",
     )
 
-    thresholds: Mapped[List["PatientThreshold"]] = relationship(
+    thresholds: Mapped[list["PatientThreshold"]] = relationship(
         "PatientThreshold",
         back_populates="patient",
         cascade="all, delete-orphan",
-        doc="Seuils personnalisés des constantes vitales"
+        doc="Seuils personnalisés des constantes vitales",
     )
 
-    vitals: Mapped[List["PatientVitals"]] = relationship(
+    vitals: Mapped[list["PatientVitals"]] = relationship(
         "PatientVitals",
         back_populates="patient",
         cascade="all, delete-orphan",
         order_by="desc(PatientVitals.measured_at)",
-        doc="Mesures de constantes vitales"
+        doc="Mesures de constantes vitales",
     )
 
-    devices: Mapped[List["PatientDevice"]] = relationship(
+    devices: Mapped[list["PatientDevice"]] = relationship(
         "PatientDevice",
         back_populates="patient",
         cascade="all, delete-orphan",
-        doc="Devices connectés du patient"
+        doc="Devices connectés du patient",
     )
 
     # --- Relations - Documents générés ---
-    documents: Mapped[List["PatientDocument"]] = relationship(
+    documents: Mapped[list["PatientDocument"]] = relationship(
         "PatientDocument",
         back_populates="patient",
         cascade="all, delete-orphan",
         order_by="desc(PatientDocument.generated_at)",
-        doc="Documents générés pour ce patient"
+        doc="Documents générés pour ce patient",
     )
 
     # --- Relations - Carnet de coordination ---
-    coordination_entries: Mapped[List["CoordinationEntry"]] = relationship(
+    coordination_entries: Mapped[list["CoordinationEntry"]] = relationship(
         "CoordinationEntry",
         back_populates="patient",
         cascade="all, delete-orphan",
         order_by="desc(CoordinationEntry.performed_at)",
-        doc="Entrées du carnet de coordination"
+        doc="Entrées du carnet de coordination",
     )
 
     # === Géolocalisation (pour calcul de distance) ===
@@ -324,21 +341,15 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
     # le calcul de distance. Précision réduite (~100m) recommandée.
 
     latitude: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 7),
-        nullable=True,
-        comment="Latitude du domicile (précision réduite pour RGPD)"
+        Numeric(10, 7), nullable=True, comment="Latitude du domicile (précision réduite pour RGPD)"
     )
 
     longitude: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 7),
-        nullable=True,
-        comment="Longitude du domicile (précision réduite pour RGPD)"
+        Numeric(10, 7), nullable=True, comment="Longitude du domicile (précision réduite pour RGPD)"
     )
 
     geo_validated_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-        comment="Date de dernière validation de la géolocalisation"
+        DateTime, nullable=True, comment="Date de dernière validation de la géolocalisation"
     )
 
     # === Propriétés ===
@@ -352,13 +363,6 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
     def latest_evaluation(self) -> "PatientEvaluation | None":
         """Retourne la dernière évaluation du patient."""
         return self.evaluations[0] if self.evaluations else None
-
-    @property
-    def current_gir(self) -> int | None:
-        """Retourne le score GIR actuel du patient."""
-        if self.latest_evaluation:
-            return self.latest_evaluation.gir_score  # type: ignore[return-value]
-        return None
 
     @property
     def latest_ppa(self) -> "PatientDocument | None":
@@ -377,7 +381,7 @@ class Patient(VersionedMixin, TimestampMixin, AuditMixin, Base):
         return None
 
     @property
-    def recent_coordination_entries(self) -> List["CoordinationEntry"]:
+    def recent_coordination_entries(self) -> list["CoordinationEntry"]:
         """Retourne les entrées de coordination des dernières 24h."""
         return [e for e in self.coordination_entries if e.is_recent and e.is_active]
 

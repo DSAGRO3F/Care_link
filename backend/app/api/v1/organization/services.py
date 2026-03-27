@@ -6,21 +6,21 @@ Utilise les modèles SQLAlchemy existants.
 
 MULTI-TENANT: Toutes les opérations sont filtrées par tenant_id.
 """
-from typing import Optional, List, Tuple
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 # Import des modèles existants
 from app.models.organization.entity import Entity
 from app.models.reference.country import Country
+
 from .schemas import (
-    EntityCreate,
-    EntityUpdate,
-    EntityFilters,
     CountryCreate,
     CountryUpdate,
+    EntityCreate,
+    EntityFilters,
+    EntityUpdate,
 )
 
 
@@ -28,13 +28,14 @@ from .schemas import (
 # EXCEPTIONS MÉTIER
 # =============================================================================
 
+
 class EntityNotFoundError(HTTPException):
     """Entité introuvable."""
 
     def __init__(self, entity_id: int):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Entité avec l'ID {entity_id} introuvable"
+            detail=f"Entité avec l'ID {entity_id} introuvable",
         )
 
 
@@ -43,8 +44,7 @@ class CountryNotFoundError(HTTPException):
 
     def __init__(self, country_id: int):
         super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Pays avec l'ID {country_id} introuvable"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Pays avec l'ID {country_id} introuvable"
         )
 
 
@@ -54,7 +54,7 @@ class DuplicateFINESSError(HTTPException):
     def __init__(self, finess: str):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Le numéro FINESS {finess} est déjà utilisé par une autre entité"
+            detail=f"Le numéro FINESS {finess} est déjà utilisé par une autre entité",
         )
 
 
@@ -64,7 +64,7 @@ class DuplicateSIRETError(HTTPException):
     def __init__(self, siret: str):
         super().__init__(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Le numéro SIRET {siret} est déjà utilisé par une autre entité"
+            detail=f"Le numéro SIRET {siret} est déjà utilisé par une autre entité",
         )
 
 
@@ -73,8 +73,7 @@ class DuplicateCountryCodeError(HTTPException):
 
     def __init__(self, code: str):
         super().__init__(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Le code pays {code} est déjà utilisé"
+            status_code=status.HTTP_409_CONFLICT, detail=f"Le code pays {code} est déjà utilisé"
         )
 
 
@@ -84,13 +83,14 @@ class CircularHierarchyError(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Impossible de créer une hiérarchie circulaire (une entité ne peut pas être son propre parent)"
+            detail="Impossible de créer une hiérarchie circulaire (une entité ne peut pas être son propre parent)",
         )
 
 
 # =============================================================================
 # COUNTRY SERVICE
 # =============================================================================
+
 
 class CountryService:
     """
@@ -104,12 +104,12 @@ class CountryService:
         self.db = db
 
     def get_all(
-            self,
-            *,
-            page: int = 1,
-            size: int = 20,
-            is_active: Optional[bool] = None,
-    ) -> Tuple[List[Country], int]:
+        self,
+        *,
+        page: int = 1,
+        size: int = 20,
+        is_active: bool | None = None,
+    ) -> tuple[list[Country], int]:
         """
         Récupère la liste paginée des pays.
 
@@ -144,7 +144,7 @@ class CountryService:
             raise CountryNotFoundError(country_id)
         return country
 
-    def get_by_code(self, country_code: str) -> Optional[Country]:
+    def get_by_code(self, country_code: str) -> Country | None:
         """Récupère un pays par son code ISO."""
         query = select(Country).where(Country.country_code == country_code.upper())
         return self.db.execute(query).scalar_one_or_none()
@@ -169,10 +169,10 @@ class CountryService:
         update_data = data.model_dump(exclude_unset=True)
 
         # Vérifier unicité du code si modifié
-        if 'country_code' in update_data and update_data['country_code']:
-            existing = self.get_by_code(update_data['country_code'])
+        if update_data.get("country_code"):
+            existing = self.get_by_code(update_data["country_code"])
             if existing and existing.id != country_id:
-                raise DuplicateCountryCodeError(update_data['country_code'])
+                raise DuplicateCountryCodeError(update_data["country_code"])
 
         for field, value in update_data.items():
             setattr(country, field, value)
@@ -191,6 +191,7 @@ class CountryService:
 # =============================================================================
 # ENTITY SERVICE
 # =============================================================================
+
 
 class EntityService:
     """
@@ -215,14 +216,14 @@ class EntityService:
         return select(Entity).where(Entity.tenant_id == self.tenant_id)
 
     def get_all(
-            self,
-            *,
-            page: int = 1,
-            size: int = 20,
-            sort_by: Optional[str] = "name",
-            sort_order: str = "asc",
-            filters: Optional[EntityFilters] = None,
-    ) -> Tuple[List[Entity], int]:
+        self,
+        *,
+        page: int = 1,
+        size: int = 20,
+        sort_by: str | None = "name",
+        sort_order: str = "asc",
+        filters: EntityFilters | None = None,
+    ) -> tuple[list[Entity], int]:
         """
         Récupère la liste paginée des entités avec filtres.
 
@@ -239,8 +240,7 @@ class EntityService:
             Tuple (items, total_count)
         """
         query = self._base_query().options(
-            selectinload(Entity.country),
-            selectinload(Entity.parent_entity)
+            selectinload(Entity.country), selectinload(Entity.parent_entity)
         )
 
         # Appliquer les filtres
@@ -297,10 +297,14 @@ class EntityService:
         MULTI-TENANT: Vérifie que l'entité appartient au tenant courant.
         """
         if load_relations:
-            query = self._base_query().where(Entity.id == entity_id).options(
-                selectinload(Entity.country),
-                selectinload(Entity.parent_entity),
-                selectinload(Entity.child_entities)
+            query = (
+                self._base_query()
+                .where(Entity.id == entity_id)
+                .options(
+                    selectinload(Entity.country),
+                    selectinload(Entity.parent_entity),
+                    selectinload(Entity.child_entities),
+                )
             )
             entity = self.db.execute(query).scalar_one_or_none()
         else:
@@ -311,17 +315,17 @@ class EntityService:
             raise EntityNotFoundError(entity_id)
         return entity
 
-    def get_by_finess(self, finess_et: str) -> Optional[Entity]:
+    def get_by_finess(self, finess_et: str) -> Entity | None:
         """Récupère une entité par son FINESS établissement (dans le tenant courant)."""
         query = self._base_query().where(Entity.finess_et == finess_et)
         return self.db.execute(query).scalar_one_or_none()
 
-    def get_by_siret(self, siret: str) -> Optional[Entity]:
+    def get_by_siret(self, siret: str) -> Entity | None:
         """Récupère une entité par son SIRET (dans le tenant courant)."""
         query = self._base_query().where(Entity.siret == siret)
         return self.db.execute(query).scalar_one_or_none()
 
-    def get_children(self, entity_id: int) -> List[Entity]:
+    def get_children(self, entity_id: int) -> list[Entity]:
         """Récupère les entités enfants d'une entité parente."""
         # Vérifier que l'entité parente existe et appartient au tenant
         self.get_by_id(entity_id, load_relations=False)
@@ -330,7 +334,7 @@ class EntityService:
         query = query.order_by(Entity.name)
         return list(self.db.execute(query).scalars().all())
 
-    def get_roots(self) -> List[Entity]:
+    def get_roots(self) -> list[Entity]:
         """Récupère les entités racines (sans parent) du tenant."""
         query = self._base_query().where(Entity.parent_entity_id.is_(None))
         query = query.options(selectinload(Entity.child_entities))
@@ -366,7 +370,7 @@ class EntityService:
         # Créer l'entité avec tenant_id auto-injecté
         entity = Entity(
             tenant_id=self.tenant_id,  # AUTO-INJECTION DU TENANT
-            **data.model_dump()
+            **data.model_dump(),
         )
         self.db.add(entity)
         self.db.commit()
@@ -382,29 +386,29 @@ class EntityService:
         update_data = data.model_dump(exclude_unset=True)
 
         # Vérifier unicité FINESS si modifié
-        if 'finess_et' in update_data and update_data['finess_et']:
-            existing = self.get_by_finess(update_data['finess_et'])
+        if update_data.get("finess_et"):
+            existing = self.get_by_finess(update_data["finess_et"])
             if existing and existing.id != entity_id:
-                raise DuplicateFINESSError(update_data['finess_et'])
+                raise DuplicateFINESSError(update_data["finess_et"])
 
         # Vérifier unicité SIRET si modifié
-        if 'siret' in update_data and update_data['siret']:
-            existing = self.get_by_siret(update_data['siret'])
+        if update_data.get("siret"):
+            existing = self.get_by_siret(update_data["siret"])
             if existing and existing.id != entity_id:
-                raise DuplicateSIRETError(update_data['siret'])
+                raise DuplicateSIRETError(update_data["siret"])
 
         # Vérifier que le nouveau parent n'est pas l'entité elle-même
-        if 'parent_entity_id' in update_data:
-            if update_data['parent_entity_id'] == entity_id:
+        if "parent_entity_id" in update_data:
+            if update_data["parent_entity_id"] == entity_id:
                 raise CircularHierarchyError()
             # Vérifier que le nouveau parent existe (et appartient au tenant)
-            if update_data['parent_entity_id']:
-                self.get_by_id(update_data['parent_entity_id'], load_relations=False)
+            if update_data["parent_entity_id"]:
+                self.get_by_id(update_data["parent_entity_id"], load_relations=False)
 
         # Vérifier que le pays existe si modifié
-        if 'country_id' in update_data and update_data['country_id']:
+        if update_data.get("country_id"):
             country_service = CountryService(self.db)
-            country_service.get_by_id(update_data['country_id'])
+            country_service.get_by_id(update_data["country_id"])
 
         for field, value in update_data.items():
             setattr(entity, field, value)
@@ -425,7 +429,7 @@ class EntityService:
         entity.is_active = False
         self.db.commit()
 
-    def get_hierarchy(self, root_id: Optional[int] = None) -> List[Entity]:
+    def get_hierarchy(self, root_id: int | None = None) -> list[Entity]:
         """
         Récupère l'arborescence des entités du tenant.
 
@@ -439,5 +443,4 @@ class EntityService:
         if root_id:
             entity = self.get_by_id(root_id)
             return [entity]
-        else:
-            return self.get_roots()
+        return self.get_roots()

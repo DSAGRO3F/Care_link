@@ -1,70 +1,70 @@
 <script setup lang="ts">
-/**
- * Header de l'application
- * Titre de page, recherche, notifications, menu utilisateur
- *
- * 🆕 v4.11 : Menu utilisateur custom (remplace Menu PrimeVue popup)
- *   - Dropdown soigné avec backdrop transparent pour fermeture au clic extérieur
- *   - En-tête avec avatar, nom complet et email
- *   - Items avec icônes colorées et hover élégant
- *   - Séparateur visuel avant Déconnexion
- *
- * Destination : src/components/common/AppHeader.vue
- */
-import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore, useUiStore, useOfflineStore } from '@/stores'
+  /**
+   * Header de l'application
+   * Titre de page, recherche, notifications, menu utilisateur
+   *
+   * 🆕 v4.11 : Menu utilisateur custom (remplace Menu PrimeVue popup)
+   *   - Dropdown soigné avec backdrop transparent pour fermeture au clic extérieur
+   *   - En-tête avec avatar, nom complet et email
+   *   - Items avec icônes colorées et hover élégant
+   *   - Séparateur visuel avant Déconnexion
+   *
+   * Destination : src/components/common/AppHeader.vue
+   */
+  import { ref, computed } from 'vue';
+  import { useRoute, useRouter } from 'vue-router';
+  import { useAuthStore, useUiStore, useOfflineStore } from '@/stores';
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
-const uiStore = useUiStore()
-const offlineStore = useOfflineStore()
+  const route = useRoute();
+  const router = useRouter();
+  const authStore = useAuthStore();
+  const uiStore = useUiStore();
+  const offlineStore = useOfflineStore();
 
-// Titre de la page depuis les meta de la route
-const pageTitle = computed(() => route.meta.title || 'CareLink')
+  // Titre de la page depuis les meta de la route
+  const pageTitle = computed(() => route.meta.title || 'CareLink');
 
-// Menu utilisateur — état ouvert/fermé
-const userMenuOpen = ref(false)
+  // Menu utilisateur — état ouvert/fermé
+  const userMenuOpen = ref(false);
 
-function toggleUserMenu() {
-  userMenuOpen.value = !userMenuOpen.value
-}
+  function toggleUserMenu() {
+    userMenuOpen.value = !userMenuOpen.value;
+  }
 
-function closeUserMenu() {
-  userMenuOpen.value = false
-}
+  function closeUserMenu() {
+    userMenuOpen.value = false;
+  }
 
-function goToProfile() {
-  closeUserMenu()
-  router.push('/profile')
-}
+  // TODO — Fonctions prévues pour le menu utilisateur (profil, paramètres)
+  // function _goToProfile() {
+  //   closeUserMenu();
+  //   router.push('/profile');
+  // }
+  // function _goToSettings() {
+  //   closeUserMenu();
+  //   router.push('/settings');
+  // }
 
-function goToSettings() {
-  closeUserMenu()
-  router.push('/settings')
-}
+  function handleLogout() {
+    closeUserMenu();
+    authStore.logout();
+    router.push('/login');
+  }
 
-function handleLogout() {
-  closeUserMenu()
-  authStore.logout()
-  router.push('/login')
-}
+  // Initiales de l'utilisateur pour l'avatar
+  const userInitials = computed(() => {
+    if (!authStore.user) return '?';
+    const first = authStore.user.first_name?.[0] || '';
+    const last = authStore.user.last_name?.[0] || '';
+    return (first + last).toUpperCase() || '?';
+  });
 
-// Initiales de l'utilisateur pour l'avatar
-const userInitials = computed(() => {
-  if (!authStore.user) return '?'
-  const first = authStore.user.first_name?.[0] || ''
-  const last = authStore.user.last_name?.[0] || ''
-  return (first + last).toUpperCase() || '?'
-})
+  const userFullName = computed(() => {
+    if (!authStore.user) return '';
+    return `${authStore.user.first_name || ''} ${authStore.user.last_name || ''}`.trim();
+  });
 
-const userFullName = computed(() => {
-  if (!authStore.user) return ''
-  return `${authStore.user.first_name || ''} ${authStore.user.last_name || ''}`.trim()
-})
-
-const userEmail = computed(() => authStore.user?.email || '')
+  const userEmail = computed(() => authStore.user?.email || '');
 </script>
 
 <template>
@@ -94,7 +94,7 @@ const userEmail = computed(() => authStore.user?.email || '')
           v-if="offlineStore.hasPendingChanges"
           class="flex items-center gap-1 text-sm text-warning-600 bg-warning-50 px-2 py-1 rounded"
         >
-          <i class="pi pi-sync" :class="{ 'animate-spin': offlineStore.isSyncing }"></i>
+          <i :class="{ 'animate-spin': offlineStore.isSyncing }" class="pi pi-sync"></i>
           <span class="hidden sm:inline">{{ offlineStore.pendingCount }} en attente</span>
         </div>
 
@@ -109,14 +109,14 @@ const userEmail = computed(() => authStore.user?.email || '')
         <div class="relative">
           <!-- Bouton trigger -->
           <button
+            :class="userMenuOpen ? 'bg-neutral-100' : 'hover:bg-neutral-100'"
             class="flex items-center gap-2 p-1.5 rounded-lg transition-colors"
-            :class="userMenuOpen
-              ? 'bg-neutral-100'
-              : 'hover:bg-neutral-100'"
             @click="toggleUserMenu"
           >
             <!-- Avatar -->
-            <div class="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium">
+            <div
+              class="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-medium"
+            >
               {{ userInitials }}
             </div>
             <!-- Nom (desktop) -->
@@ -124,17 +124,13 @@ const userEmail = computed(() => authStore.user?.email || '')
               {{ authStore.user?.first_name }}
             </span>
             <i
-              class="pi text-xs text-neutral-400 hidden lg:block transition-transform duration-200"
               :class="userMenuOpen ? 'pi-chevron-up' : 'pi-chevron-down'"
+              class="pi text-xs text-neutral-400 hidden lg:block transition-transform duration-200"
             ></i>
           </button>
 
           <!-- Backdrop invisible (ferme le menu au clic extérieur) -->
-          <div
-            v-if="userMenuOpen"
-            class="fixed inset-0 z-[99]"
-            @click="closeUserMenu"
-          ></div>
+          <div v-if="userMenuOpen" class="fixed inset-0 z-[99]" @click="closeUserMenu"></div>
 
           <!-- Dropdown -->
           <Transition
@@ -152,11 +148,15 @@ const userEmail = computed(() => authStore.user?.email || '')
               <!-- En-tête utilisateur -->
               <div class="px-4 py-3 bg-neutral-50 border-b border-neutral-100">
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                  <div
+                    class="w-10 h-10 rounded-full bg-primary-600 text-white flex items-center justify-center text-sm font-semibold flex-shrink-0"
+                  >
                     {{ userInitials }}
                   </div>
                   <div class="min-w-0">
-                    <p class="text-sm font-semibold text-neutral-800 truncate">{{ userFullName }}</p>
+                    <p class="text-sm font-semibold text-neutral-800 truncate">
+                      {{ userFullName }}
+                    </p>
                     <p class="text-xs text-neutral-500 truncate">{{ userEmail }}</p>
                   </div>
                 </div>

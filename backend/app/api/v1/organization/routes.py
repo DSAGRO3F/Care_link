@@ -8,8 +8,8 @@ Endpoints:
 MULTI-TENANT: Les endpoints Entity injectent automatiquement le tenant_id
 depuis l'utilisateur authentifié.
 """
+
 from math import ceil
-from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -19,23 +19,25 @@ from app.core.auth.user_auth import get_current_user, require_role
 from app.database.session_rls import get_db
 from app.models.enums import EntityType, IntegrationType
 from app.models.user import User
+
+from ..dependencies import PaginationParams
 from .schemas import (
     # Country
     CountryCreate,
-    CountryUpdate,
-    CountryResponse,
     CountryList,
+    CountryResponse,
+    CountryUpdate,
     # Entity
     EntityCreate,
-    EntityUpdate,
+    EntityFilters,
+    EntityList,
     EntityResponse,
     EntitySummary,
+    EntityUpdate,
     EntityWithChildren,
-    EntityList,
-    EntityFilters,
 )
-from .services import EntityService, CountryService
-from ..dependencies import PaginationParams
+from .services import CountryService, EntityService
+
 
 # =============================================================================
 # ROUTER CONFIGURATION
@@ -48,6 +50,7 @@ router = APIRouter(prefix="/organizations", tags=["Organizations"])
 # COUNTRY ENDPOINTS
 # =============================================================================
 
+
 @router.get(
     "/countries",
     response_model=CountryList,
@@ -55,10 +58,10 @@ router = APIRouter(prefix="/organizations", tags=["Organizations"])
     description="Récupère la liste paginée des pays disponibles.",
 )
 async def list_countries(
-        db: Session = Depends(get_db),
-        pagination: PaginationParams = Depends(),
-        is_active: Optional[bool] = Query(None, description="Filtrer par statut actif"),
-        current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    pagination: PaginationParams = Depends(),
+    is_active: bool | None = Query(None, description="Filtrer par statut actif"),
+    current_user: User = Depends(get_current_user),
 ):
     """Liste tous les pays avec pagination."""
     service = CountryService(db)
@@ -83,9 +86,9 @@ async def list_countries(
     summary="Détail d'un pays",
 )
 async def get_country(
-        country_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user),
+    country_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Récupère les détails d'un pays par son ID."""
     service = CountryService(db)
@@ -100,9 +103,9 @@ async def get_country(
     summary="Créer un pays",
 )
 async def create_country(
-        data: CountryCreate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    data: CountryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Crée un nouveau pays.
@@ -120,10 +123,10 @@ async def create_country(
     summary="Modifier un pays",
 )
 async def update_country(
-        country_id: int,
-        data: CountryUpdate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    country_id: int,
+    data: CountryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Met à jour partiellement un pays.
@@ -141,9 +144,9 @@ async def update_country(
     summary="Supprimer un pays",
 )
 async def delete_country(
-        country_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_role("ADMIN")),
+    country_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Désactive un pays (soft delete).
@@ -152,12 +155,13 @@ async def delete_country(
     """
     service = CountryService(db)
     service.delete(country_id)
-    return None
+    return
 
 
 # =============================================================================
 # ENTITY ENDPOINTS
 # =============================================================================
+
 
 @router.get(
     "/entities",
@@ -166,19 +170,19 @@ async def delete_country(
     description="Récupère la liste paginée des entités avec filtres optionnels.",
 )
 async def list_entities(
-        db: Session = Depends(get_db),
-        pagination: PaginationParams = Depends(),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
-        # Filtres
-        entity_type: Optional[EntityType] = Query(None, description="Type d'entité (SSIAD, SAAD...)"),
-        integration_type: Optional[IntegrationType] = Query(None, description="Type d'intégration"),
-        parent_entity_id: Optional[int] = Query(None, description="ID entité parente"),
-        country_id: Optional[int] = Query(None, description="ID du pays"),
-        city: Optional[str] = Query(None, description="Ville (recherche partielle)"),
-        postal_code: Optional[str] = Query(None, description="Code postal (préfixe)"),
-        is_active: Optional[bool] = Query(None, description="Statut actif"),
-        search: Optional[str] = Query(None, description="Recherche (nom, FINESS, SIRET)"),
+    db: Session = Depends(get_db),
+    pagination: PaginationParams = Depends(),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
+    # Filtres
+    entity_type: EntityType | None = Query(None, description="Type d'entité (SSIAD, SAAD...)"),
+    integration_type: IntegrationType | None = Query(None, description="Type d'intégration"),
+    parent_entity_id: int | None = Query(None, description="ID entité parente"),
+    country_id: int | None = Query(None, description="ID du pays"),
+    city: str | None = Query(None, description="Ville (recherche partielle)"),
+    postal_code: str | None = Query(None, description="Code postal (préfixe)"),
+    is_active: bool | None = Query(None, description="Statut actif"),
+    search: str | None = Query(None, description="Recherche (nom, FINESS, SIRET)"),
 ):
     """
     Liste toutes les entités avec pagination et filtres.
@@ -227,10 +231,10 @@ async def list_entities(
     summary="Détail d'une entité",
 )
 async def get_entity(
-        entity_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    entity_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """
     Récupère les détails d'une entité par son ID.
@@ -244,15 +248,15 @@ async def get_entity(
 
 @router.get(
     "/entities/{entity_id}/children",
-    response_model=List[EntitySummary],
+    response_model=list[EntitySummary],
     summary="Sous-entités",
     description="Récupère les entités directement rattachées à une entité parente.",
 )
 async def get_entity_children(
-        entity_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
+    entity_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
 ):
     """
     Liste les entités enfants d'une entité parente.
@@ -271,10 +275,10 @@ async def get_entity_children(
     summary="Créer une entité",
 )
 async def create_entity(
-        data: EntityCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    data: EntityCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Crée une nouvelle entité.
@@ -300,11 +304,11 @@ async def create_entity(
     summary="Remplacer une entité",
 )
 async def replace_entity(
-        entity_id: int,
-        data: EntityCreate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    entity_id: int,
+    data: EntityCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Remplace complètement une entité (tous les champs).
@@ -324,11 +328,11 @@ async def replace_entity(
     summary="Modifier une entité",
 )
 async def update_entity(
-        entity_id: int,
-        data: EntityUpdate,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    entity_id: int,
+    data: EntityUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Met à jour partiellement une entité.
@@ -348,10 +352,10 @@ async def update_entity(
     summary="Supprimer une entité",
 )
 async def delete_entity(
-        entity_id: int,
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(require_role("ADMIN")),
+    entity_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(require_role("ADMIN")),
 ):
     """
     Désactive une entité (soft delete).
@@ -363,24 +367,25 @@ async def delete_entity(
     """
     service = EntityService(db, tenant_id)
     service.delete(entity_id)
-    return None
+    return
 
 
 # =============================================================================
 # HIERARCHY ENDPOINTS
 # =============================================================================
 
+
 @router.get(
     "/hierarchy",
-    response_model=List[EntityWithChildren],
+    response_model=list[EntityWithChildren],
     summary="Arborescence des entités",
     description="Récupère l'arborescence complète des entités.",
 )
 async def get_hierarchy(
-        db: Session = Depends(get_db),
-        tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
-        current_user: User = Depends(get_current_user),
-        root_id: Optional[int] = Query(None, description="ID de la racine (optionnel)"),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_current_tenant_id),  # MULTI-TENANT
+    current_user: User = Depends(get_current_user),
+    root_id: int | None = Query(None, description="ID de la racine (optionnel)"),
 ):
     """
     Affiche la hiérarchie des entités du tenant.

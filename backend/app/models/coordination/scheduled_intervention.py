@@ -11,21 +11,22 @@ Flux de données :
 
 from __future__ import annotations
 
-from datetime import date, time, datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from datetime import UTC, date, datetime, time
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Integer, Text, ForeignKey, Date, Time, Enum as SQLEnum, Index
+from sqlalchemy import Date, Enum as SQLEnum, ForeignKey, Index, Integer, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.enums import InterventionStatus
 from app.models.mixins import TimestampMixin
 
+
 if TYPE_CHECKING:
     from app.models.careplan.care_plan_service import CarePlanService
+    from app.models.coordination.coordination_entry import CoordinationEntry
     from app.models.patient.patient import Patient
     from app.models.user.user import User
-    from app.models.coordination.coordination_entry import CoordinationEntry
 
 
 class ScheduledIntervention(TimestampMixin, Base):
@@ -67,7 +68,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         ...     scheduled_date=date(2024, 12, 20),
         ...     scheduled_start_time=time(8, 0),
         ...     scheduled_end_time=time(8, 45),
-        ...     status=InterventionStatus.SCHEDULED
+        ...     status=InterventionStatus.SCHEDULED,
         ... )
     """
 
@@ -77,7 +78,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         Index("ix_sched_interv_user_date", "user_id", "scheduled_date"),
         Index("ix_sched_interv_patient_date", "patient_id", "scheduled_date"),
         Index("ix_sched_interv_date_status", "scheduled_date", "status"),
-        {"comment": "Planning des interventions futures"}
+        {"comment": "Planning des interventions futures"},
     )
 
     # === Clé primaire ===
@@ -85,9 +86,7 @@ class ScheduledIntervention(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'intervention planifiée",
-        info={
-            "description": "Clé primaire auto-incrémentée"
-        }
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # === Multi-tenant ===
@@ -96,7 +95,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant propriétaire de cet enregistrement"
+        comment="Tenant propriétaire de cet enregistrement",
     )
 
     # === Références ===
@@ -106,10 +105,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="Service du plan à l'origine de cette intervention",
-        info={
-            "description": "FK vers care_plan_services. Suppression en cascade",
-            "example": 1
-        }
+        info={"description": "FK vers care_plan_services. Suppression en cascade", "example": 1},
     )
 
     # Dénormalisé pour performance des requêtes de planning
@@ -120,8 +116,8 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Patient concerné",
         info={
             "description": "FK vers patients. Dénormalisé pour performance des requêtes de planning",
-            "example": 1
-        }
+            "example": 1,
+        },
     )
 
     user_id: Mapped[int | None] = mapped_column(
@@ -129,9 +125,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         nullable=True,
         index=True,
         doc="Professionnel affecté à cette intervention",
-        info={
-            "description": "FK vers users. NULL si pas encore affecté ou professionnel supprimé"
-        }
+        info={"description": "FK vers users. NULL si pas encore affecté ou professionnel supprimé"},
     )
 
     # === Planning prévu ===
@@ -143,30 +137,22 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Date prévue de l'intervention",
         info={
             "description": "Date à laquelle l'intervention est planifiée",
-            "example": "2024-12-20"
-        }
+            "example": "2024-12-20",
+        },
     )
 
     scheduled_start_time: Mapped[time] = mapped_column(
         Time,
         nullable=False,
         doc="Heure de début prévue",
-        info={
-            "description": "Heure de début planifiée",
-            "format": "HH:MM",
-            "example": "08:00"
-        }
+        info={"description": "Heure de début planifiée", "format": "HH:MM", "example": "08:00"},
     )
 
     scheduled_end_time: Mapped[time] = mapped_column(
         Time,
         nullable=False,
         doc="Heure de fin prévue",
-        info={
-            "description": "Heure de fin planifiée",
-            "format": "HH:MM",
-            "example": "08:45"
-        }
+        info={"description": "Heure de fin planifiée", "format": "HH:MM", "example": "08:45"},
     )
 
     # === Statut ===
@@ -180,8 +166,8 @@ class ScheduledIntervention(TimestampMixin, Base):
         info={
             "description": "État actuel de l'intervention dans son cycle de vie",
             "enum": [e.value for e in InterventionStatus],
-            "default": "SCHEDULED"
-        }
+            "default": "SCHEDULED",
+        },
     )
 
     # === Réalisation effective ===
@@ -192,8 +178,8 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Heure réelle de début",
         info={
             "description": "Heure à laquelle l'intervention a réellement commencé",
-            "format": "HH:MM"
-        }
+            "format": "HH:MM",
+        },
     )
 
     actual_end_time: Mapped[time | None] = mapped_column(
@@ -202,8 +188,8 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Heure réelle de fin",
         info={
             "description": "Heure à laquelle l'intervention s'est réellement terminée",
-            "format": "HH:MM"
-        }
+            "format": "HH:MM",
+        },
     )
 
     actual_duration_minutes: Mapped[int | None] = mapped_column(
@@ -212,8 +198,8 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Durée réelle en minutes",
         info={
             "description": "Durée effective de l'intervention (calculée ou saisie)",
-            "unit": "minutes"
-        }
+            "unit": "minutes",
+        },
     )
 
     # === Notes et commentaires ===
@@ -222,18 +208,14 @@ class ScheduledIntervention(TimestampMixin, Base):
         Text,
         nullable=True,
         doc="Notes à la fin de l'intervention",
-        info={
-            "description": "Observations du professionnel après réalisation"
-        }
+        info={"description": "Observations du professionnel après réalisation"},
     )
 
     cancellation_reason: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         doc="Raison d'annulation ou de non-réalisation",
-        info={
-            "description": "Motif en cas d'annulation, manquée ou reprogrammation"
-        }
+        info={"description": "Motif en cas d'annulation, manquée ou reprogrammation"},
     )
 
     # === Lien avec l'historique ===
@@ -245,7 +227,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Lien vers l'entrée de coordination après réalisation",
         info={
             "description": "FK vers coordination_entries. Créé quand l'intervention est complétée"
-        }
+        },
     )
 
     # === Reprogrammation (auto-référence) ===
@@ -256,7 +238,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Intervention d'origine si celle-ci est une reprogrammation",
         info={
             "description": "FK auto-référencée. Pointe vers l'intervention originale reprogrammée"
-        }
+        },
     )
 
     rescheduled_to_id: Mapped[int | None] = mapped_column(
@@ -265,50 +247,50 @@ class ScheduledIntervention(TimestampMixin, Base):
         doc="Nouvelle intervention si celle-ci a été reprogrammée",
         info={
             "description": "FK auto-référencée. Pointe vers la nouvelle intervention de remplacement"
-        }
+        },
     )
 
     # === Relations ===
 
-    care_plan_service: Mapped["CarePlanService"] = relationship(
+    care_plan_service: Mapped[CarePlanService] = relationship(
         "CarePlanService",
         back_populates="scheduled_interventions",
-        doc="Service du plan d'aide à l'origine de cette intervention"
+        doc="Service du plan d'aide à l'origine de cette intervention",
     )
 
-    patient: Mapped["Patient"] = relationship(
+    patient: Mapped[Patient] = relationship(
         "Patient",
         back_populates="scheduled_interventions",
-        doc="Patient concerné par cette intervention"
+        doc="Patient concerné par cette intervention",
     )
 
-    user: Mapped[Optional["User"]] = relationship(
+    user: Mapped[User | None] = relationship(
         "User",
         foreign_keys=[user_id],
         back_populates="scheduled_interventions",
-        doc="Professionnel affecté à cette intervention"
+        doc="Professionnel affecté à cette intervention",
     )
 
-    coordination_entry: Mapped[Optional["CoordinationEntry"]] = relationship(
+    coordination_entry: Mapped[CoordinationEntry | None] = relationship(
         "CoordinationEntry",
         back_populates="scheduled_intervention",
-        doc="Entrée de coordination créée après réalisation"
+        doc="Entrée de coordination créée après réalisation",
     )
 
-    rescheduled_from: Mapped[Optional["ScheduledIntervention"]] = relationship(
+    rescheduled_from: Mapped[ScheduledIntervention | None] = relationship(
         "ScheduledIntervention",
         foreign_keys=[rescheduled_from_id],
         remote_side="ScheduledIntervention.id",
         uselist=False,
-        doc="Intervention originale dont celle-ci est la reprogrammation"
+        doc="Intervention originale dont celle-ci est la reprogrammation",
     )
 
-    rescheduled_to: Mapped[Optional["ScheduledIntervention"]] = relationship(
+    rescheduled_to: Mapped[ScheduledIntervention | None] = relationship(
         "ScheduledIntervention",
         foreign_keys=[rescheduled_to_id],
         remote_side="ScheduledIntervention.id",
         uselist=False,
-        doc="Nouvelle intervention remplaçant celle-ci"
+        doc="Nouvelle intervention remplaçant celle-ci",
     )
 
     # === Méthodes ===
@@ -396,7 +378,7 @@ class ScheduledIntervention(TimestampMixin, Base):
             InterventionStatus.COMPLETED,
             InterventionStatus.CANCELLED,
             InterventionStatus.MISSED,
-            InterventionStatus.RESCHEDULED
+            InterventionStatus.RESCHEDULED,
         )
 
     @property
@@ -434,7 +416,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         if not self.can_be_started:
             raise ValueError("L'intervention ne peut pas être démarrée dans son état actuel")
         self.status = InterventionStatus.IN_PROGRESS
-        self.actual_start_time = actual_start or datetime.now(timezone.utc).time()
+        self.actual_start_time = actual_start or datetime.now(UTC).time()
 
     def complete(self, actual_end: time | None = None, notes: str | None = None) -> None:
         """
@@ -448,7 +430,7 @@ class ScheduledIntervention(TimestampMixin, Base):
             raise ValueError("Seule une intervention en cours peut être terminée")
 
         self.status = InterventionStatus.COMPLETED
-        self.actual_end_time = actual_end or datetime.now(timezone.utc).time()
+        self.actual_end_time = actual_end or datetime.now(UTC).time()
 
         # Calculer la durée réelle
         if self.actual_start_time and self.actual_end_time:
@@ -483,7 +465,9 @@ class ScheduledIntervention(TimestampMixin, Base):
         self.status = InterventionStatus.MISSED
         self.cancellation_reason = reason or "Intervention non réalisée"
 
-    def reschedule(self, new_intervention: "ScheduledIntervention", reason: str | None = None) -> None:
+    def reschedule(
+        self, new_intervention: ScheduledIntervention, reason: str | None = None
+    ) -> None:
         """
         Reprogramme l'intervention vers une nouvelle date/heure.
 
@@ -501,7 +485,7 @@ class ScheduledIntervention(TimestampMixin, Base):
         if reason:
             self.cancellation_reason = reason
 
-    def link_to_coordination_entry(self, entry: "CoordinationEntry") -> None:
+    def link_to_coordination_entry(self, entry: CoordinationEntry) -> None:
         """
         Lie l'intervention à une entrée de coordination (historique).
 

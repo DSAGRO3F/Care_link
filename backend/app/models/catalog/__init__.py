@@ -7,10 +7,11 @@ Ce module contient :
 """
 
 from app.models.catalog.entity_service import EntityService
-from app.models.catalog.service_template import ServiceTemplate, INITIAL_SERVICE_TEMPLATES
+from app.models.catalog.service_template import INITIAL_SERVICE_TEMPLATES, ServiceTemplate
+
 
 __all__ = [
-    "ServiceTemplate",
-    "EntityService",
     "INITIAL_SERVICE_TEMPLATES",
+    "EntityService",
+    "ServiceTemplate",
 ]

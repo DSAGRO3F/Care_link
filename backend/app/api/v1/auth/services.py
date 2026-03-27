@@ -19,68 +19,64 @@ Changement v4.8 : Harmonisation encryption
 - Création User PSC avec encrypt_for_db() + noms de colonnes _encrypted
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Tuple, Optional, Dict, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.api.v1.auth.schemas import (
-    TokenResponse,
+    AccessType,
     AuthenticatedUser,
+    AuthMethod,
     LoginResponse,
     PSCSessionData,
-    AuthMethod,
-    AccessType,
+    TokenResponse,
 )
 from app.core.auth.psc import (
     get_psc_client,
 )
 from app.core.config import settings
-from app.core.security.hashing import verify_password, hash_password
+from app.core.security.hashing import hash_password, verify_password
 from app.core.security.jwt import create_access_token, create_refresh_token
 from app.core.session.redis_client import get_redis
+from app.models.enums import TenantStatus
+from app.models.tenants.tenant import Tenant
 from app.models.user.profession import Profession
 from app.models.user.role import Role
 from app.models.user.user import User
-
-from app.models.tenants.tenant import Tenant
-from app.models.enums import TenantStatus
-from app.services.encryption import user_encryptor, get_user_search_blind
+from app.services.encryption import get_user_search_blind, user_encryptor
 
 
 # =============================================================================
 # EXCEPTIONS
 # =============================================================================
 
+
 class AuthenticationError(Exception):
     """Erreur d'authentification générique."""
-    pass
 
 
 class InvalidCredentialsError(AuthenticationError):
     """Identifiants invalides."""
-    pass
 
 
 class InactiveUserError(AuthenticationError):
     """Compte utilisateur inactif."""
-    pass
 
 
 class PSCSessionError(AuthenticationError):
     """Erreur de session PSC (state invalide, session expirée, etc.)."""
-    pass
 
 
 class PatientAccessError(Exception):
     """Erreur d'accès patient."""
-    pass
 
 
 # =============================================================================
 # SERVICE D'AUTHENTIFICATION
 # =============================================================================
+
 
 class AuthService:
     """
@@ -130,7 +126,6 @@ class AuthService:
     # Solution : Bypasser temporairement le RLS pour authenticate_local
     # ============================================================================
 
-
     def authenticate_local(self, email: str, password: str, tenant_code: str) -> User:
         """
         Authentifie un utilisateur avec email/mot de passe.
@@ -147,9 +142,7 @@ class AuthService:
         self.db.execute(text("SET app.is_super_admin = 'true'"))
         try:
             # Résoudre le tenant par son code
-            tenant = self.db.query(Tenant).filter(
-                Tenant.code == tenant_code.upper()
-            ).first()
+            tenant = self.db.query(Tenant).filter(Tenant.code == tenant_code.upper()).first()
             if not tenant:
                 raise InvalidCredentialsError("Code structure, email ou mot de passe incorrect")
             if tenant.status != TenantStatus.ACTIVE:
@@ -159,10 +152,14 @@ class AuthService:
             tenant_id_value: int = tenant.id  # type: ignore[assignment]
             email_blind = get_user_search_blind(email, "email", tenant_id_value)
 
-            user: User | None = self.db.query(User).filter(
-                User.email_blind == email_blind,
-                User.tenant_id == tenant.id,
-            ).first()
+            user: User | None = (
+                self.db.query(User)
+                .filter(
+                    User.email_blind == email_blind,
+                    User.tenant_id == tenant.id,
+                )
+                .first()
+            )
 
             if not user:
                 raise InvalidCredentialsError("Email ou mot de passe incorrect")
@@ -184,8 +181,7 @@ class AuthService:
             # Vérifier que l'utilisateur a un mot de passe (pas un compte PSC uniquement)
             if not user.password_hash:
                 raise InvalidCredentialsError(
-                    "Ce compte utilise Pro Santé Connect. "
-                    "Veuillez vous connecter avec votre e-CPS."
+                    "Ce compte utilise Pro Santé Connect. Veuillez vous connecter avec votre e-CPS."
                 )
 
             # À ce stade, password_hash est garanti non-None
@@ -209,6 +205,8 @@ class AuthService:
             self.db.execute(text("SET app.is_super_admin = 'false'"))
 
             self.db.commit()
+            # Re-set RLS context after commit (context lost on commit)
+            self.db.execute(text(f"SET app.current_tenant_id = '{user.tenant_id}'"))
             self.db.refresh(user)
 
             # Forcer le chargement des relations avant détachement
@@ -228,7 +226,7 @@ class AuthService:
             # Remettre RLS en mode normal avant de propager l'exception
             self.db.execute(text("SET app.is_super_admin = 'false'"))
             raise
-        except Exception as e:
+        except Exception:
             # Remettre RLS en mode normal en cas d'erreur inattendue
             self.db.execute(text("SET app.is_super_admin = 'false'"))
             raise
@@ -271,7 +269,7 @@ class AuthService:
     # AUTHENTIFICATION PRO SANTÉ CONNECT
     # =========================================================================
 
-    def create_psc_session(self, redirect_after: Optional[str] = None) -> Tuple[str, str]:
+    def create_psc_session(self, redirect_after: str | None = None) -> tuple[str, str]:
         """
         Crée une session PSC et retourne l'URL d'autorisation.
 
@@ -296,17 +294,13 @@ class AuthService:
             state=state,
             nonce=nonce,
             code_verifier=code_verifier,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             redirect_after=redirect_after,
         )
 
         # Stocker en Redis avec TTL
         session_key = f"{self.PSC_SESSION_PREFIX}{state}"
-        self.redis.setex(
-            session_key,
-            self.PSC_SESSION_TTL_SECONDS,
-            session_data.model_dump_json()
-        )
+        self.redis.setex(session_key, self.PSC_SESSION_TTL_SECONDS, session_data.model_dump_json())
 
         return auth_url, state
 
@@ -336,7 +330,7 @@ class AuthService:
 
         return PSCSessionData.model_validate_json(session_json)
 
-    async def authenticate_with_psc(self, code: str, state: str) -> Tuple[User, Dict[str, Any]]:
+    async def authenticate_with_psc(self, code: str, state: str) -> tuple[User, dict[str, Any]]:
         """
         Processus complet d'authentification via Pro Santé Connect.
 
@@ -365,8 +359,7 @@ class AuthService:
 
         # Échanger le code contre des tokens
         tokens = await psc_client.exchange_code_for_tokens(
-            code=code,
-            code_verifier=session.code_verifier
+            code=code, code_verifier=session.code_verifier
         )
 
         # Récupérer les infos utilisateur
@@ -381,13 +374,11 @@ class AuthService:
 
         # Vérifier que l'utilisateur a accès
         if not user.is_active:
-            raise InactiveUserError(
-                "Votre compte est inactif. Contactez un administrateur."
-            )
+            raise InactiveUserError("Votre compte est inactif. Contactez un administrateur.")
 
         return user, parsed_info
 
-    def _create_or_update_user_from_psc(self, psc_info: Dict[str, Any]) -> User:
+    def _create_or_update_user_from_psc(self, psc_info: dict[str, Any]) -> User:
         """
         Crée ou met à jour un utilisateur depuis les données PSC.
 
@@ -434,7 +425,7 @@ class AuthService:
                 user.email_encrypted = encrypted_email["email_encrypted"]
                 user.email_blind = encrypted_email["email_blind"]
 
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = datetime.now(UTC)
 
             self.db.commit()
             self.db.refresh(user)
@@ -445,9 +436,9 @@ class AuthService:
             # Trouver la profession correspondante
             profession = None
             if profession_code:
-                profession = self.db.query(Profession).filter(
-                    Profession.code == profession_code
-                ).first()
+                profession = (
+                    self.db.query(Profession).filter(Profession.code == profession_code).first()
+                )
 
             # Générer un email si non fourni par PSC
             if not email:
@@ -457,8 +448,7 @@ class AuthService:
             # TODO: Déterminer dynamiquement le tenant_id pour les nouveaux users PSC
             target_tenant_id = 1  # TODO: Déterminer dynamiquement
             encrypted_data = user_encryptor.encrypt_for_db(
-                {"email": email, "rpps": rpps},
-                tenant_id=target_tenant_id
+                {"email": email, "rpps": rpps}, tenant_id=target_tenant_id
             )
 
             # Créer l'utilisateur avec les colonnes _encrypted
@@ -474,7 +464,7 @@ class AuthService:
                 is_active=True,
                 is_admin=False,
                 tenant_id=target_tenant_id,
-                last_login=datetime.now(timezone.utc),
+                last_login=datetime.now(UTC),
             )
 
             self.db.add(user)
@@ -490,7 +480,7 @@ class AuthService:
 
         return user
 
-    def _get_default_role_for_profession(self, profession: str) -> Optional[Role]:
+    def _get_default_role_for_profession(self, profession: str) -> Role | None:
         """
         Retourne le rôle par défaut à attribuer selon la profession.
 
@@ -593,36 +583,40 @@ class AuthService:
             return False
 
         # Médecin traitant : accès total
-        if hasattr(patient, 'medecin_traitant_id') and patient.medecin_traitant_id == user.id:
+        if hasattr(patient, "medecin_traitant_id") and patient.medecin_traitant_id == user.id:
             return True
 
         # Vérifier les autorisations explicites
-        access = self.db.query(PatientAccess).filter(
-            PatientAccess.patient_id == patient_id,
-            PatientAccess.user_id == user.id,
-            PatientAccess.revoked_at.is_(None)
-        ).first()
+        access = (
+            self.db.query(PatientAccess)
+            .filter(
+                PatientAccess.patient_id == patient_id,
+                PatientAccess.user_id == user.id,
+                PatientAccess.revoked_at.is_(None),
+            )
+            .first()
+        )
 
         if access:
             # Vérifier l'expiration si définie
-            if access.expires_at and access.expires_at < datetime.now(timezone.utc):
+            if access.expires_at and access.expires_at < datetime.now(UTC):
                 return False
             return True
 
         # Même tenant = accès (selon politique)
-        if hasattr(patient, 'tenant_id') and patient.tenant_id == user.tenant_id:
+        if hasattr(patient, "tenant_id") and patient.tenant_id == user.tenant_id:
             return True
 
         return False
 
     def grant_patient_access(
-            self,
-            patient_id: int,
-            user_id: int,
-            granted_by_id: int,
-            access_type: AccessType,
-            reason: str,
-            expires_in_days: Optional[int] = None
+        self,
+        patient_id: int,
+        user_id: int,
+        granted_by_id: int,
+        access_type: AccessType,
+        reason: str,
+        expires_in_days: int | None = None,
     ) -> None:
         """
         Accorde à un utilisateur l'accès à un patient.
@@ -641,11 +635,15 @@ class AuthService:
         from app.models.patient.patient_access import PatientAccess
 
         # Vérifier si l'accès existe déjà
-        existing_access = self.db.query(PatientAccess).filter(
-            PatientAccess.patient_id == patient_id,
-            PatientAccess.user_id == user_id,
-            PatientAccess.revoked_at.is_(None)
-        ).first()
+        existing_access = (
+            self.db.query(PatientAccess)
+            .filter(
+                PatientAccess.patient_id == patient_id,
+                PatientAccess.user_id == user_id,
+                PatientAccess.revoked_at.is_(None),
+            )
+            .first()
+        )
 
         if existing_access:
             raise PatientAccessError("L'utilisateur a déjà un accès actif à ce patient")
@@ -653,7 +651,7 @@ class AuthService:
         # Calculer la date d'expiration
         expires_at = None
         if expires_in_days:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+            expires_at = datetime.now(UTC) + timedelta(days=expires_in_days)
 
         # Créer l'accès
         access = PatientAccess(
@@ -662,7 +660,7 @@ class AuthService:
             access_type=access_type.value,
             reason=reason,
             granted_by=granted_by_id,
-            granted_at=datetime.now(timezone.utc),
+            granted_at=datetime.now(UTC),
             expires_at=expires_at,
         )
 
@@ -682,14 +680,18 @@ class AuthService:
         """
         from app.models.patient.patient_access import PatientAccess
 
-        access = self.db.query(PatientAccess).filter(
-            PatientAccess.patient_id == patient_id,
-            PatientAccess.user_id == user_id,
-            PatientAccess.revoked_at.is_(None)
-        ).first()
+        access = (
+            self.db.query(PatientAccess)
+            .filter(
+                PatientAccess.patient_id == patient_id,
+                PatientAccess.user_id == user_id,
+                PatientAccess.revoked_at.is_(None),
+            )
+            .first()
+        )
 
         if access:
-            access.revoked_at = datetime.now(timezone.utc)
+            access.revoked_at = datetime.now(UTC)
             self.db.commit()
             return True
 
@@ -767,18 +769,14 @@ class AuthService:
             full_name=f"{user.first_name} {user.last_name}",
             rpps=user.rpps,
             profession=profession_name,
-            speciality=getattr(user, 'speciality', None),
+            speciality=getattr(user, "speciality", None),
             roles=role_names,
             is_admin=user.is_admin,
             must_change_password=user.must_change_password,
             tenant_id=user.tenant_id,
         )
 
-    def build_login_response(
-            self,
-            user: User,
-            auth_method: AuthMethod
-    ) -> LoginResponse:
+    def build_login_response(self, user: User, auth_method: AuthMethod) -> LoginResponse:
         """
         Construit la réponse complète de login.
 
@@ -799,6 +797,7 @@ class AuthService:
 # =============================================================================
 # FACTORY
 # =============================================================================
+
 
 def get_auth_service(db: Session) -> AuthService:
     """Factory pour créer un AuthService avec une session DB."""

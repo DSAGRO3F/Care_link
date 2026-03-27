@@ -1,14 +1,14 @@
 <script setup lang="ts">
-/**
- * Carnet de liaison
- * Fil d'actualité des transmissions entre professionnels
- */
-import { ref } from 'vue'
-import Card from 'primevue/card'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
+  /**
+   * Carnet de liaison
+   * Fil d'actualité des transmissions entre professionnels
+   */
+  import { ref } from 'vue';
+  import Card from 'primevue/card';
+  import Button from 'primevue/button';
+  import InputText from 'primevue/inputtext';
 
-const searchQuery = ref('')
+  const searchQuery = ref('');
 </script>
 
 <template>
@@ -16,10 +16,7 @@ const searchQuery = ref('')
     <!-- Header -->
     <div class="page-header">
       <h1 class="page-title">Carnet de liaison</h1>
-      <Button
-        label="Nouvelle entrée"
-        icon="pi pi-plus"
-      />
+      <Button label="Nouvelle entrée" icon="pi pi-plus" />
     </div>
 
     <!-- Filtres -->
@@ -39,15 +36,9 @@ const searchQuery = ref('')
       <template #content>
         <div class="text-center py-12">
           <i class="pi pi-comments text-6xl text-neutral-300 mb-4"></i>
-          <h3 class="text-lg font-medium text-neutral-900">
-            Transmissions
-          </h3>
-          <p class="text-neutral-600 mt-2">
-            Les entrées du carnet de liaison apparaîtront ici
-          </p>
-          <p class="text-sm text-neutral-400 mt-4">
-            (Liste à implémenter)
-          </p>
+          <h3 class="text-lg font-medium text-neutral-900">Transmissions</h3>
+          <p class="text-neutral-600 mt-2">Les entrées du carnet de liaison apparaîtront ici</p>
+          <p class="text-sm text-neutral-400 mt-4">(Liste à implémenter)</p>
         </div>
       </template>
     </Card>

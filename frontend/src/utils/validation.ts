@@ -4,9 +4,9 @@
  */
 
 /** Regex email basique mais suffisante pour validation inline */
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Vérifie qu'une chaîne est un email valide */
 export function isValidEmail(value: string): boolean {
-  return EMAIL_REGEX.test(value.trim())
+  return EMAIL_REGEX.test(value.trim());
 }

@@ -1,4 +1,5 @@
-from app.services.aggir.calculator import AggirCalculator, Variable, Adverbes
+from app.services.aggir.calculator import Adverbes, AggirCalculator, Variable
+
 
 # Test simple
 calculator = AggirCalculator()

@@ -7,16 +7,23 @@ Contient la logique CRUD pour :
 
 Version multi-tenant : toutes les requêtes filtrent par tenant_id.
 """
-from datetime import date
-from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func, and_
+from datetime import date
+
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.coordination.schemas import (
-    CoordinationEntryCreate, CoordinationEntryUpdate, CoordinationEntryFilters,
-    ScheduledInterventionCreate, ScheduledInterventionUpdate, ScheduledInterventionFilters,
-    InterventionStart, InterventionComplete, InterventionCancel, InterventionReschedule,
+    CoordinationEntryCreate,
+    CoordinationEntryFilters,
+    CoordinationEntryUpdate,
+    InterventionCancel,
+    InterventionComplete,
+    InterventionReschedule,
+    InterventionStart,
+    ScheduledInterventionCreate,
+    ScheduledInterventionFilters,
+    ScheduledInterventionUpdate,
 )
 from app.models.careplan.care_plan_service import CarePlanService
 from app.models.coordination.coordination_entry import CoordinationEntry
@@ -30,44 +37,39 @@ from app.models.user.user import User
 # EXCEPTIONS
 # =============================================================================
 
+
 class CoordinationEntryNotFoundError(Exception):
     """Entrée de coordination non trouvée."""
-    pass
 
 
 class ScheduledInterventionNotFoundError(Exception):
     """Intervention planifiée non trouvée."""
-    pass
 
 
 class PatientNotFoundError(Exception):
     """Patient non trouvé."""
-    pass
 
 
 class UserNotFoundError(Exception):
     """Utilisateur non trouvé."""
-    pass
 
 
 class CarePlanServiceNotFoundError(Exception):
     """Service de plan non trouvé."""
-    pass
 
 
 class InterventionStatusError(Exception):
     """Erreur de statut d'intervention."""
-    pass
 
 
 class EntryAlreadyDeletedError(Exception):
     """Entrée déjà supprimée."""
-    pass
 
 
 # =============================================================================
 # COORDINATION ENTRY SERVICE
 # =============================================================================
+
 
 class CoordinationEntryService:
     """
@@ -105,8 +107,7 @@ class CoordinationEntryService:
             PatientNotFoundError: Si le patient n'existe pas ou n'appartient pas au tenant
         """
         patient_query = select(Patient).where(
-            Patient.id == patient_id,
-            Patient.tenant_id == self.tenant_id
+            Patient.id == patient_id, Patient.tenant_id == self.tenant_id
         )
         patient = self.db.execute(patient_query).scalar_one_or_none()
         if not patient:
@@ -114,11 +115,11 @@ class CoordinationEntryService:
         return patient
 
     def get_all(
-            self,
-            page: int = 1,
-            size: int = 20,
-            filters: Optional[CoordinationEntryFilters] = None,
-    ) -> Tuple[List[CoordinationEntry], int]:
+        self,
+        page: int = 1,
+        size: int = 20,
+        filters: CoordinationEntryFilters | None = None,
+    ) -> tuple[list[CoordinationEntry], int]:
         """Liste les entrées de coordination avec pagination et filtres."""
         query = self._base_query()
 
@@ -164,18 +165,16 @@ class CoordinationEntryService:
         return entry
 
     def get_for_patient(
-            self,
-            patient_id: int,
-            limit: int = 50,
-            include_deleted: bool = False,
-    ) -> List[CoordinationEntry]:
+        self,
+        patient_id: int,
+        limit: int = 50,
+        include_deleted: bool = False,
+    ) -> list[CoordinationEntry]:
         """Récupère les entrées d'un patient."""
         # Vérifier que le patient appartient au tenant
         self._verify_patient_belongs_to_tenant(patient_id)
 
-        query = self._base_query().where(
-            CoordinationEntry.patient_id == patient_id
-        )
+        query = self._base_query().where(CoordinationEntry.patient_id == patient_id)
 
         if not include_deleted:
             query = query.where(CoordinationEntry.deleted_at.is_(None))
@@ -184,9 +183,9 @@ class CoordinationEntryService:
         return list(self.db.execute(query).scalars().all())
 
     def create(
-            self,
-            data: CoordinationEntryCreate,
-            user_id: int,
+        self,
+        data: CoordinationEntryCreate,
+        user_id: int,
     ) -> CoordinationEntry:
         """Crée une nouvelle entrée de coordination."""
         # Vérifier que le patient existe et appartient au tenant
@@ -211,9 +210,9 @@ class CoordinationEntryService:
         return entry
 
     def update(
-            self,
-            entry_id: int,
-            data: CoordinationEntryUpdate,
+        self,
+        entry_id: int,
+        data: CoordinationEntryUpdate,
     ) -> CoordinationEntry:
         """Met à jour une entrée de coordination."""
         entry = self.get_by_id(entry_id)
@@ -256,6 +255,7 @@ class CoordinationEntryService:
 # SCHEDULED INTERVENTION SERVICE
 # =============================================================================
 
+
 class ScheduledInterventionService:
     """
     Service pour la gestion des interventions planifiées.
@@ -276,13 +276,14 @@ class ScheduledInterventionService:
 
     def _base_query(self):
         """Retourne une requête de base filtrée par tenant_id."""
-        return select(ScheduledIntervention).where(ScheduledIntervention.tenant_id == self.tenant_id)
+        return select(ScheduledIntervention).where(
+            ScheduledIntervention.tenant_id == self.tenant_id
+        )
 
     def _verify_patient_belongs_to_tenant(self, patient_id: int) -> Patient:
         """Vérifie qu'un patient appartient au tenant."""
         patient_query = select(Patient).where(
-            Patient.id == patient_id,
-            Patient.tenant_id == self.tenant_id
+            Patient.id == patient_id, Patient.tenant_id == self.tenant_id
         )
         patient = self.db.execute(patient_query).scalar_one_or_none()
         if not patient:
@@ -291,10 +292,7 @@ class ScheduledInterventionService:
 
     def _verify_user_belongs_to_tenant(self, user_id: int) -> User:
         """Vérifie qu'un utilisateur appartient au tenant."""
-        user_query = select(User).where(
-            User.id == user_id,
-            User.tenant_id == self.tenant_id
-        )
+        user_query = select(User).where(User.id == user_id, User.tenant_id == self.tenant_id)
         user = self.db.execute(user_query).scalar_one_or_none()
         if not user:
             raise UserNotFoundError(f"Utilisateur {user_id} non trouvé")
@@ -303,8 +301,7 @@ class ScheduledInterventionService:
     def _verify_care_plan_service_belongs_to_tenant(self, service_id: int) -> CarePlanService:
         """Vérifie qu'un service de plan appartient au tenant."""
         service_query = select(CarePlanService).where(
-            CarePlanService.id == service_id,
-            CarePlanService.tenant_id == self.tenant_id
+            CarePlanService.id == service_id, CarePlanService.tenant_id == self.tenant_id
         )
         service = self.db.execute(service_query).scalar_one_or_none()
         if not service:
@@ -312,13 +309,11 @@ class ScheduledInterventionService:
         return service
 
     def get_all(
-            self,
-            filters: Optional[ScheduledInterventionFilters] = None,
-    ) -> List[ScheduledIntervention]:
+        self,
+        filters: ScheduledInterventionFilters | None = None,
+    ) -> list[ScheduledIntervention]:
         """Liste les interventions planifiées avec filtres."""
-        query = self._base_query().options(
-            selectinload(ScheduledIntervention.care_plan_service)
-        )
+        query = self._base_query().options(selectinload(ScheduledIntervention.care_plan_service))
 
         if filters:
             if filters.patient_id:
@@ -328,7 +323,9 @@ class ScheduledInterventionService:
                 query = query.where(ScheduledIntervention.user_id == filters.user_id)
 
             if filters.care_plan_service_id:
-                query = query.where(ScheduledIntervention.care_plan_service_id == filters.care_plan_service_id)
+                query = query.where(
+                    ScheduledIntervention.care_plan_service_id == filters.care_plan_service_id
+                )
 
             if filters.date_from:
                 query = query.where(ScheduledIntervention.scheduled_date >= filters.date_from)
@@ -337,7 +334,9 @@ class ScheduledInterventionService:
                 query = query.where(ScheduledIntervention.scheduled_date <= filters.date_to)
 
             if filters.status:
-                query = query.where(ScheduledIntervention.status == InterventionStatus(filters.status.upper()))
+                query = query.where(
+                    ScheduledIntervention.status == InterventionStatus(filters.status.upper())
+                )
 
         query = query.order_by(
             ScheduledIntervention.scheduled_date,
@@ -348,10 +347,10 @@ class ScheduledInterventionService:
 
     def get_by_id(self, intervention_id: int) -> ScheduledIntervention:
         """Récupère une intervention par son ID."""
-        query = self._base_query().where(
-            ScheduledIntervention.id == intervention_id
-        ).options(
-            selectinload(ScheduledIntervention.care_plan_service)
+        query = (
+            self._base_query()
+            .where(ScheduledIntervention.id == intervention_id)
+            .options(selectinload(ScheduledIntervention.care_plan_service))
         )
         intervention = self.db.execute(query).scalar_one_or_none()
         if not intervention:
@@ -359,32 +358,37 @@ class ScheduledInterventionService:
         return intervention
 
     def get_daily_planning(
-            self,
-            user_id: int,
-            planning_date: date,
-    ) -> List[ScheduledIntervention]:
+        self,
+        user_id: int,
+        planning_date: date,
+    ) -> list[ScheduledIntervention]:
         """Récupère le planning journalier d'un professionnel."""
         # Vérifier que l'utilisateur appartient au tenant
         self._verify_user_belongs_to_tenant(user_id)
 
-        query = self._base_query().where(
-            and_(
-                ScheduledIntervention.user_id == user_id,
-                ScheduledIntervention.scheduled_date == planning_date,
-                ScheduledIntervention.status.not_in([
-                    InterventionStatus.CANCELLED,
-                    InterventionStatus.RESCHEDULED,
-                ])
+        query = (
+            self._base_query()
+            .where(
+                and_(
+                    ScheduledIntervention.user_id == user_id,
+                    ScheduledIntervention.scheduled_date == planning_date,
+                    ScheduledIntervention.status.not_in(
+                        [
+                            InterventionStatus.CANCELLED,
+                            InterventionStatus.RESCHEDULED,
+                        ]
+                    ),
+                )
             )
-        ).options(
-            selectinload(ScheduledIntervention.care_plan_service)
-        ).order_by(ScheduledIntervention.scheduled_start_time)
+            .options(selectinload(ScheduledIntervention.care_plan_service))
+            .order_by(ScheduledIntervention.scheduled_start_time)
+        )
 
         return list(self.db.execute(query).scalars().all())
 
     def create(
-            self,
-            data: ScheduledInterventionCreate,
+        self,
+        data: ScheduledInterventionCreate,
     ) -> ScheduledIntervention:
         """Crée une nouvelle intervention planifiée."""
         # Vérifier que le service du plan existe et appartient au tenant
@@ -414,17 +418,15 @@ class ScheduledInterventionService:
         return intervention
 
     def update(
-            self,
-            intervention_id: int,
-            data: ScheduledInterventionUpdate,
+        self,
+        intervention_id: int,
+        data: ScheduledInterventionUpdate,
     ) -> ScheduledIntervention:
         """Met à jour une intervention planifiée."""
         intervention = self.get_by_id(intervention_id)
 
         if intervention.is_terminal:
-            raise InterventionStatusError(
-                "Une intervention terminée ne peut pas être modifiée"
-            )
+            raise InterventionStatusError("Une intervention terminée ne peut pas être modifiée")
 
         # Vérifier l'utilisateur si modifié
         if data.user_id is not None:
@@ -444,9 +446,7 @@ class ScheduledInterventionService:
         intervention = self.get_by_id(intervention_id)
 
         if not intervention.is_pending:
-            raise InterventionStatusError(
-                "Seule une intervention en attente peut être supprimée"
-            )
+            raise InterventionStatusError("Seule une intervention en attente peut être supprimée")
 
         self.db.delete(intervention)
         self.db.commit()
@@ -460,16 +460,16 @@ class ScheduledInterventionService:
         try:
             intervention.confirm()
         except ValueError as e:
-            raise InterventionStatusError(str(e))
+            raise InterventionStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(intervention)
         return intervention
 
     def start(
-            self,
-            intervention_id: int,
-            data: Optional[InterventionStart] = None,
+        self,
+        intervention_id: int,
+        data: InterventionStart | None = None,
     ) -> ScheduledIntervention:
         """Démarre une intervention."""
         intervention = self.get_by_id(intervention_id)
@@ -479,16 +479,16 @@ class ScheduledInterventionService:
         try:
             intervention.start(actual_start)
         except ValueError as e:
-            raise InterventionStatusError(str(e))
+            raise InterventionStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(intervention)
         return intervention
 
     def complete(
-            self,
-            intervention_id: int,
-            data: Optional[InterventionComplete] = None,
+        self,
+        intervention_id: int,
+        data: InterventionComplete | None = None,
     ) -> ScheduledIntervention:
         """Termine une intervention."""
         intervention = self.get_by_id(intervention_id)
@@ -499,16 +499,16 @@ class ScheduledInterventionService:
         try:
             intervention.complete(actual_end, notes)
         except ValueError as e:
-            raise InterventionStatusError(str(e))
+            raise InterventionStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(intervention)
         return intervention
 
     def cancel(
-            self,
-            intervention_id: int,
-            data: InterventionCancel,
+        self,
+        intervention_id: int,
+        data: InterventionCancel,
     ) -> ScheduledIntervention:
         """Annule une intervention."""
         intervention = self.get_by_id(intervention_id)
@@ -516,16 +516,16 @@ class ScheduledInterventionService:
         try:
             intervention.cancel(data.reason)
         except ValueError as e:
-            raise InterventionStatusError(str(e))
+            raise InterventionStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(intervention)
         return intervention
 
     def mark_missed(
-            self,
-            intervention_id: int,
-            reason: Optional[str] = None,
+        self,
+        intervention_id: int,
+        reason: str | None = None,
     ) -> ScheduledIntervention:
         """Marque une intervention comme manquée."""
         intervention = self.get_by_id(intervention_id)
@@ -533,24 +533,22 @@ class ScheduledInterventionService:
         try:
             intervention.mark_missed(reason)
         except ValueError as e:
-            raise InterventionStatusError(str(e))
+            raise InterventionStatusError(str(e)) from e
 
         self.db.commit()
         self.db.refresh(intervention)
         return intervention
 
     def reschedule(
-            self,
-            intervention_id: int,
-            data: InterventionReschedule,
+        self,
+        intervention_id: int,
+        data: InterventionReschedule,
     ) -> ScheduledIntervention:
         """Reprogramme une intervention."""
         intervention = self.get_by_id(intervention_id)
 
         if intervention.is_terminal:
-            raise InterventionStatusError(
-                "Une intervention terminée ne peut pas être reprogrammée"
-            )
+            raise InterventionStatusError("Une intervention terminée ne peut pas être reprogrammée")
 
         # Créer la nouvelle intervention avec le tenant_id
         new_intervention = ScheduledIntervention(

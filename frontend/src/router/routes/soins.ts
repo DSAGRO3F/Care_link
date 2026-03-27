@@ -2,7 +2,7 @@
  * Routes de l'Espace Soins
  * Dashboard, patients, planning, carnet de liaison
  */
-import type { RouteRecordRaw } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router';
 
 const soinsRoutes: RouteRecordRaw[] = [
   {
@@ -10,7 +10,7 @@ const soinsRoutes: RouteRecordRaw[] = [
     name: 'soins',
     redirect: { name: 'soins-dashboard' },
     meta: {
-      layout: 'default',  // Explicite — sera remplacé par 'soins' quand on créera SoinsLayout
+      layout: 'default', // Explicite — sera remplacé par 'soins' quand on créera SoinsLayout
     },
     children: [
       // Dashboard "Ma journée"
@@ -25,24 +25,24 @@ const soinsRoutes: RouteRecordRaw[] = [
 
       // Évaluation — création
       {
-      path: 'patients/:patientId/evaluations/new',
-      name: 'soins-evaluation-create',
-      component: () => import('@/pages/soins/EvaluationCreatePage.vue'),
-      meta: {
-        title: 'Nouvelle évaluation',
+        path: 'patients/:patientId/evaluations/new',
+        name: 'soins-evaluation-create',
+        component: () => import('@/pages/soins/EvaluationCreatePage.vue'),
+        meta: {
+          title: 'Nouvelle évaluation',
         },
       },
 
-    // Évaluation — édition brouillon
-    {
-      path: 'patients/:patientId/evaluations/:evaluationId/edit',
-      name: 'soins-evaluation-edit',
-      component: () => import('@/pages/soins/EvaluationCreatePage.vue'),
-      meta: {
-        title: 'Modifier l\'évaluation',
+      // Évaluation — édition brouillon
+      {
+        path: 'patients/:patientId/evaluations/:evaluationId/edit',
+        name: 'soins-evaluation-edit',
+        component: () => import('@/pages/soins/EvaluationCreatePage.vue'),
+        meta: {
+          title: "Modifier l'évaluation",
+        },
       },
-    },
-      
+
       // Liste des patients
       {
         path: 'patients',
@@ -52,18 +52,18 @@ const soinsRoutes: RouteRecordRaw[] = [
           title: 'Mes patients',
         },
       },
-      
+
       // Dossier patient (avec onglets via query param)
       {
         path: 'patients/:id',
         name: 'soins-patient-detail',
-        component: () => import('@/pages/soins/PatientDetailPage.vue'),
+        component: () => import('@/pages/soins/PatientDetailPage_soins.vue'),
         meta: {
           title: 'Dossier patient',
         },
         props: true,
       },
-      
+
       // Planning
       {
         path: 'planning',
@@ -73,7 +73,7 @@ const soinsRoutes: RouteRecordRaw[] = [
           title: 'Mon planning',
         },
       },
-      
+
       // Carnet de liaison
       {
         path: 'liaison',
@@ -85,6 +85,6 @@ const soinsRoutes: RouteRecordRaw[] = [
       },
     ],
   },
-]
+];
 
-export default soinsRoutes
+export default soinsRoutes;

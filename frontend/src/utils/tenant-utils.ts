@@ -6,7 +6,7 @@
  *
  * Destination : src/utils/tenant-utils.ts
  */
-import { TenantStatus } from '@/types/tenant'
+import { TenantStatus } from '@/types';
 
 /**
  * Retourne la severity PrimeVue (Tag, Badge) selon le statut du tenant
@@ -17,8 +17,8 @@ export function getStatusSeverity(status: TenantStatus): string {
     [TenantStatus.ACTIVE]: 'success',
     [TenantStatus.SUSPENDED]: 'danger',
     [TenantStatus.TERMINATED]: 'secondary',
-  }
-  return map[status] || 'info'
+  };
+  return map[status] || 'info';
 }
 
 /**
@@ -29,5 +29,5 @@ export function formatDate(dateStr: string): string {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
-  })
+  });
 }

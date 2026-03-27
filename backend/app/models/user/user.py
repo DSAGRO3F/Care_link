@@ -10,29 +10,29 @@ Changement v4.8 : Harmonisation encryption
 - Properties `email` / `rpps` ajoutées pour rétro-compatibilité transitoire
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import TYPE_CHECKING, List, Set
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, ForeignKey, Index, text, DateTime
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
 from app.models.mixins import TimestampMixin
-
 from app.models.user.profession_permissions import get_profession_permissions  # S4
 
+
 if TYPE_CHECKING:
-    from app.models.user.profession import Profession
-    from app.models.user.role import Role
-    from app.models.user.permission import Permission
-    from app.models.organization.entity import Entity
-    from app.models.patient.patient import Patient
-    from app.models.user.user_associations import UserRole, UserEntity
     from app.models.careplan.care_plan import CarePlan
     from app.models.careplan.care_plan_service import CarePlanService
-    from app.models.user.user_availability import UserAvailability
     from app.models.coordination.scheduled_intervention import ScheduledIntervention
+    from app.models.organization.entity import Entity
+    from app.models.patient.patient import Patient
     from app.models.tenants.tenant import Tenant
+    from app.models.user.permission import Permission
+    from app.models.user.profession import Profession
+    from app.models.user.role import Role
+    from app.models.user.user_associations import UserEntity, UserRole
+    from app.models.user.user_availability import UserAvailability
     from app.models.user.user_tenant_assignment import UserTenantAssignment
 
 
@@ -68,11 +68,14 @@ class User(TimestampMixin, Base):
     __table_args__ = (
         # Unicité sur les blind indexes (par tenant)
         Index("ix_users_email_blind_tenant", "email_blind", "tenant_id", unique=True),
-        Index("ix_users_rpps_blind_tenant", "rpps_blind", "tenant_id",
-              unique=True, postgresql_where=text("rpps_blind IS NOT NULL")),
-        {
-            "comment": "Table des utilisateurs (professionnels de santé et administratifs)"
-        }
+        Index(
+            "ix_users_rpps_blind_tenant",
+            "rpps_blind",
+            "tenant_id",
+            unique=True,
+            postgresql_where=text("rpps_blind IS NOT NULL"),
+        ),
+        {"comment": "Table des utilisateurs (professionnels de santé et administratifs)"},
     )
 
     # === Colonnes ===
@@ -80,7 +83,7 @@ class User(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(
         primary_key=True,
         doc="Identifiant unique de l'utilisateur",
-        info={"description": "Clé primaire auto-incrémentée"}
+        info={"description": "Clé primaire auto-incrémentée"},
     )
 
     # --- Champs chiffrés (convention v4.8 : {field}_encrypted) ---
@@ -94,8 +97,8 @@ class User(TimestampMixin, Base):
             "format": "email",
             "pii": True,
             "encrypted": True,
-            "example": "marie.dupont@ssiad.fr"
-        }
+            "example": "marie.dupont@ssiad.fr",
+        },
     )
 
     email_blind: Mapped[str | None] = mapped_column(
@@ -105,8 +108,8 @@ class User(TimestampMixin, Base):
         doc="Blind index de l'email pour recherche",
         info={
             "description": "HMAC-SHA256 de l'email normalisé pour recherche sans déchiffrement",
-            "internal": True
-        }
+            "internal": True,
+        },
     )
 
     rpps_encrypted: Mapped[str | None] = mapped_column(
@@ -117,8 +120,8 @@ class User(TimestampMixin, Base):
             "description": "RPPS (chiffré)",
             "pattern": "^[0-9]{11}$",
             "encrypted": True,
-            "example": "12345678901"
-        }
+            "example": "12345678901",
+        },
     )
 
     rpps_blind: Mapped[str | None] = mapped_column(
@@ -128,8 +131,8 @@ class User(TimestampMixin, Base):
         doc="Blind index du RPPS pour recherche",
         info={
             "description": "HMAC-SHA256 du RPPS pour recherche sans déchiffrement",
-            "internal": True
-        }
+            "internal": True,
+        },
     )
 
     # --- Champs en clair ---
@@ -138,35 +141,35 @@ class User(TimestampMixin, Base):
         String(100),
         nullable=False,
         doc="Prénom de l'utilisateur",
-        info={"description": "Prénom", "pii": True, "example": "Marie"}
+        info={"description": "Prénom", "pii": True, "example": "Marie"},
     )
 
     last_name: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
         doc="Nom de famille de l'utilisateur",
-        info={"description": "Nom de famille", "pii": True, "example": "Dupont"}
+        info={"description": "Nom de famille", "pii": True, "example": "Dupont"},
     )
 
     password_hash: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
         doc="Hash bcrypt du mot de passe (si authentification locale)",
-        info={"description": "Hash du mot de passe pour auth locale", "sensitive": True}
+        info={"description": "Hash du mot de passe pour auth locale", "sensitive": True},
     )
 
     is_admin: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         doc="L'utilisateur est-il administrateur système ?",
-        info={"description": "True = accès administrateur complet", "default": False}
+        info={"description": "True = accès administrateur complet", "default": False},
     )
 
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
         doc="Le compte utilisateur est-il actif ?",
-        info={"description": "False = compte désactivé, connexion impossible", "default": True}
+        info={"description": "False = compte désactivé, connexion impossible", "default": True},
     )
 
     must_change_password: Mapped[bool] = mapped_column(
@@ -177,13 +180,13 @@ class User(TimestampMixin, Base):
         info={
             "description": "True = redirection vers changement de mot de passe au login",
             "default": False,
-        }
+        },
     )
 
     last_login: Mapped[datetime | None] = mapped_column(
         nullable=True,
         doc="Date et heure de dernière connexion",
-        info={"description": "Timestamp de la dernière authentification réussie"}
+        info={"description": "Timestamp de la dernière authentification réussie"},
     )
 
     # === Sécurité anti-brute-force ===
@@ -191,12 +194,10 @@ class User(TimestampMixin, Base):
         default=0,
         server_default=text("0"),
         nullable=False,
-        doc="Nombre de tentatives de connexion échouées"
+        doc="Nombre de tentatives de connexion échouées",
     )
     locked_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        doc="Date jusqu'à laquelle le compte est verrouillé"
+        DateTime(timezone=True), nullable=True, doc="Date jusqu'à laquelle le compte est verrouillé"
     )
 
     # === Clés étrangères ===
@@ -206,91 +207,85 @@ class User(TimestampMixin, Base):
         nullable=False,
         index=True,
         doc="ID du tenant propriétaire",
-        info={
-            "description": "Référence vers le tenant (client) propriétaire de cette entité"
-        }
+        info={"description": "Référence vers le tenant (client) propriétaire de cette entité"},
     )
 
     profession_id: Mapped[int | None] = mapped_column(
         ForeignKey("professions.id", ondelete="SET NULL"),
         nullable=True,
         doc="ID de la profession réglementée",
-        info={"description": "Référence vers la profession"}
+        info={"description": "Référence vers la profession"},
     )
 
     # === Relations ===
 
     tenant: Mapped["Tenant"] = relationship(
-        "Tenant",
-        back_populates="users",
-        doc="Tenant propriétaire de cet utilisateur"
+        "Tenant", back_populates="users", doc="Tenant propriétaire de cet utilisateur"
     )
 
     profession: Mapped["Profession | None"] = relationship(
-        "Profession",
-        back_populates="users",
-        doc="Profession réglementée de l'utilisateur"
+        "Profession", back_populates="users", doc="Profession réglementée de l'utilisateur"
     )
 
     # IMPORTANT: foreign_keys spécifié car UserRole a 2 FK vers users (user_id et assigned_by)
-    role_associations: Mapped[List["UserRole"]] = relationship(
+    role_associations: Mapped[list["UserRole"]] = relationship(
         "UserRole",
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="[UserRole.user_id]",
-        doc="Associations avec les rôles (via table de jonction)"
+        doc="Associations avec les rôles (via table de jonction)",
     )
 
-    entity_associations: Mapped[List["UserEntity"]] = relationship(
+    entity_associations: Mapped[list["UserEntity"]] = relationship(
         "UserEntity",
         back_populates="user",
         cascade="all, delete-orphan",
-        doc="Associations avec les entités (via table de jonction)"
+        doc="Associations avec les entités (via table de jonction)",
     )
 
     # Patients dont cet utilisateur est médecin traitant
-    patients_as_medecin: Mapped[List["Patient"]] = relationship(
+    patients_as_medecin: Mapped[list["Patient"]] = relationship(
         "Patient",
         back_populates="medecin_traitant",
         foreign_keys="[Patient.medecin_traitant_id]",
-        doc="Patients dont cet utilisateur est le médecin traitant"
+        doc="Patients dont cet utilisateur est le médecin traitant",
     )
 
-    validated_care_plans: Mapped[List["CarePlan"]] = relationship(
+    validated_care_plans: Mapped[list["CarePlan"]] = relationship(
         "CarePlan",
         foreign_keys="[CarePlan.validated_by_id]",
         back_populates="validated_by",
-        doc="Plans d'aide validés par cet utilisateur"
+        doc="Plans d'aide validés par cet utilisateur",
     )
 
-    assigned_services: Mapped[List["CarePlanService"]] = relationship(
+    assigned_services: Mapped[list["CarePlanService"]] = relationship(
         "CarePlanService",
         foreign_keys="[CarePlanService.assigned_user_id]",
         back_populates="assigned_user",
-        doc="Services de plans d'aide affectés à cet utilisateur"
+        doc="Services de plans d'aide affectés à cet utilisateur",
     )
 
-    availabilities: Mapped[List["UserAvailability"]] = relationship(
+    availabilities: Mapped[list["UserAvailability"]] = relationship(
         "UserAvailability",
         back_populates="user",
         cascade="all, delete-orphan",
-        doc="Disponibilités de cet utilisateur"
+        doc="Disponibilités de cet utilisateur",
     )
 
-    scheduled_interventions: Mapped[List["ScheduledIntervention"]] = relationship(
+    scheduled_interventions: Mapped[list["ScheduledIntervention"]] = relationship(
         "ScheduledIntervention",
         foreign_keys="[ScheduledIntervention.user_id]",
         back_populates="user",
-        doc="Interventions planifiées pour cet utilisateur"
+        doc="Interventions planifiées pour cet utilisateur",
     )
 
     # Rattachements à d'autres tenants (cross-tenant)
-    tenant_assignments: Mapped[List["UserTenantAssignment"]] = relationship(
+    tenant_assignments: Mapped[list["UserTenantAssignment"]] = relationship(
         "UserTenantAssignment",
         foreign_keys="[UserTenantAssignment.user_id]",
         back_populates="user",
         cascade="all, delete-orphan",
-        doc="Rattachements à d'autres tenants (missions temporaires, remplacements)"
+        doc="Rattachements à d'autres tenants (missions temporaires, remplacements)",
     )
 
     # =========================================================================
@@ -344,17 +339,17 @@ class User(TimestampMixin, Base):
         return self.full_name
 
     @property
-    def roles(self) -> List["Role"]:
+    def roles(self) -> list["Role"]:
         """Liste des rôles de l'utilisateur."""
         return [ra.role for ra in self.role_associations]
 
     @property
-    def role_names(self) -> List[str]:
+    def role_names(self) -> list[str]:
         """Liste des noms de rôles de l'utilisateur."""
         return [r.name for r in self.roles]
 
     @property
-    def entities(self) -> List["Entity"]:
+    def entities(self) -> list["Entity"]:
         """Liste des entités actives de l'utilisateur."""
         return [ea.entity for ea in self.entity_associations if ea.end_date is None]
 
@@ -369,15 +364,15 @@ class User(TimestampMixin, Base):
         return active[0].entity if active else None
 
     @property
-    def permissions(self) -> List["Permission"]:
+    def permissions(self) -> list["Permission"]:
         """
         Liste de toutes les permissions de l'utilisateur (via ses rôles).
 
         Returns:
             Liste des objets Permission uniques
         """
-        seen_ids: Set[int] = set()
-        permissions: List["Permission"] = []
+        seen_ids: set[int] = set()
+        permissions: list[Permission] = []
 
         for role in self.roles:
             for perm in role.permissions:
@@ -388,7 +383,7 @@ class User(TimestampMixin, Base):
         return permissions
 
     @property
-    def all_permissions(self) -> Set[str]:
+    def all_permissions(self) -> set[str]:
         """
         Ensemble de tous les codes de permissions de l'utilisateur.
 
@@ -397,7 +392,7 @@ class User(TimestampMixin, Base):
         Returns:
             Set des codes de permissions (ex: {"PATIENT_VIEW", "USER_EDIT"})
         """
-        permission_codes: Set[str] = set()
+        permission_codes: set[str] = set()
 
         for role in self.roles:
             permission_codes.update(role.permission_codes)
@@ -405,7 +400,7 @@ class User(TimestampMixin, Base):
         return permission_codes
 
     @property
-    def effective_permission_codes(self) -> Set[str]:
+    def effective_permission_codes(self) -> set[str]:
         """
         Permissions effectives = profession (base) ∪ rôles (additifs).
 
@@ -417,7 +412,7 @@ class User(TimestampMixin, Base):
         Returns:
             Set des codes de permissions effectives
         """
-        perms: Set[str] = set()
+        perms: set[str] = set()
 
         # 1. Permissions de la profession (socle métier)
         if self.profession:
@@ -433,19 +428,19 @@ class User(TimestampMixin, Base):
         return perms
 
     @property
-    def effective_permissions(self) -> List[str]:
+    def effective_permissions(self) -> list[str]:
         """
         Alias listé pour sérialisation Pydantic (approche B, S4).
 
         - Post-expunge : retourne le cache calculé par le service
         - En session : calcule à la volée via effective_permission_codes
         """
-        if hasattr(self, '_cached_effective_permissions'):
+        if hasattr(self, "_cached_effective_permissions"):
             return self._cached_effective_permissions
         return sorted(self.effective_permission_codes)
 
     @property
-    def all_tenant_ids(self) -> List[int]:
+    def all_tenant_ids(self) -> list[int]:
         """
         Liste tous les tenant_ids accessibles par cet utilisateur.
 
@@ -479,11 +474,11 @@ class User(TimestampMixin, Base):
         """Vérifie si le compte est actuellement verrouillé."""
         if not self.locked_until:
             return False
-        return datetime.now(timezone.utc) < self.locked_until
+        return datetime.now(UTC) < self.locked_until
 
     def record_login_success(self) -> None:
         """Enregistre une connexion réussie."""
-        self.last_login = datetime.now(timezone.utc)
+        self.last_login = datetime.now(UTC)
         self.failed_login_attempts = 0
         self.locked_until = None
 
@@ -497,7 +492,7 @@ class User(TimestampMixin, Base):
         """
         self.failed_login_attempts += 1
         if self.failed_login_attempts >= max_attempts:
-            self.locked_until = datetime.now(timezone.utc) + timedelta(minutes=lock_duration_minutes)
+            self.locked_until = datetime.now(UTC) + timedelta(minutes=lock_duration_minutes)
 
     # === Méthodes ===
 
@@ -530,7 +525,7 @@ class User(TimestampMixin, Base):
 
         return permission_code in effective
 
-    def has_any_permission(self, permission_codes: List[str]) -> bool:
+    def has_any_permission(self, permission_codes: list[str]) -> bool:
         """
         Vérifie si l'utilisateur possède au moins une des permissions.
 
@@ -551,7 +546,7 @@ class User(TimestampMixin, Base):
 
         return any(code in effective for code in permission_codes)
 
-    def has_all_permissions(self, permission_codes: List[str]) -> bool:
+    def has_all_permissions(self, permission_codes: list[str]) -> bool:
         """
         Vérifie si l'utilisateur possède toutes les permissions.
 

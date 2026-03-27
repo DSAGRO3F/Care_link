@@ -23,25 +23,22 @@ import secrets
 import sys
 from pathlib import Path
 
+
 # Ajouter le répertoire backend au path pour les imports
 backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from sqlalchemy.orm import Session
 
-from app.database.session import SessionLocal
 from app.core.security.hashing import hash_password
-from app.models.user.user import User
+from app.database.session import SessionLocal
+from app.models.enums import TenantStatus, TenantType
 from app.models.tenants.tenant import Tenant
-from app.models.enums import TenantType, TenantStatus
+from app.models.user.user import User
 
 
 def get_or_create_tenant(
-        db: Session,
-        code: str,
-        name: str,
-        tenant_type: TenantType,
-        contact_email: str
+    db: Session, code: str, name: str, tenant_type: TenantType, contact_email: str
 ) -> Tenant:
     """
     Récupère ou crée le premier tenant.
@@ -53,7 +50,7 @@ def get_or_create_tenant(
     existing = db.query(Tenant).first()
 
     if existing:
-        print(f"✅ Tenant existant trouvé :")
+        print("✅ Tenant existant trouvé :")
         print(f"   - ID: {existing.id}")
         print(f"   - Code: {existing.code}")
         print(f"   - Nom: {existing.name}")
@@ -81,7 +78,7 @@ def get_or_create_tenant(
     db.commit()
     db.refresh(tenant)
 
-    print(f"✅ Tenant créé :")
+    print("✅ Tenant créé :")
     print(f"   - ID: {tenant.id}")
     print(f"   - Code: {tenant.code}")
     print(f"   - Nom: {tenant.name}")
@@ -92,12 +89,7 @@ def get_or_create_tenant(
 
 
 def create_first_admin(
-        db: Session,
-        email: str,
-        password: str,
-        first_name: str,
-        last_name: str,
-        tenant_id: int
+    db: Session, email: str, password: str, first_name: str, last_name: str, tenant_id: int
 ) -> User | None:
     """
     Crée le premier administrateur.
@@ -134,7 +126,7 @@ def create_first_admin(
     db.commit()
     db.refresh(admin)
 
-    print(f"✅ Administrateur créé :")
+    print("✅ Administrateur créé :")
     print(f"   - ID: {admin.id}")
     print(f"   - Email: {admin.email}")
     print(f"   - Nom: {admin.full_name}")
@@ -153,40 +145,26 @@ def main():
     parser.add_argument(
         "--email",
         default="olivier.debeyssac@gmail.com",
-        help="Email de l'administrateur (défaut: olivier.debeyssac@gmail.com)"
+        help="Email de l'administrateur (défaut: olivier.debeyssac@gmail.com)",
     )
-    parser.add_argument(
-        "--password",
-        default="Fer458it",
-        help="Mot de passe (défaut: Fer458it)"
-    )
-    parser.add_argument(
-        "--first-name",
-        default="Olivier",
-        help="Prénom (défaut: Olivier)"
-    )
-    parser.add_argument(
-        "--last-name",
-        default="de Beyssac",
-        help="Nom (défaut: de Beyssac)"
-    )
+    parser.add_argument("--password", default="Fer458it", help="Mot de passe (défaut: Fer458it)")
+    parser.add_argument("--first-name", default="Olivier", help="Prénom (défaut: Olivier)")
+    parser.add_argument("--last-name", default="de Beyssac", help="Nom (défaut: de Beyssac)")
 
     # Paramètres Tenant
     parser.add_argument(
         "--tenant-code",
         default="CARELINK-DEMO-01",
-        help="Code unique du tenant (défaut: CARELINK-DEMO-01)"
+        help="Code unique du tenant (défaut: CARELINK-DEMO-01)",
     )
     parser.add_argument(
-        "--tenant-name",
-        default="CareLink Demo",
-        help="Nom du tenant (défaut: CareLink Demo)"
+        "--tenant-name", default="CareLink Demo", help="Nom du tenant (défaut: CareLink Demo)"
     )
     parser.add_argument(
         "--tenant-type",
         default="SSIAD",
         choices=["GCSMS", "SSIAD", "SAAD", "SPASAD", "EHPAD", "DAC", "CPTS", "OTHER"],
-        help="Type de tenant (défaut: SSIAD)"
+        help="Type de tenant (défaut: SSIAD)",
     )
 
     args = parser.parse_args()
@@ -216,18 +194,18 @@ def main():
             password=args.password,
             first_name=args.first_name,
             last_name=args.last_name,
-            tenant_id=tenant.id
+            tenant_id=tenant.id,
         )
 
         if admin:
             print("\n" + "=" * 60)
             print("🎉 Bootstrap terminé avec succès !")
             print("=" * 60)
-            print(f"\n📧 Connectez-vous avec :")
-            print(f"   URL: http://localhost:3000/login")
+            print("\n📧 Connectez-vous avec :")
+            print("   URL: http://localhost:3000/login")
             print(f"   Email: {args.email}")
             print(f"   Mot de passe: {args.password}")
-            print(f"\n⚠️  IMPORTANT: Changez ce mot de passe après la première connexion !")
+            print("\n⚠️  IMPORTANT: Changez ce mot de passe après la première connexion !")
         else:
             print("\n⚠️  Admin non créé (existe peut-être déjà)")
             print("    Vous pouvez utiliser l'admin existant pour vous connecter.")
@@ -236,6 +214,7 @@ def main():
         db.rollback()
         print(f"\n❌ Erreur: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     finally:

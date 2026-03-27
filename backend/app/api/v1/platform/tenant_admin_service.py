@@ -17,58 +17,52 @@ Changement v4.8 : Harmonisation encryption
 - Depuis S3, le rôle s'appelle ADMIN, la permission s'appelle ADMIN_FULL
 - Corrige le bug où l'admin client n'avait aucun rôle assigné
 """
-from typing import Optional, List
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
+from app.api.v1.platform.schemas import TenantAdminUserCreate, TenantAdminUserResponse
 from app.core.security.hashing import hash_password
+from app.models.enums import TenantStatus
 from app.models.organization.entity import Entity
 from app.models.platform.platform_audit_log import PlatformAuditLog
 from app.models.platform.super_admin import SuperAdmin
 from app.models.tenants.tenant import Tenant
-from app.models.enums import TenantStatus
-from app.models.user.user import User
 from app.models.user.role import Role
-from app.models.user.user_associations import UserRole, UserEntity
-
+from app.models.user.user import User
+from app.models.user.user_associations import UserEntity, UserRole
 from app.services.encryption import user_encryptor
-
-from app.api.v1.platform.schemas import TenantAdminUserCreate, TenantAdminUserResponse
 
 
 # =============================================================================
 # EXCEPTIONS
 # =============================================================================
 
+
 class TenantNotActiveError(Exception):
     """Le tenant n'est pas actif."""
-    pass
 
 
 class AdminEmailExistsError(Exception):
     """Un utilisateur avec cet email existe déjà dans ce tenant."""
-    pass
 
 
 class NoRootEntityError(Exception):
     """Aucune entité racine trouvée pour ce tenant."""
-    pass
 
 
 class EntityNotInTenantError(Exception):
     """L'entité spécifiée n'appartient pas à ce tenant."""
-    pass
 
 
 class AdminRoleNotFoundError(Exception):
     """Le rôle ADMIN n'a pas été trouvé en base."""
-    pass
 
 
 # =============================================================================
 # SERVICE
 # =============================================================================
+
 
 class TenantAdminService:
     """Service pour la gestion des admin clients depuis l'espace Platform."""
@@ -77,10 +71,10 @@ class TenantAdminService:
         self.db = db
 
     def create_admin_user(
-            self,
-            tenant_id: int,
-            data: TenantAdminUserCreate,
-            created_by: SuperAdmin,
+        self,
+        tenant_id: int,
+        data: TenantAdminUserCreate,
+        created_by: SuperAdmin,
     ) -> TenantAdminUserResponse:
         """
         Crée un utilisateur admin dans un tenant.
@@ -101,16 +95,11 @@ class TenantAdminService:
         if not tenant:
             raise TenantNotFoundError(f"Tenant {tenant_id} non trouvé")
         if tenant.status != TenantStatus.ACTIVE:
-            raise TenantNotActiveError(
-                f"Le tenant est {tenant.status.value}, il doit être ACTIVE"
-            )
+            raise TenantNotActiveError(f"Le tenant est {tenant.status.value}, il doit être ACTIVE")
 
         # 2. Vérifier unicité email dans le tenant (via blind index)
         # v4.8 : encrypt_for_db retourne maintenant {field}_encrypted
-        encrypted_data = user_encryptor.encrypt_for_db(
-            {"email": data.email},
-            tenant_id
-        )
+        encrypted_data = user_encryptor.encrypt_for_db({"email": data.email}, tenant_id)
 
         existing = self.db.execute(
             select(User).where(
@@ -122,9 +111,7 @@ class TenantAdminService:
         ).scalar_one_or_none()
 
         if existing:
-            raise AdminEmailExistsError(
-                f"Un utilisateur avec cet email existe déjà dans ce tenant"
-            )
+            raise AdminEmailExistsError("Un utilisateur avec cet email existe déjà dans ce tenant")
 
         # 3. Résoudre l'entité de rattachement
         if data.entity_id:
@@ -137,9 +124,7 @@ class TenantAdminService:
                 )
             ).scalar_one_or_none()
             if not entity:
-                raise EntityNotInTenantError(
-                    f"Entité {data.entity_id} non trouvée dans ce tenant"
-                )
+                raise EntityNotInTenantError(f"Entité {data.entity_id} non trouvée dans ce tenant")
         else:
             # Rattacher à l'entité racine (parent_id IS NULL)
             entity = self.db.execute(
@@ -202,7 +187,7 @@ class TenantAdminService:
         admin_role = self.db.execute(
             select(Role).where(
                 and_(
-                    Role.name == "ADMIN",           # 🔄 S5 fix (était "ADMIN_FULL")
+                    Role.name == "ADMIN",  # 🔄 S5 fix (était "ADMIN_FULL")
                     Role.is_system_role == True,
                 )
             )
@@ -234,7 +219,7 @@ class TenantAdminService:
                 "user_email": data.email,
                 "entity_id": entity.id,
                 "entity_name": entity.name,
-            }
+            },
         )
 
         self.db.commit()
@@ -251,12 +236,12 @@ class TenantAdminService:
             is_active=True,
             entity_id=entity.id,
             entity_name=entity.name,
-            role="ADMIN",                           # 🔄 S5 fix (était "ADMIN_FULL")
+            role="ADMIN",  # 🔄 S5 fix (était "ADMIN_FULL")
             must_change_password=True,
             created_at=user.created_at,
         )
 
-    def list_admin_users(self, tenant_id: int) -> List[TenantAdminUserResponse]:
+    def list_admin_users(self, tenant_id: int) -> list[TenantAdminUserResponse]:
         """
         Liste les administrateurs d'un tenant.
 
@@ -270,15 +255,19 @@ class TenantAdminService:
             raise TenantNotFoundError(f"Tenant {tenant_id} non trouvé")
 
         # Récupérer les admins du tenant
-        admins = self.db.execute(
-            select(User).where(
-                and_(
-                    User.tenant_id == tenant_id,
-                    User.is_admin == True,
-                    User.is_active == True,
+        admins = (
+            self.db.execute(
+                select(User).where(
+                    and_(
+                        User.tenant_id == tenant_id,
+                        User.is_admin == True,
+                        User.is_active == True,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         results = []
         for admin in admins:
@@ -301,36 +290,40 @@ class TenantAdminService:
             # ──────────────────────────────────────────────────────────
             # 🔄 S5 fix : Le rôle s'appelle "ADMIN" (pas "ADMIN_FULL")
             # ──────────────────────────────────────────────────────────
-            role_name = "ADMIN" if "ADMIN" in admin.role_names else (
-                admin.role_names[0] if admin.role_names else "AUCUN_ROLE"
+            role_name = (
+                "ADMIN"
+                if "ADMIN" in admin.role_names
+                else (admin.role_names[0] if admin.role_names else "AUCUN_ROLE")
             )
 
-            results.append(TenantAdminUserResponse(
-                id=admin.id,
-                tenant_id=tenant_id,
-                first_name=admin.first_name,
-                last_name=admin.last_name,
-                email=email_clear,
-                phone=None,
-                is_admin=admin.is_admin,
-                is_active=admin.is_active,
-                entity_id=entity_id,
-                entity_name=entity_name,
-                role=role_name,
-                must_change_password=admin.must_change_password,
-                created_at=admin.created_at,
-            ))
+            results.append(
+                TenantAdminUserResponse(
+                    id=admin.id,
+                    tenant_id=tenant_id,
+                    first_name=admin.first_name,
+                    last_name=admin.last_name,
+                    email=email_clear,
+                    phone=None,
+                    is_admin=admin.is_admin,
+                    is_active=admin.is_active,
+                    entity_id=entity_id,
+                    entity_name=entity_name,
+                    role=role_name,
+                    must_change_password=admin.must_change_password,
+                    created_at=admin.created_at,
+                )
+            )
 
         return results
 
     def _log_action(
-            self,
-            action: str,
-            resource_type: str,
-            resource_id: str,
-            super_admin_id: Optional[int],
-            tenant_id: Optional[int] = None,
-            details: Optional[dict] = None,
+        self,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        super_admin_id: int | None,
+        tenant_id: int | None = None,
+        details: dict | None = None,
     ):
         """Crée une entrée dans le log d'audit."""
         log = PlatformAuditLog(
