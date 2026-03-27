@@ -32,11 +32,11 @@ from app.services.aggir.parser import AggirParser
 
 
 __all__ = [
-    # Calculator
-    "Variable",
     "Adverbes",
-    "AggiralgorithmTable",
     "AggirCalculator",
     # Parser
     "AggirParser",
+    "AggiralgorithmTable",
+    # Calculator
+    "Variable",
 ]

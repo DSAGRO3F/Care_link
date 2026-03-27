@@ -7,13 +7,13 @@ d'édition concurrente entre plusieurs utilisateurs.
 
 import json
 from datetime import datetime, timedelta
-from enum import Enum
+from enum import StrEnum
 
 from app.core.config import settings
 from app.core.session.redis_client import get_redis
 
 
-class ResourceType(str, Enum):
+class ResourceType(StrEnum):
     """Types de ressources verrouillables."""
 
     PATIENT = "patient"

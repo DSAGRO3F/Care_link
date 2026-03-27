@@ -461,7 +461,7 @@ class AggirCalculator:
             GIR (1-6) ou None si passage au groupe suivant
         """
         rangs = AggiralgorithmTable.RANGS[groupe_name]
-        for seuil_min, seuil_max, rang, gir in rangs:
+        for seuil_min, seuil_max, _rang, gir in rangs:
             if seuil_min <= score < seuil_max:
                 return gir
         return None

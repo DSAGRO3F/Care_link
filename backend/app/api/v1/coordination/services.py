@@ -429,9 +429,8 @@ class ScheduledInterventionService:
             raise InterventionStatusError("Une intervention terminée ne peut pas être modifiée")
 
         # Vérifier l'utilisateur si modifié
-        if data.user_id is not None:
-            if data.user_id != 0:  # 0 = désaffectation
-                self._verify_user_belongs_to_tenant(data.user_id)
+        if data.user_id is not None and data.user_id != 0:  # 0 = désaffectation
+            self._verify_user_belongs_to_tenant(data.user_id)
 
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():

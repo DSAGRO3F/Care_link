@@ -16,7 +16,7 @@ Historique :
 """
 
 from datetime import UTC, date, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from app.models.user.user import User
 
 
-class AssignmentType(str, Enum):
+class AssignmentType(StrEnum):
     """
     Types de rattachement à un tenant supplémentaire.
 
@@ -232,9 +232,7 @@ class UserTenantAssignment(TimestampMixin, Base):
             return False
         if self.is_expired:
             return False
-        if self.is_future:
-            return False
-        return True
+        return not self.is_future
 
     @property
     def days_remaining(self) -> int | None:
@@ -419,7 +417,4 @@ def check_user_tenant_access(db_session, user_id: int, tenant_id: int) -> bool:
         .first()
     )
 
-    if assignment and assignment.is_valid:
-        return True
-
-    return False
+    return bool(assignment and assignment.is_valid)

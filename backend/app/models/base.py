@@ -129,43 +129,43 @@ from app.models.user.user_tenant_assignment import (
 __all__ = [
     # Base SQLAlchemy
     "Base",
-    # Référence
-    "Country",
-    # Multi-tenant
-    "Tenant",
-    "Subscription",
-    "SubscriptionUsage",
-    # Platform
-    "SuperAdmin",
-    "PlatformAuditLog",
-    # Utilisateurs et permissions (v4.3)
-    "Profession",
-    "Permission",
-    "Role",
-    "RolePermission",
-    "User",
-    "UserRole",
-    "UserEntity",
-    "UserAvailability",
-    "UserTenantAssignment",
-    # Organisation
-    "Entity",
-    # Patients
-    "Patient",
-    "PatientAccess",
-    "PatientEvaluation",
-    "PatientThreshold",
-    "PatientDevice",
-    "PatientVitals",
-    "PatientDocument",
-    "EvaluationSession",
-    # Catalogue
-    "ServiceTemplate",
-    "EntityService",
     # Plans d'aide
     "CarePlan",
     "CarePlanService",
     # Coordination
     "CoordinationEntry",
+    # Référence
+    "Country",
+    # Organisation
+    "Entity",
+    "EntityService",
+    "EvaluationSession",
+    # Patients
+    "Patient",
+    "PatientAccess",
+    "PatientDevice",
+    "PatientDocument",
+    "PatientEvaluation",
+    "PatientThreshold",
+    "PatientVitals",
+    "Permission",
+    "PlatformAuditLog",
+    # Utilisateurs et permissions (v4.3)
+    "Profession",
+    "Role",
+    "RolePermission",
     "ScheduledIntervention",
+    # Catalogue
+    "ServiceTemplate",
+    "Subscription",
+    "SubscriptionUsage",
+    # Platform
+    "SuperAdmin",
+    # Multi-tenant
+    "Tenant",
+    "User",
+    "UserAvailability",
+    "UserEntity",
+    "UserRole",
+    "UserTenantAssignment",
 ]

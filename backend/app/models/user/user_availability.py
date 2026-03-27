@@ -171,10 +171,7 @@ class UserAvailability(TimestampMixin, Base):
         # Vérifier la période de validité
         if self.valid_from and check_date < self.valid_from:
             return False
-        if self.valid_until and check_date > self.valid_until:
-            return False
-
-        return True
+        return not (self.valid_until and check_date > self.valid_until)
 
     def overlaps_with(self, other: UserAvailability) -> bool:
         """Vérifie si ce créneau chevauche un autre créneau."""

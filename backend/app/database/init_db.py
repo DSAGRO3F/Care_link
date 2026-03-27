@@ -733,18 +733,18 @@ def init_database(
    - Admin : {admin_email}
 
 📊 Tables créées (24 tables) :
-   
+
    🏛️ MODULE TENANT (nouveau v4.1)
    - tenants            : Clients/locataires de la plateforme
    - subscriptions      : Abonnements et facturation
    - subscription_usage : Suivi de consommation mensuelle
-   
+
    🌍 MODULE REFERENCE
    - countries          : Pays
-   
+
    🏢 MODULE ORGANIZATION
    - entities           : Entités de soins (SSIAD, EHPAD...)
-   
+
    👥 MODULE USER
    - professions        : Professions réglementées
    - roles              : Rôles fonctionnels
@@ -752,7 +752,7 @@ def init_database(
    - user_roles         : Association User ↔ Role
    - user_entities      : Association User ↔ Entity
    - user_availabilities: Disponibilités des professionnels
-   
+
    🏥 MODULE PATIENT
    - patients           : Dossiers patients (chiffrés)
    - patient_access     : Traçabilité RGPD
@@ -761,15 +761,15 @@ def init_database(
    - patient_vitals     : Mesures de constantes
    - patient_devices    : Devices connectés
    - patient_documents  : Documents générés (PPA, PPCS...)
-   
+
    📚 MODULE CATALOG
    - service_templates  : Catalogue national des prestations
    - entity_services    : Services activés par entité
-   
+
    📋 MODULE CAREPLAN
    - care_plans         : Plans d'aide patients
    - care_plan_services : Services des plans d'aide
-   
+
    📅 MODULE COORDINATION
    - coordination_entries    : Carnet de coordination
    - scheduled_interventions : Planning des interventions

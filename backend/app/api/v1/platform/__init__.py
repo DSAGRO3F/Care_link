@@ -16,11 +16,11 @@ from app.api.v1.platform.super_admin_security import (
 
 
 __all__ = [
-    "router",
+    "SuperAdminPermissions",
     # Sécurité SuperAdmin
     "get_current_super_admin",
     "get_optional_super_admin",
     "require_role",
     "require_super_admin_permission",
-    "SuperAdminPermissions",
+    "router",
 ]

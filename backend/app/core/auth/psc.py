@@ -46,13 +46,13 @@ from app.core.config import settings
 # =============================================================================
 
 __all__ = [
-    # Exceptions
-    "ProSanteConnectError",
     "PSCAuthenticationError",
     "PSCTokenError",
     "PSCUserInfoError",
     # Client
     "ProSanteConnectClient",
+    # Exceptions
+    "ProSanteConnectError",
     "get_psc_client",
     "psc_client",
 ]

@@ -45,24 +45,24 @@ from app.api.v1.auth.services import (
 
 
 __all__ = [
-    # Router
-    "router",
+    "AccessType",
+    "AuthMethod",
     # Services
     "AuthService",
-    "get_auth_service",
+    "AuthStatusResponse",
+    "AuthenticatedUser",
     # Exceptions
     "AuthenticationError",
-    "InvalidCredentialsError",
     "InactiveUserError",
-    "PSCSessionError",
-    "PatientAccessError",
+    "InvalidCredentialsError",
     # Schémas
     "LoginRequest",
     "LoginResponse",
-    "TokenResponse",
-    "AuthenticatedUser",
-    "AuthStatusResponse",
     "PSCAuthorizationResponse",
-    "AccessType",
-    "AuthMethod",
+    "PSCSessionError",
+    "PatientAccessError",
+    "TokenResponse",
+    "get_auth_service",
+    # Router
+    "router",
 ]

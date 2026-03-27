@@ -14,17 +14,17 @@ Compatible avec les modèles existants :
 """
 
 from datetime import date, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.api.v1.organization.schemas import (
     EntityBase,
-    EntityFilters,  # noqa: F401 — re-export pour platform/routes.py
-    EntityResponse,  # noqa: F401 — re-export pour platform/routes.py
-    EntitySummary,  # noqa: F401 — re-export pour platform/routes.py
-    EntityUpdate,  # noqa: F401 — re-export pour platform/routes.py
+    EntityFilters,
+    EntityResponse,
+    EntitySummary,
+    EntityUpdate,
 )
 from app.models.enums import EntityType
 
@@ -34,7 +34,7 @@ from app.models.enums import EntityType
 # =============================================================================
 
 
-class TenantStatusAPI(str, Enum):
+class TenantStatusAPI(StrEnum):
     """Statuts de tenant - doit matcher TenantStatus du modèle."""
 
     ACTIVE = "ACTIVE"
@@ -42,7 +42,7 @@ class TenantStatusAPI(str, Enum):
     TERMINATED = "TERMINATED"
 
 
-class TenantTypeAPI(str, Enum):
+class TenantTypeAPI(StrEnum):
     """Types de tenant - doit matcher TenantType du modèle."""
 
     GCSMS = "GCSMS"
@@ -55,7 +55,7 @@ class TenantTypeAPI(str, Enum):
     OTHER = "OTHER"
 
 
-class AssignmentTypeAPI(str, Enum):
+class AssignmentTypeAPI(StrEnum):
     """Types d'affectation cross-tenant."""
 
     PERMANENT = "PERMANENT"
@@ -63,7 +63,7 @@ class AssignmentTypeAPI(str, Enum):
     EMERGENCY = "EMERGENCY"
 
 
-class SuperAdminRoleAPI(str, Enum):
+class SuperAdminRoleAPI(StrEnum):
     """Rôles des super-admins - doit matcher SuperAdminRole du modèle."""
 
     PLATFORM_OWNER = "PLATFORM_OWNER"
@@ -395,9 +395,8 @@ class UserTenantAssignmentCreate(BaseModel):
     @field_validator("end_date")
     @classmethod
     def validate_end_date(cls, v: date | None, info) -> date | None:
-        if v is not None and "start_date" in info.data:
-            if v < info.data["start_date"]:
-                raise ValueError("La date de fin doit être postérieure à la date de début")
+        if v is not None and "start_date" in info.data and v < info.data["start_date"]:
+            raise ValueError("La date de fin doit être postérieure à la date de début")
         return v
 
 

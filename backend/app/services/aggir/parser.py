@@ -221,11 +221,7 @@ class AggirParser:
         if len(adverbes_data) < 4:
             return False
 
-        for adv in adverbes_data:
-            if adv.get("Reponse") is None:
-                return False
-
-        return True
+        return all(adv.get("Reponse") is not None for adv in adverbes_data)
 
     def get_incomplete_variables(self, evaluation_data: dict[str, Any]) -> list[str]:
         """
@@ -295,9 +291,9 @@ class AggirParser:
         evaluation_data: dict[str, Any],
         variable_code: str,
         adverbes: dict[str, bool],
-        recorded_at: datetime = None,
-        recorded_by_user_id: int = None,
-        session_id: int = None,
+        recorded_at: datetime | None = None,
+        recorded_by_user_id: int | None = None,
+        session_id: int | None = None,
     ) -> dict[str, Any]:
         """
         Met à jour une variable spécifique dans le JSON d'évaluation.
@@ -349,9 +345,9 @@ class AggirParser:
         var_data: dict[str, Any],
         adverbes: dict[str, bool],
         resultat: str,
-        recorded_at: datetime = None,
-        recorded_by_user_id: int = None,
-        session_id: int = None,
+        recorded_at: datetime | None = None,
+        recorded_by_user_id: int | None = None,
+        session_id: int | None = None,
     ) -> None:
         """Met à jour les données d'une variable in-place."""
         # Mettre à jour les adverbes

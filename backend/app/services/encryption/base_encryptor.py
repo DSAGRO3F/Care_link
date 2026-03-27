@@ -302,7 +302,7 @@ class BaseEncryptor(ABC):
 
     def get_db_encrypted_columns(self) -> list[str]:
         """Liste des noms de colonnes DB chiffrées."""
-        return [f"{f}_encrypted" for f in self.encrypted_fields.keys()]
+        return [f"{f}_encrypted" for f in self.encrypted_fields]
 
     def get_db_blind_columns(self) -> list[str]:
         """Liste des noms de colonnes DB blind index."""

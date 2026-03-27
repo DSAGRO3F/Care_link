@@ -5,7 +5,7 @@ Ce module centralise tous les enums utilisés dans les modèles SQLAlchemy.
 Ils sont convertis en types ENUM PostgreSQL via SQLEnum.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
 # =============================================================================
@@ -13,7 +13,7 @@ from enum import Enum
 # =============================================================================
 
 
-class EntityType(str, Enum):
+class EntityType(StrEnum):
     """Types de structures médico-sociales."""
 
     # Services d'aide et de soins à domicile
@@ -60,7 +60,7 @@ class EntityType(str, Enum):
     AGENCE = "AGENCE"
 
 
-class IntegrationType(str, Enum):
+class IntegrationType(StrEnum):
     """Types d'intégration dans un groupement."""
 
     MANAGED = "MANAGED"  # Intégré (gestion complète par le GCSMS)
@@ -69,7 +69,7 @@ class IntegrationType(str, Enum):
     FINANCIAL_CONTROL = "FINANCIAL_CONTROL"  # Contrôle financier uniquement
 
 
-class OrganizationModel(str, Enum):
+class OrganizationModel(StrEnum):
     """Modèles d'organisation des groupements."""
 
     INTEGRATED = "INTEGRATED"  # Intégré (direction unique)
@@ -77,7 +77,7 @@ class OrganizationModel(str, Enum):
     HYBRID = "HYBRID"  # Hybride (mix des deux)
 
 
-class TerritoryType(str, Enum):
+class TerritoryType(StrEnum):
     """Types de zones géographiques."""
 
     COMMUNE = "COMMUNE"  # Commune
@@ -92,7 +92,7 @@ class TerritoryType(str, Enum):
 # =============================================================================
 
 
-class ProfessionCategory(str, Enum):
+class ProfessionCategory(StrEnum):
     """Catégories de professions."""
 
     MEDICAL = "MEDICAL"  # Médecins
@@ -101,7 +101,7 @@ class ProfessionCategory(str, Enum):
     SOCIAL = "SOCIAL"  # Assistants sociaux, éducateurs...
 
 
-class RoleName(str, Enum):
+class RoleName(StrEnum):
     """
     Noms des rôles fonctionnels système (S3).
 
@@ -118,7 +118,7 @@ class RoleName(str, Enum):
     INTERVENANT = "INTERVENANT"  # Intervenant ponctuel (lecture seule)
 
 
-class ContractType(str, Enum):
+class ContractType(StrEnum):
     """Types de contrats de travail."""
 
     SALARIE = "SALARIE"  # Salarié CDI/CDD
@@ -130,7 +130,7 @@ class ContractType(str, Enum):
     MUTUAL_POOL = "MUTUAL_POOL"  # Pool mutualisé (GCSMS)
 
 
-class PermissionCategory(str, Enum):
+class PermissionCategory(StrEnum):
     """
     Catégories de permissions pour le regroupement dans l'UI.
 
@@ -153,7 +153,7 @@ class PermissionCategory(str, Enum):
 # =============================================================================
 
 
-class PatientStatus(str, Enum):
+class PatientStatus(StrEnum):
     """Statuts d'un patient."""
 
     ACTIVE = "ACTIVE"  # Patient actif en prise en charge
@@ -162,7 +162,7 @@ class PatientStatus(str, Enum):
     TRANSFERRED = "TRANSFERRED"  # Transféré vers autre structure
 
 
-class AccessType(str, Enum):
+class AccessType(StrEnum):
     """Types d'accès au dossier patient."""
 
     READ = "READ"  # Lecture seule
@@ -170,7 +170,7 @@ class AccessType(str, Enum):
     FULL = "FULL"  # Accès complet (inclut suppression)
 
 
-class GirLevel(str, Enum):
+class GirLevel(StrEnum):
     """Niveaux de la grille AGGIR (Autonomie Gérontologie Groupes Iso-Ressources)."""
 
     GIR_1 = "GIR_1"  # Dépendance totale, fonctions mentales altérées
@@ -181,7 +181,7 @@ class GirLevel(str, Enum):
     GIR_6 = "GIR_6"  # Autonome pour les actes de la vie courante
 
 
-class VitalType(str, Enum):
+class VitalType(StrEnum):
     """Types de constantes vitales."""
 
     FC = "FC"  # Fréquence cardiaque (bpm)
@@ -196,7 +196,7 @@ class VitalType(str, Enum):
     DIURESE = "DIURESE"  # Diurèse (mL/24h)
 
 
-class VitalStatus(str, Enum):
+class VitalStatus(StrEnum):
     """Statuts par rapport aux seuils."""
 
     NORMAL = "NORMAL"  # Dans les normes
@@ -205,7 +205,7 @@ class VitalStatus(str, Enum):
     CRITICAL = "CRITICAL"  # Critique (très hors normes)
 
 
-class VitalSource(str, Enum):
+class VitalSource(StrEnum):
     """Sources des mesures de constantes."""
 
     MANUAL = "MANUAL"  # Saisie manuelle
@@ -215,7 +215,7 @@ class VitalSource(str, Enum):
     OTHER_DEVICE = "OTHER_DEVICE"  # Autre device connecté
 
 
-class DeviceType(str, Enum):
+class DeviceType(StrEnum):
     """Types d'appareils connectés."""
 
     SCALE = "SCALE"  # Balance connectée
@@ -227,7 +227,7 @@ class DeviceType(str, Enum):
     OTHER = "OTHER"  # Autre appareil
 
 
-class EvaluationSchemaType(str, Enum):
+class EvaluationSchemaType(StrEnum):
     """Types de schémas d'évaluation."""
 
     AGGIR = "AGGIR"  # Grille AGGIR
@@ -235,7 +235,7 @@ class EvaluationSchemaType(str, Enum):
     CUSTOM = "CUSTOM"  # Grille personnalisée
 
 
-class DocumentType(str, Enum):
+class DocumentType(StrEnum):
     """Types de documents du dossier patient."""
 
     PRESCRIPTION = "PRESCRIPTION"  # Ordonnance
@@ -249,7 +249,7 @@ class DocumentType(str, Enum):
     OTHER = "OTHER"  # Autre
 
 
-class DocumentFormat(str, Enum):
+class DocumentFormat(StrEnum):
     """Formats de fichiers autorisés."""
 
     PDF = "PDF"
@@ -264,7 +264,7 @@ class DocumentFormat(str, Enum):
 # =============================================================================
 
 
-class EvaluationStatus(str, Enum):
+class EvaluationStatus(StrEnum):
     """Statuts d'une évaluation."""
 
     IN_PROGRESS = "IN_PROGRESS"  # En cours de saisie
@@ -273,7 +273,7 @@ class EvaluationStatus(str, Enum):
     CANCELLED = "CANCELLED"  # Annulée
 
 
-class EvaluationSessionStatus(str, Enum):
+class EvaluationSessionStatus(StrEnum):
     """Statuts d'une session d'évaluation."""
 
     DRAFT = "DRAFT"  # Brouillon
@@ -282,7 +282,7 @@ class EvaluationSessionStatus(str, Enum):
     VALIDATED = "VALIDATED"  # Validée
 
 
-class SyncStatus(str, Enum):
+class SyncStatus(StrEnum):
     """Statuts de synchronisation."""
 
     PENDING = "PENDING"  # En attente
@@ -290,7 +290,7 @@ class SyncStatus(str, Enum):
     ERROR = "ERROR"  # Erreur de synchronisation
 
 
-class AggirVariableCode(str, Enum):
+class AggirVariableCode(StrEnum):
     """Codes des variables discriminantes AGGIR."""
 
     COHERENCE = "COHERENCE"
@@ -305,7 +305,7 @@ class AggirVariableCode(str, Enum):
     COMMUNICATION = "COMMUNICATION"
 
 
-class AggirSubVariableCode(str, Enum):
+class AggirSubVariableCode(StrEnum):
     """Codes des sous-variables AGGIR."""
 
     # Toilette
@@ -323,7 +323,7 @@ class AggirSubVariableCode(str, Enum):
     ELIMINATION_FECALE = "ELIMINATION_FECALE"
 
 
-class AggirResultLetter(str, Enum):
+class AggirResultLetter(StrEnum):
     """Lettres de résultat AGGIR (A, B, C)."""
 
     A = "A"  # Fait seul, spontanément, totalement, habituellement, correctement
@@ -336,7 +336,7 @@ class AggirResultLetter(str, Enum):
 # =============================================================================
 
 
-class CoordinationCategory(str, Enum):
+class CoordinationCategory(StrEnum):
     """Catégories d'entrées de coordination."""
 
     OBSERVATION = "OBSERVATION"  # Observation clinique
@@ -350,7 +350,7 @@ class CoordinationCategory(str, Enum):
 # =============================================================================
 
 
-class ServiceCategory(str, Enum):
+class ServiceCategory(StrEnum):
     """Catégories de services."""
 
     NURSING = "NURSING"  # Soins infirmiers
@@ -362,7 +362,7 @@ class ServiceCategory(str, Enum):
     COORDINATION = "COORDINATION"  # Coordination de parcours
 
 
-class ServiceType(str, Enum):
+class ServiceType(StrEnum):
     """Types de services."""
 
     INDIVIDUAL = "INDIVIDUAL"  # Service individuel
@@ -370,7 +370,7 @@ class ServiceType(str, Enum):
     TELECARE = "TELECARE"  # Télésoin
 
 
-class ServiceUnit(str, Enum):
+class ServiceUnit(StrEnum):
     """Unités de facturation des services."""
 
     HOUR = "HOUR"  # À l'heure
@@ -385,7 +385,7 @@ class ServiceUnit(str, Enum):
 # =============================================================================
 
 
-class CarePlanStatus(str, Enum):
+class CarePlanStatus(StrEnum):
     """Statuts d'un plan d'aide."""
 
     DRAFT = "DRAFT"  # Brouillon en cours de création
@@ -396,7 +396,7 @@ class CarePlanStatus(str, Enum):
     CANCELLED = "CANCELLED"  # Annulé
 
 
-class FrequencyType(str, Enum):
+class FrequencyType(StrEnum):
     """Types de fréquence pour les services."""
 
     DAILY = "DAILY"  # Tous les jours
@@ -406,7 +406,7 @@ class FrequencyType(str, Enum):
     ON_DEMAND = "ON_DEMAND"  # À la demande
 
 
-class ServicePriority(str, Enum):
+class ServicePriority(StrEnum):
     """Priorité d'un service dans le plan."""
 
     LOW = "LOW"  # Basse priorité (confort)
@@ -415,7 +415,7 @@ class ServicePriority(str, Enum):
     CRITICAL = "CRITICAL"  # Critique (vital)
 
 
-class AssignmentStatus(str, Enum):
+class AssignmentStatus(StrEnum):
     """Statuts d'affectation d'un service à un professionnel."""
 
     UNASSIGNED = "UNASSIGNED"  # Non affecté
@@ -430,7 +430,7 @@ class AssignmentStatus(str, Enum):
 # =============================================================================
 
 
-class InterventionStatus(str, Enum):
+class InterventionStatus(StrEnum):
     """Statuts d'une intervention planifiée."""
 
     SCHEDULED = "SCHEDULED"  # Planifiée
@@ -447,7 +447,7 @@ class InterventionStatus(str, Enum):
 # =============================================================================
 
 
-class TenantType(str, Enum):
+class TenantType(StrEnum):
     """Types de clients/locataires.
 
     Reprend les principaux types d'EntityType qui peuvent être
@@ -474,7 +474,7 @@ class TenantType(str, Enum):
     OTHER = "OTHER"  # Autre type de structure
 
 
-class TenantStatus(str, Enum):
+class TenantStatus(StrEnum):
     """Statuts d'un tenant."""
 
     ACTIVE = "ACTIVE"  # Tenant actif, accès autorisé
@@ -487,7 +487,7 @@ class TenantStatus(str, Enum):
 # =============================================================================
 
 
-class SubscriptionPlan(str, Enum):
+class SubscriptionPlan(StrEnum):
     """Plans d'abonnement disponibles."""
 
     S = "S"  # 1-200 patients
@@ -497,7 +497,7 @@ class SubscriptionPlan(str, Enum):
     ENTERPRISE = "ENTERPRISE"  # 3000+ patients, sur devis
 
 
-class SubscriptionStatus(str, Enum):
+class SubscriptionStatus(StrEnum):
     """Statuts possibles d'un abonnement."""
 
     TRIAL = "TRIAL"  # Période d'essai
@@ -506,7 +506,7 @@ class SubscriptionStatus(str, Enum):
     CANCELLED = "CANCELLED"  # Abonnement annulé
 
 
-class BillingCycle(str, Enum):
+class BillingCycle(StrEnum):
     """Cycles de facturation."""
 
     MONTHLY = "MONTHLY"  # Mensuel
@@ -519,52 +519,52 @@ class BillingCycle(str, Enum):
 # =============================================================================
 
 __all__ = [
+    "AccessType",
+    "AggirResultLetter",
+    "AggirSubVariableCode",
+    "AggirVariableCode",
+    "AssignmentStatus",
+    "BillingCycle",
+    # CarePlan
+    "CarePlanStatus",
+    "ContractType",
+    # Coordination
+    "CoordinationCategory",
+    "DeviceType",
+    "DocumentFormat",
+    "DocumentType",
     # Organization
     "EntityType",
+    "EvaluationSchemaType",
+    "EvaluationSessionStatus",
+    # Evaluation patient
+    "EvaluationStatus",
+    "FrequencyType",
+    "GirLevel",
     "IntegrationType",
+    # Interventions
+    "InterventionStatus",
     "OrganizationModel",
-    "TerritoryType",
+    # Patient
+    "PatientStatus",
+    "PermissionCategory",
     # User
     "ProfessionCategory",
     "RoleName",
-    "ContractType",
-    "PermissionCategory",
-    # Patient
-    "PatientStatus",
-    "AccessType",
-    "GirLevel",
-    "VitalType",
-    "VitalStatus",
-    "VitalSource",
-    "DeviceType",
-    "EvaluationSchemaType",
-    "DocumentType",
-    "DocumentFormat",
-    # Evaluation patient
-    "EvaluationStatus",
-    "EvaluationSessionStatus",
-    "SyncStatus",
-    "AggirVariableCode",
-    "AggirSubVariableCode",
-    "AggirResultLetter",
-    # Coordination
-    "CoordinationCategory",
     # Catalog
     "ServiceCategory",
+    "ServicePriority",
     "ServiceType",
     "ServiceUnit",
-    # CarePlan
-    "CarePlanStatus",
-    "FrequencyType",
-    "ServicePriority",
-    "AssignmentStatus",
-    # Interventions
-    "InterventionStatus",
-    # Tenant (v4.1, mis à jour v4.4)
-    "TenantType",
-    "TenantStatus",
     # Subscription
     "SubscriptionPlan",
     "SubscriptionStatus",
-    "BillingCycle",
+    "SyncStatus",
+    "TenantStatus",
+    # Tenant (v4.1, mis à jour v4.4)
+    "TenantType",
+    "TerritoryType",
+    "VitalSource",
+    "VitalStatus",
+    "VitalType",
 ]

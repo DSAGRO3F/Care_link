@@ -10,7 +10,7 @@ Contient les schémas pour :
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 # =============================================================================
 
 
-class AccessType(str, Enum):
+class AccessType(StrEnum):
     """Types d'accès aux données patient."""
 
     READ = "READ"
@@ -29,7 +29,7 @@ class AccessType(str, Enum):
     FULL = "FULL"
 
 
-class AuthMethod(str, Enum):
+class AuthMethod(StrEnum):
     """Méthodes d'authentification."""
 
     PSC = "psc"

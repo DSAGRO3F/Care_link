@@ -697,11 +697,10 @@ class UserService:
                 raise DuplicateEmailError(f"Email '{update_data['email']}' déjà utilisé")
 
         # 3. Vérifier unicité RPPS via blind index (comparaison par ID)
-        if "rpps" in update_data:
-            if update_data["rpps"]:
-                existing = self.get_by_rpps(update_data["rpps"])
-                if existing and existing.id != user_id:
-                    raise DuplicateRPPSError(f"RPPS '{update_data['rpps']}' déjà utilisé")
+        if update_data.get("rpps"):
+            existing = self.get_by_rpps(update_data["rpps"])
+            if existing and existing.id != user_id:
+                raise DuplicateRPPSError(f"RPPS '{update_data['rpps']}' déjà utilisé")
 
         # 4. Vérifier profession existe
         if update_data.get("profession_id"):

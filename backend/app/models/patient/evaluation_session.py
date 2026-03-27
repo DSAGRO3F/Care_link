@@ -157,7 +157,7 @@ class EvaluationSession(TimestampMixin, Base):
         self.ended_at = datetime.now(UTC)
         self.status = "COMPLETED"
 
-    def interrupt_session(self, note: str = None) -> None:
+    def interrupt_session(self, note: str | None = None) -> None:
         """Interrompt la session (perte de connexion, etc.)."""
         self.ended_at = datetime.now(UTC)
         self.status = "INTERRUPTED"

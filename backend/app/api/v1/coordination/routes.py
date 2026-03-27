@@ -71,7 +71,7 @@ planning_router = APIRouter(prefix="/planning", tags=["Planning"])
 # =============================================================================
 
 
-def _build_entry_response(entry, user_name: str = None) -> CoordinationEntryResponse:
+def _build_entry_response(entry, user_name: str | None = None) -> CoordinationEntryResponse:
     """Construit la réponse pour une entrée de coordination."""
     return CoordinationEntryResponse(
         id=entry.id,

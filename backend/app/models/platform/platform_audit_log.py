@@ -11,7 +11,7 @@ IMPORTANT :
 """
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from app.models.tenants.tenant import Tenant
 
 
-class AuditAction(str, Enum):
+class AuditAction(StrEnum):
     """
     Types d'actions auditées.
 

@@ -62,12 +62,12 @@ router = APIRouter(
     summary="Initier l'authentification PSC",
     description="""
     Démarre le flux d'authentification Pro Santé Connect.
-    
+
     Cette route redirige l'utilisateur vers la page de connexion PSC
     où il pourra s'authentifier avec son e-CPS ou sa carte CPS.
-    
+
     Après authentification, PSC redirigera vers /auth/psc/callback.
-    
+
     **Environnement actuel**: Configuré via PSC_ENVIRONMENT dans .env
     - `bas`: Bac à Sable (développement, identités fictives)
     - `prod`: Production (vrais professionnels de santé)
@@ -100,7 +100,7 @@ async def psc_login(
 
     # Créer la session PSC
     auth_service = get_auth_service(db)
-    authorization_url, state = auth_service.create_psc_session(redirect_after)
+    authorization_url, _state = auth_service.create_psc_session(redirect_after)
 
     # Rediriger vers PSC
     return RedirectResponse(url=authorization_url, status_code=302)
@@ -112,7 +112,7 @@ async def psc_login(
     summary="Obtenir l'URL d'authentification PSC (sans redirection)",
     description="""
     Retourne l'URL d'authentification PSC sans effectuer de redirection.
-    
+
     Utile pour les applications SPA qui gèrent elles-mêmes la redirection,
     ou pour afficher un bouton "Se connecter avec Pro Santé Connect".
     """,
@@ -154,12 +154,12 @@ async def psc_login_url(
     summary="Callback PSC",
     description="""
     Endpoint appelé par PSC après l'authentification de l'utilisateur.
-    
+
     Reçoit le code d'autorisation, l'échange contre des tokens,
     récupère les informations utilisateur et crée/met à jour le compte.
-    
+
     Retourne les tokens JWT CareLink pour les requêtes suivantes.
-    
+
     **Processus:**
     1. Valide le state (protection CSRF)
     2. Échange le code contre des tokens PSC
@@ -196,7 +196,7 @@ async def psc_callback(
 
     try:
         # Terminer l'authentification PSC
-        user, psc_info = await auth_service.authenticate_with_psc(code=code, state=state)
+        user, _psc_info = await auth_service.authenticate_with_psc(code=code, state=state)
 
         # Construire et retourner la réponse
         return auth_service.build_login_response(user, auth_method=AuthMethod.PSC)
@@ -231,10 +231,10 @@ async def psc_callback(
     summary="Connexion email/mot de passe",
     description="""
     Authentifie un utilisateur avec son email et mot de passe.
-    
+
     Cette méthode est réservée aux utilisateurs non professionnels de santé
     (administrateurs, coordinateurs sans RPPS, etc.).
-    
+
     Les professionnels de santé doivent utiliser Pro Santé Connect
     via `/auth/psc/login`.
     """,
@@ -328,10 +328,10 @@ async def change_password(
     summary="Renouveler les tokens",
     description=f"""
     Renouvelle l'access token à partir d'un refresh token valide.
-    
+
     Utilisez cette route lorsque l'access token expire pour en obtenir
     un nouveau sans redemander les identifiants à l'utilisateur.
-    
+
     **Durées de validité:**
     - Access token: {settings.ACCESS_TOKEN_EXPIRE_MINUTES} minutes
     - Refresh token: {settings.REFRESH_TOKEN_EXPIRE_DAYS} jours
@@ -408,7 +408,7 @@ async def get_me(
     summary="Statut d'authentification et configuration",
     description="""
     Vérifie la configuration de l'authentification.
-    
+
     Cette route ne nécessite pas d'authentification.
     Utile pour savoir si PSC est configuré avant d'afficher le bouton.
     """,
@@ -437,10 +437,10 @@ async def auth_status() -> AuthStatusResponse:
     summary="Déconnexion",
     description="""
     Déconnecte l'utilisateur courant.
-    
+
     **Note**: Les JWT étant stateless, cette route ne fait que confirmer
     la déconnexion. Le client doit supprimer les tokens de son côté.
-    
+
     Pour une vraie invalidation de tokens côté serveur, il faudrait
     implémenter une blacklist (Redis).
     """,

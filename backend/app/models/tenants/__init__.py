@@ -33,16 +33,16 @@ from app.models.tenants.tenant import Tenant
 
 
 __all__ = [
-    # Tenant
-    "Tenant",
-    "TenantStatus",
-    "TenantType",
+    "BillingCycle",
     "IntegrationType",
     # Subscription
     "Subscription",
     "SubscriptionPlan",
     "SubscriptionStatus",
-    "BillingCycle",
     # Usage
     "SubscriptionUsage",
+    # Tenant
+    "Tenant",
+    "TenantStatus",
+    "TenantType",
 ]

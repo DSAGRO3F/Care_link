@@ -299,7 +299,7 @@ async def update_tenant(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant non trouvé")
 
     update_data = tenant_data.model_dump(exclude_unset=True)
-    old_values = {k: getattr(tenant, k) for k in update_data.keys()}
+    old_values = {k: getattr(tenant, k) for k in update_data}
 
     # Vérifier unicité du SIRET si modifié
     if update_data.get("siret"):

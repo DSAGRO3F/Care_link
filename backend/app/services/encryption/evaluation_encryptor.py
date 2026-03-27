@@ -377,9 +377,7 @@ class EvaluationEncryptor:
         """
         if value is None:
             return False
-        if isinstance(value, str) and value.strip() == "":
-            return False
-        return True
+        return not (isinstance(value, str) and value.strip() == "")
 
     @staticmethod
     def _encrypt_value(value: Any) -> str:

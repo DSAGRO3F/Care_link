@@ -171,9 +171,7 @@ class PatientAccess(Base):
         """Retourne True si l'accès est actif (non révoqué et non expiré)."""
         if self.revoked_at is not None:
             return False
-        if self.expires_at is not None and self.expires_at < datetime.now(UTC):
-            return False
-        return True
+        return not (self.expires_at is not None and self.expires_at < datetime.now(UTC))
 
     @property
     def is_expired(self) -> bool:

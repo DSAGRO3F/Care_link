@@ -135,99 +135,99 @@ from app.models.user.user_tenant_assignment import (
 
 # === Export explicite ===
 __all__ = [
+    "INITIAL_PERMISSIONS",
+    "INITIAL_PROFESSIONS",
+    "INITIAL_ROLES",
+    "INITIAL_ROLE_PERMISSIONS",
+    "INITIAL_SERVICE_TEMPLATES",
+    "PROFESSION_DEFAULT_PERMISSIONS",  # S4
+    # Patients
+    "AccessType",
+    "AssignmentStatus",
+    "AssignmentType",
+    "AuditAction",
+    "AuditMixin",
+    "BillingCycle",
+    # Plans d'aide
+    "CarePlan",
+    "CarePlanService",
+    # Plans d'aide et interventions
+    "CarePlanStatus",
+    "ContractType",
+    # Coordination et services
+    "CoordinationCategory",
+    # Coordination
+    "CoordinationEntry",
+    # Référence
+    "Country",
+    "DeviceType",
+    "DocumentFormat",
+    "DocumentType",
+    # Organisation
+    "Entity",
+    "EntityService",
     # --- Enums ---
     # Organisation
     "EntityType",
-    "IntegrationType",
-    "OrganizationModel",
-    "TerritoryType",
-    # Professions et rôles
-    "ProfessionCategory",
-    "RoleName",
-    "ContractType",
-    "PermissionCategory",  # v4.3
-    # Patients
-    "AccessType",
-    "PatientStatus",
-    "GirLevel",
-    # Constantes vitales
-    "VitalType",
-    "VitalStatus",
-    "VitalSource",
-    "DeviceType",
     # Évaluations et documents
     "EvaluationSchemaType",
-    "DocumentType",
-    "DocumentFormat",
-    # Coordination et services
-    "CoordinationCategory",
+    "EvaluationSession",
+    "FrequencyType",
+    "GirLevel",
+    "IntegrationType",
+    "InterventionStatus",
+    "OrganizationModel",
+    # Patients
+    "Patient",
+    "PatientAccess",
+    "PatientDevice",
+    "PatientDocument",
+    "PatientEvaluation",
+    "PatientStatus",
+    "PatientThreshold",
+    "PatientVitals",
+    "Permission",
+    "PermissionCategory",  # v4.3
+    "PlatformAuditLog",
+    "Profession",
+    # Professions et rôles
+    "ProfessionCategory",
+    "Role",
+    "RoleName",
+    "RolePermission",
+    "ScheduledIntervention",
     "ServiceCategory",
+    "ServicePriority",
+    # Catalogue
+    "ServiceTemplate",
     "ServiceType",
     "ServiceUnit",
-    # Plans d'aide et interventions
-    "CarePlanStatus",
-    "FrequencyType",
-    "ServicePriority",
-    "AssignmentStatus",
-    "InterventionStatus",
-    # --- Mixins ---
-    "TimestampMixin",
-    "AuditMixin",
-    "VersionedMixin",
     "StatusMixin",
+    "Subscription",
+    "SubscriptionPlan",
+    "SubscriptionStatus",
+    "SubscriptionUsage",
     # --- Modèles ---
     # Platform (v4.2)
     "SuperAdmin",
     "SuperAdminRole",
-    "PlatformAuditLog",
-    "AuditAction",
     # Tenant (v4.1)
     "Tenant",
     "TenantStatus",
     "TenantType",
-    "Subscription",
-    "SubscriptionPlan",
-    "SubscriptionStatus",
-    "BillingCycle",
-    "SubscriptionUsage",
-    # Référence
-    "Country",
-    # Organisation
-    "Entity",
+    "TerritoryType",
+    # --- Mixins ---
+    "TimestampMixin",
     # Utilisateurs et permissions (v4.3)
     "User",
-    "Role",
-    "INITIAL_ROLES",
-    "Permission",
-    "INITIAL_PERMISSIONS",
-    "RolePermission",
-    "INITIAL_ROLE_PERMISSIONS",
-    "Profession",
-    "INITIAL_PROFESSIONS",
-    "PROFESSION_DEFAULT_PERMISSIONS",  # S4
-    "get_profession_permissions",  # S4
-    "UserRole",
-    "UserEntity",
     "UserAvailability",
+    "UserEntity",
+    "UserRole",
     "UserTenantAssignment",
-    "AssignmentType",
-    # Patients
-    "Patient",
-    "PatientAccess",
-    "PatientEvaluation",
-    "EvaluationSession",
-    "PatientThreshold",
-    "PatientVitals",
-    "PatientDevice",
-    "PatientDocument",
-    # Catalogue
-    "ServiceTemplate",
-    "INITIAL_SERVICE_TEMPLATES",
-    "EntityService",
-    # Plans d'aide
-    "CarePlan",
-    "CarePlanService",
-    # Coordination
-    "CoordinationEntry",
-    "ScheduledIntervention",
+    "VersionedMixin",
+    "VitalSource",
+    "VitalStatus",
+    # Constantes vitales
+    "VitalType",
+    "get_profession_permissions",  # S4
 ]

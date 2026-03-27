@@ -33,25 +33,25 @@ from app.models.user.user_tenant_assignment import (
 
 
 __all__ = [
-    # Modèles principaux
-    "User",
-    "Role",
-    "Permission",
-    "Profession",
-    # Tables de jonction
-    "RolePermission",
-    "UserRole",
-    "UserEntity",
-    "UserAvailability",
-    "UserTenantAssignment",
-    # Enums
-    "AssignmentType",
-    # Fonctions utilitaires
-    "get_user_tenant_access",
-    "check_user_tenant_access",
+    "INITIAL_PERMISSIONS",
+    "INITIAL_PROFESSIONS",
     # Données initiales (seed)
     "INITIAL_ROLES",
-    "INITIAL_PERMISSIONS",
     "INITIAL_ROLE_PERMISSIONS",
-    "INITIAL_PROFESSIONS",
+    # Enums
+    "AssignmentType",
+    "Permission",
+    "Profession",
+    "Role",
+    # Tables de jonction
+    "RolePermission",
+    # Modèles principaux
+    "User",
+    "UserAvailability",
+    "UserEntity",
+    "UserRole",
+    "UserTenantAssignment",
+    "check_user_tenant_access",
+    # Fonctions utilitaires
+    "get_user_tenant_access",
 ]

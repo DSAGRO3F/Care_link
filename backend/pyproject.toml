@@ -174,12 +174,14 @@ ignore = [
 
 # --- Exceptions par dossier ---
 [tool.ruff.lint.per-file-ignores]
-"tests/**"           = ["S101", "S106", "S105", "T20"]
-"test_*.py"          = ["S101", "S106", "S105", "T20"]
-"alembic/**"         = ["F401", "I001", "E501"]
-"scripts/**"         = ["T20", "S101"]
-"app/core/config.py" = ["S105", "N802"]
-"__init__.py"        = ["F401"]
+"tests/**"              = ["S101", "S106", "S105", "T20"]
+"test_*.py"             = ["S101", "S106", "S105", "T20"]
+"alembic/**"            = ["F401", "I001", "E501"]
+"scripts/**"            = ["T20", "S101"]
+"app/core/config.py"    = ["S105", "N802"]
+"__init__.py"           = ["F401"]
+"app/database/base.py"  = ["F401"]  # Alembic model discovery — imports nécessaires
+"app/api/v1/platform/schemas.py" = ["F401"]  # Re-exports schemas organization
 
 # --- Tri des imports ---
 [tool.ruff.lint.isort]

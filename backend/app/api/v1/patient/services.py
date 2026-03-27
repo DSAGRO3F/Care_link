@@ -163,7 +163,7 @@ class EvaluationNotEditableError(Exception):
 class InvalidEvaluationDataError(Exception):
     """Données d'évaluation invalides selon le JSON Schema."""
 
-    def __init__(self, message: str, errors: list = None):
+    def __init__(self, message: str, errors: list | None = None):
         self.message = message
         self.errors = errors or []
         super().__init__(message)

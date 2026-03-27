@@ -109,22 +109,22 @@ from app.services.encryption.user_encryptor import (
 __all__ = [
     # Base
     "BaseEncryptor",
-    # Patient
-    "PatientEncryptor",
-    "patient_encryptor",
-    "encrypt_patient_data",
-    "decrypt_patient_data",
-    "get_patient_search_blind",
-    # User
-    "UserEncryptor",
-    "user_encryptor",
-    "encrypt_user_data",
-    "decrypt_user_data",
-    "get_user_search_blind",
     # Evaluation
     "EvaluationEncryptor",
-    "evaluation_encryptor",
-    "encrypt_evaluation_data",
+    # Patient
+    "PatientEncryptor",
+    # User
+    "UserEncryptor",
     "decrypt_evaluation_data",
+    "decrypt_patient_data",
+    "decrypt_user_data",
+    "encrypt_evaluation_data",
+    "encrypt_patient_data",
+    "encrypt_user_data",
+    "evaluation_encryptor",
     "get_evaluation_encrypted_paths",
+    "get_patient_search_blind",
+    "get_user_search_blind",
+    "patient_encryptor",
+    "user_encryptor",
 ]

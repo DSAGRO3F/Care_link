@@ -599,15 +599,10 @@ class AuthService:
 
         if access:
             # Vérifier l'expiration si définie
-            if access.expires_at and access.expires_at < datetime.now(UTC):
-                return False
-            return True
+            return not (access.expires_at and access.expires_at < datetime.now(UTC))
 
         # Même tenant = accès (selon politique)
-        if hasattr(patient, "tenant_id") and patient.tenant_id == user.tenant_id:
-            return True
-
-        return False
+        return bool(hasattr(patient, "tenant_id") and patient.tenant_id == user.tenant_id)
 
     def grant_patient_access(
         self,

@@ -358,14 +358,13 @@ class PlatformEntityService:
         update_data = data.model_dump(exclude_unset=True)
 
         # --- Interdire le changement de type d'une racine ---
-        if entity.entity_type in ROOT_ENTITY_TYPES:
-            if "entity_type" in update_data:
-                new_type = update_data["entity_type"]
-                if new_type not in ROOT_ENTITY_TYPES:
-                    raise ValueError(
-                        f"Impossible de changer le type d'une entité racine "
-                        f"de {entity.entity_type.value} vers {new_type}"
-                    )
+        if entity.entity_type in ROOT_ENTITY_TYPES and "entity_type" in update_data:
+            new_type = update_data["entity_type"]
+            if new_type not in ROOT_ENTITY_TYPES:
+                raise ValueError(
+                    f"Impossible de changer le type d'une entité racine "
+                    f"de {entity.entity_type.value} vers {new_type}"
+                )
 
         # --- Vérifier unicité FINESS si modifié ---
         if update_data.get("finess_et"):

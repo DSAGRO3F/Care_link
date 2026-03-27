@@ -377,12 +377,11 @@ def update_user(
         )
 
     # Seul l'admin peut modifier is_admin ou is_active
-    if not current_user.is_admin:
-        if data.is_admin is not None or data.is_active is not None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Seul un administrateur peut modifier ces champs",
-            )
+    if not current_user.is_admin and (data.is_admin is not None or data.is_active is not None):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seul un administrateur peut modifier ces champs",
+        )
 
     try:
         service = UserService(db, tenant_id)

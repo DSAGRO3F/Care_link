@@ -12,7 +12,7 @@ IMPORTANT :
 """
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from app.models.platform.platform_audit_log import PlatformAuditLog
 
 
-class SuperAdminRole(str, Enum):
+class SuperAdminRole(StrEnum):
     """
     Rôles des super-administrateurs CareLink.
 

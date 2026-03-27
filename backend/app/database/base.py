@@ -11,7 +11,7 @@ from app.database.base_class import Base
 # 2. Alembic puisse détecter tous les modèles pour les migrations
 # 3. Les métadonnées soient complètes lors de create_all()
 # Import centralisé depuis app/models/__init__.py
-from app.models import (  # noqa: F401
+from app.models import (
     INITIAL_PERMISSIONS,
     INITIAL_PROFESSIONS,
     INITIAL_ROLE_PERMISSIONS,
@@ -74,7 +74,7 @@ from app.models import (  # noqa: F401
 )
 
 # Import EvaluationSession (manquant dans app/models/__init__.py)
-from app.models.patient import EvaluationSession  # noqa: F401
+from app.models.patient import EvaluationSession
 
 
 # Note : Le noqa: F401 supprime l'avertissement "imported but unused"
