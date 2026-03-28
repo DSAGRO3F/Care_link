@@ -350,7 +350,7 @@ async def refresh_token(
     """
     try:
         # Vérifier le refresh token
-        payload = verify_token(request.refresh_token, token_type="refresh")
+        payload = verify_token(request.refresh_token, token_type="refresh")  # noqa: S106
         user_id = int(payload.get("sub"))
 
         # Récupérer l'utilisateur

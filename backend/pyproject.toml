@@ -174,14 +174,19 @@ ignore = [
 
 # --- Exceptions par dossier ---
 [tool.ruff.lint.per-file-ignores]
-"tests/**"              = ["S101", "S106", "S105", "T20"]
-"test_*.py"             = ["S101", "S106", "S105", "T20"]
+"tests/**"              = ["S101", "S106", "S105", "T20", "E402", "S608", "PTH", "B017"]
+"test_*.py"             = ["S101", "S106", "S105", "T20", "E402", "S608", "PTH"]
 "alembic/**"            = ["F401", "I001", "E501"]
-"scripts/**"            = ["T20", "S101"]
+"scripts/**"            = ["T20", "S101", "E402", "S311", "PTH", "N806", "B905"]
+"app/database/session.py" = ["N801"]
+"app/services/validation/schema_validator.py" = ["B019", "PTH123"]
+"app/core/session/session_manager.py" = ["S112"]
 "app/core/config.py"    = ["S105", "N802"]
 "__init__.py"           = ["F401"]
-"app/database/base.py"  = ["F401"]  # Alembic model discovery — imports nécessaires
-"app/api/v1/platform/schemas.py" = ["F401"]  # Re-exports schemas organization
+"app/database/base.py"  = ["F401", "T201"]
+"app/database/init_db.py" = ["F401", "E402", "T201", "F841"]
+"app/api/v1/patient/services.py" = ["E402"]
+"app/api/v1/platform/schemas.py" = ["F401"]
 
 # --- Tri des imports ---
 [tool.ruff.lint.isort]

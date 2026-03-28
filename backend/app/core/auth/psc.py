@@ -328,7 +328,7 @@ class ProSanteConnectClient:
                         error_detail = error_json.get(
                             "error_description", error_json.get("error", response.text)
                         )
-                    except Exception:
+                    except Exception:  # noqa: S110
                         pass
 
                     raise PSCTokenError(
@@ -384,7 +384,7 @@ class ProSanteConnectClient:
                         error_detail = error_json.get(
                             "error_description", error_json.get("error", response.text)
                         )
-                    except Exception:
+                    except Exception:  # noqa: S110
                         pass
 
                     raise PSCUserInfoError(
@@ -437,13 +437,13 @@ class ProSanteConnectClient:
         except httpx.RequestError as e:
             raise PSCTokenError(f"Erreur de connexion: {e!s}") from e
 
-    async def revoke_token(self, token: str, token_type_hint: str = "access_token") -> bool:
+    async def revoke_token(self, token: str, token_type_hint: str = "access_token") -> bool:  # noqa: S107
         """
         Révoque un token PSC (déconnexion).
 
         Args:
             token: Token à révoquer (access ou refresh)
-            token_type_hint: Type de token ("access_token" ou "refresh_token")
+            token_type_hint: Type de token ("access_token" ou "refresh_token")  # noqa: S107
 
         Returns:
             True si la révocation a réussi

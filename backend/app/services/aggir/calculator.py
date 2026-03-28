@@ -563,8 +563,8 @@ class AggirCalculator:
         ordre_groupes = ["A", "B", "C", "D", "E", "F", "G", "H"]
 
         details = {
-            "lettres_sous_variables": {v.name: l for v, l in lettres_sous_variables.items()},
-            "lettres_principales": {v.name: l for v, l in lettres_principales.items()},
+            "lettres_sous_variables": {v.name: l for v, l in lettres_sous_variables.items()},  # noqa: E741
+            "lettres_principales": {v.name: l for v, l in lettres_principales.items()},  # noqa: E741
             "scores_par_groupe": {},
             "groupe_final": None,
             "rang_final": None,

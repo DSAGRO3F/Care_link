@@ -98,7 +98,7 @@ def create_first_admin(
         User | None: L'utilisateur créé ou None si un admin existe déjà
     """
     # Vérifier si un admin existe déjà
-    existing_admin = db.query(User).filter(User.is_admin == True).first()
+    existing_admin = db.query(User).filter(User.is_admin == True)  # noqa: E712
     if existing_admin:
         print(f"⚠️  Un administrateur existe déjà : {existing_admin.email}")
         return None

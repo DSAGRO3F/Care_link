@@ -717,7 +717,7 @@ class PatientEvaluationService:
             Score GIR (1-6) ou None si données insuffisantes
         """
         # Mapping noms français → Variable enum (10 discriminantes)
-        NOM_TO_VARIABLE = {
+        NOM_TO_VARIABLE = {  # noqa: N806
             "Cohérence": Variable.COHERENCE,
             "Orientation": Variable.ORIENTATION,
             "Toilette": Variable.TOILETTE,
@@ -842,7 +842,7 @@ class PatientEvaluationService:
         """
         self._verify_patient_access(patient_id)
 
-        SUBMITTED_STATUSES = ["PENDING_MEDICAL", "PENDING_DEPARTMENT", "VALIDATED"]
+        SUBMITTED_STATUSES = ["PENDING_MEDICAL", "PENDING_DEPARTMENT", "VALIDATED"]  # noqa: N806
 
         evaluation = (
             self.db.execute(
@@ -1621,7 +1621,7 @@ class PatientDeviceService:
         )
 
         if active_only:
-            query = query.where(PatientDevice.is_active == True)
+            query = query.where(PatientDevice.is_active == True)  # noqa: E712
 
         query = query.order_by(PatientDevice.device_name)
         return list(self.db.execute(query).scalars().all())

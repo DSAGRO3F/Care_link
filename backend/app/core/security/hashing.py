@@ -59,6 +59,6 @@ def needs_update(hashed_value: str) -> bool:
         if len(parts) >= 3:
             rounds = int(parts[2])
             return rounds < BCRYPT_ROUNDS
-    except (ValueError, IndexError):
+    except (ValueError, IndexError):  # noqa: S110
         pass
     return True

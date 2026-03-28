@@ -134,7 +134,7 @@ async def get_current_usage(
     current_patients = db.query(Patient).filter(Patient.tenant_id == tenant_id).count()
 
     current_users = (
-        db.query(User).filter(User.tenant_id == tenant_id, User.is_active == True).count()
+        db.query(User).filter(User.tenant_id == tenant_id, User.is_active == True)  # noqa: E712
     )
 
     # TODO: Calculer le stockage réel (documents, etc.)

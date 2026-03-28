@@ -80,7 +80,7 @@ def main():
     generate_es256_keypair(keys_dir)
 
     # Générer la clé AES-256
-    aes_key = generate_aes256_key()
+    generate_aes256_key()
 
     print("=" * 60)
     print("⚠️  IMPORTANT - Sécurité")

@@ -178,7 +178,7 @@ async def create_subscription(
     """Crée un abonnement."""
 
     # Vérifier que le tenant existe
-    tenant = get_tenant_or_404(db, tenant_id)
+    get_tenant_or_404(db, tenant_id)
 
     # Désactiver l'abonnement actif existant
     active_sub = (

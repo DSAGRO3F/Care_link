@@ -281,7 +281,7 @@ class EntityServiceService:
         )
 
         if active_only:
-            query = query.where(EntityService.is_active == True)
+            query = query.where(EntityService.is_active == True)  # noqa: E712
 
         query = query.order_by(EntityService.id)
         return list(self.db.execute(query).scalars().all())
@@ -376,6 +376,6 @@ class EntityServiceService:
         )
 
         if active_only:
-            query = query.where(EntityService.is_active == True)
+            query = query.where(EntityService.is_active == True)  # noqa: E712
 
         return list(self.db.execute(query).scalars().all())

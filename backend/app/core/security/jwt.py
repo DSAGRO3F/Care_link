@@ -105,7 +105,7 @@ def create_refresh_token(data: dict) -> str:
     return encoded_jwt
 
 
-def verify_token(token: str, token_type: str = "access") -> dict[str, Any]:
+def verify_token(token: str, token_type: str = "access") -> dict[str, Any]:  # noqa: S107
     """
     Vérifie et décode un token JWT signé avec ES256.
 

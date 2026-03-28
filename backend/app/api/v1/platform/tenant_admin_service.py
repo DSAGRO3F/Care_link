@@ -188,7 +188,7 @@ class TenantAdminService:
             select(Role).where(
                 and_(
                     Role.name == "ADMIN",  # 🔄 S5 fix (était "ADMIN_FULL")
-                    Role.is_system_role == True,
+                    Role.is_system_role == True,  # noqa: E712
                 )
             )
         ).scalar_one_or_none()
@@ -260,8 +260,8 @@ class TenantAdminService:
                 select(User).where(
                     and_(
                         User.tenant_id == tenant_id,
-                        User.is_admin == True,
-                        User.is_active == True,
+                        User.is_admin == True,  # noqa: E712
+                        User.is_active == True,  # noqa: E712
                     )
                 )
             )

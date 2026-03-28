@@ -321,7 +321,7 @@ def decrypt_dict_fields(data: dict[str, Any], fields_to_decrypt: list[str]) -> d
                     if decrypted is not None:
                         result[field] = decrypted
                         continue
-                except (json.JSONDecodeError, ValueError):
+                except (json.JSONDecodeError, ValueError):  # noqa: S110
                     pass
 
                 # Sinon, déchiffrer comme string simple

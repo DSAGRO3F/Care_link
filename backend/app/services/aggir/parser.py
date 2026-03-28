@@ -123,8 +123,6 @@ class AggirParser:
         variables = aggir_data.get("AggirVariable", [])
 
         for var_data in variables:
-            var_code = var_data.get("Code")
-
             # Traiter les sous-variables si présentes
             sous_variables = var_data.get("AggirSousVariable", [])
 
@@ -319,7 +317,6 @@ class AggirParser:
         resultat = adv_obj.to_letter()
 
         # Trouver et mettre à jour la variable
-        found = False
         for var_data in result["aggir"].get("AggirVariable", []):
             # Chercher dans les sous-variables
             for sous_var in var_data.get("AggirSousVariable", []):
@@ -327,7 +324,6 @@ class AggirParser:
                     self._update_variable_data(
                         sous_var, adverbes, resultat, recorded_at, recorded_by_user_id, session_id
                     )
-                    found = True
                     break
 
             # Ou directement dans la variable
@@ -335,7 +331,6 @@ class AggirParser:
                 self._update_variable_data(
                     var_data, adverbes, resultat, recorded_at, recorded_by_user_id, session_id
                 )
-                found = True
                 break
 
         return result

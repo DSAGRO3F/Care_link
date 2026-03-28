@@ -194,7 +194,7 @@ class ProfessionService:
                 )
 
         # Vérifier unicité du code
-        if "code" in update_data and update_data["code"] != profession.code:
+        if "code" in update_data and update_data["code"] != profession.code:  # noqa: SIM102
             if update_data["code"]:
                 existing_code = db.execute(
                     select(Profession).where(Profession.code == update_data["code"])
@@ -250,7 +250,7 @@ class RoleService:
         return select(Role).where(
             or_(
                 Role.tenant_id == self.tenant_id,
-                Role.is_system_role == True,  # Rôles système partagés
+                Role.is_system_role == True,  # noqa: E712
             )
         )
 
@@ -833,14 +833,14 @@ class UserService:
         if data.is_primary:
             self.db.execute(
                 select(UserEntity).where(
-                    UserEntity.user_id == user_id, UserEntity.is_primary == True
+                    UserEntity.user_id == user_id, UserEntity.is_primary == True  # noqa: E712
                 )
             )
             # Retirer le flag primaire des autres
             for ue in (
                 self.db.execute(
                     select(UserEntity).where(
-                        UserEntity.user_id == user_id, UserEntity.is_primary == True
+                        UserEntity.user_id == user_id, UserEntity.is_primary == True  # noqa: E712
                     )
                 )
                 .scalars()
@@ -879,7 +879,7 @@ class UserService:
                 self.db.execute(
                     select(UserEntity).where(
                         UserEntity.user_id == user_id,
-                        UserEntity.is_primary == True,
+                        UserEntity.is_primary == True,  # noqa: E712
                         UserEntity.entity_id != entity_id,
                     )
                 )

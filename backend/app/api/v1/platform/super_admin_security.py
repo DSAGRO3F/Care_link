@@ -57,7 +57,7 @@ async def get_current_super_admin(
     token = credentials.credentials
 
     try:
-        payload = verify_token(token, token_type="super_admin")
+        payload = verify_token(token, token_type="super_admin")  # noqa: S106
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -68,7 +68,7 @@ async def get_current_super_admin(
     # Vérifier que c'est un token SuperAdmin
     # Défense en profondeur délibérée (car vérification déja faite ligne 57)
     token_type = payload.get("type")
-    if token_type != "super_admin":
+    if token_type != "super_admin":  # noqa: S105
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Ce endpoint nécessite une authentification SuperAdmin",
@@ -205,7 +205,7 @@ async def get_optional_super_admin(
         return None
 
     try:
-        payload = verify_token(credentials.credentials, token_type="super_admin")
+        payload = verify_token(credentials.credentials, token_type="super_admin")  # noqa: S106
     except Exception:
         return None
 

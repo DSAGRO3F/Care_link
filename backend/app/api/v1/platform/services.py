@@ -414,7 +414,7 @@ class SuperAdminService:
         query = select(SuperAdmin)
 
         if not include_inactive:
-            query = query.where(SuperAdmin.is_active == True)
+            query = query.where(SuperAdmin.is_active == True)  # noqa: E712
 
         # Count
         count_query = select(func.count()).select_from(query.subquery())
@@ -792,7 +792,7 @@ class UserTenantAssignmentService:
                 and_(
                     UserTenantAssignment.user_id == data.user_id,
                     UserTenantAssignment.tenant_id == data.tenant_id,
-                    UserTenantAssignment.is_active == True,
+                    UserTenantAssignment.is_active == True,  # noqa: E712
                     or_(
                         UserTenantAssignment.end_date.is_(None),
                         UserTenantAssignment.end_date >= date.today(),
@@ -951,7 +951,7 @@ class PlatformStatsService:
             self.db.execute(
                 select(func.count(UserTenantAssignment.id)).where(
                     and_(
-                        UserTenantAssignment.is_active == True,
+                        UserTenantAssignment.is_active == True,  # noqa: E712
                         or_(
                             UserTenantAssignment.end_date.is_(None),
                             UserTenantAssignment.end_date >= date.today(),
@@ -982,7 +982,7 @@ class PlatformStatsService:
         total_super_admins = self.db.execute(select(func.count(SuperAdmin.id))).scalar() or 0
         active_super_admins = (
             self.db.execute(
-                select(func.count(SuperAdmin.id)).where(SuperAdmin.is_active == True)
+                select(func.count(SuperAdmin.id)).where(SuperAdmin.is_active == True)  # noqa: E712
             ).scalar()
             or 0
         )

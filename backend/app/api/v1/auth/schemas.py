@@ -33,7 +33,7 @@ class AuthMethod(StrEnum):
     """Méthodes d'authentification."""
 
     PSC = "psc"
-    PASSWORD = "password"
+    PASSWORD = "password"  # noqa: S105
 
 
 # =============================================================================

@@ -219,7 +219,7 @@ class AuthService:
             self.db.expunge(user)  # Détacher → plus de tracking
             self._decrypt_user_in_place(user)
 
-            assert isinstance(user, User)
+            assert isinstance(user, User)  # noqa: S101
             return user
 
         except (InvalidCredentialsError, InactiveUserError):
@@ -544,7 +544,7 @@ class AuthService:
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
-            token_type="Bearer",
+            token_type="Bearer",  # noqa: S106
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
 
@@ -734,8 +734,8 @@ class AuthService:
                 user.email = decrypted["email"]
             if "rpps" in decrypted and decrypted["rpps"] is not None:
                 user.rpps = decrypted["rpps"]
-        except Exception:
-            pass  # Si le déchiffrement échoue, on garde les valeurs brutes
+        except Exception:  # noqa: S110
+            pass
 
     def build_authenticated_user(self, user: User) -> AuthenticatedUser:
         """

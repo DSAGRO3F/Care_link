@@ -75,7 +75,7 @@ async def get_current_user(
 
     try:
         # Décoder et vérifier le JWT
-        payload = verify_token(credentials.credentials, token_type="access")
+        payload = verify_token(credentials.credentials, token_type="access")  # noqa: S106
 
         user_id_raw = payload.get("sub")
         tenant_id = payload.get("tenant_id")

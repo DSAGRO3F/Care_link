@@ -367,7 +367,7 @@ def get_user_tenant_access(
     query = db_session.query(UserTenantAssignment).filter(UserTenantAssignment.user_id == user_id)
 
     if not include_expired:
-        query = query.filter(UserTenantAssignment.is_active == True)
+        query = query.filter(UserTenantAssignment.is_active == True)  # noqa: E712
 
     for assignment in query.all():
         tenants.append(
@@ -412,7 +412,7 @@ def check_user_tenant_access(db_session, user_id: int, tenant_id: int) -> bool:
         .filter(
             UserTenantAssignment.user_id == user_id,
             UserTenantAssignment.tenant_id == tenant_id,
-            UserTenantAssignment.is_active == True,
+            UserTenantAssignment.is_active == True,  # noqa: E712
         )
         .first()
     )
