@@ -1,23 +1,26 @@
 /**
  * Configuration Vue Router
- * Définit les routes et les guards d'authentification
+ * Définit les routes et les guards d'authentification.
  *
- * 🆕 v4.11 : Redirection post-login par rôle
- *   - is_admin=true → /admin (Admin Client)
- *   - profession RPPS → /soins (Soignant)
+ * Aiguillage post-login par permission (B48 Palier 4) :
+ *   - effective_permissions inclut ADMIN_FULL → /admin (Admin Client)
+ *   - sinon                                    → /soins (Soignant)
  *   - Helper centralisé : getDefaultRoute() / getDefaultRouteName()
+ *
+ * Guard par permission sur les routes métier (B48 Palier 4 / 4c) :
+ *   `meta.requiredPermissions: string[]` — sémantique OR, court-circuit
+ *   ADMIN_FULL natif via les getters du auth.store.
  *
  * Destination : src/router/index.ts
  */
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '@/stores';
 import { isAuthenticatedAsSuperAdmin } from '@/utils/platform-auth';
-import { getDefaultRoute, getDefaultRouteName } from '@/utils/routing';
+import { getDefaultRoute } from '@/utils/routing';
 
 // Import des routes par module
 import authRoutes from './routes/auth';
-import soinsRoutes from './routes/soins';
-import adminRoutes from './routes/admin';
+import appRoutes from './routes/app';
 import platformRoutes from './routes/platform';
 
 // =============================================================================
@@ -28,11 +31,8 @@ const routes: RouteRecordRaw[] = [
   // Routes d'authentification (publiques)
   ...authRoutes,
 
-  // Routes Espace Soins (protégées)
-  ...soinsRoutes,
-
-  // Routes Espace Admin (protégées + rôle admin)
-  ...adminRoutes,
+  // Routes métier intra-tenant (/admin/* et /soins/*, B48 Palier 4)
+  ...appRoutes,
 
   // Routes Espace Platform (SuperAdmin)
   ...platformRoutes,
@@ -132,27 +132,23 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   // =========================================================================
-  // 🆕 AIGUILLAGE PAR RÔLE
+  // GUARD PAR PERMISSION (B48 Palier 4)
   // =========================================================================
-  // Un admin client qui tente d'accéder à /soins sans profession → /admin
-  // Un soignant qui tente d'accéder à /admin sans droits → /soins
-  const defaultRouteName = getDefaultRouteName(authStore.user);
+  // Lit `meta.requiredPermissions` (sémantique OR, court-circuit ADMIN_FULL
+  // natif via les getters du auth.store, cf. resume Palier 1).
+  if (to.meta.requiredPermissions) {
+    const requiredPermissions = to.meta.requiredPermissions as string[];
+    const hasRequiredPermission = authStore.hasAnyPermission(requiredPermissions);
 
-  // Vérifier les rôles requis
-  if (to.meta.roles) {
-    const requiredRoles = to.meta.roles as string[];
-    const hasRequiredRole = authStore.hasAnyRole(requiredRoles);
-
-    if (!hasRequiredRole) {
-      console.warn('[Router] Accès refusé - rôle manquant:', requiredRoles);
-      return next({ name: defaultRouteName });
+    if (!hasRequiredPermission) {
+      console.warn(
+        '[Router] Accès refusé - permission manquante:',
+        requiredPermissions,
+        'pour la route:',
+        to.fullPath,
+      );
+      return next({ name: 'not-authorized' });
     }
-  }
-
-  // Vérifier si admin requis
-  if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    console.warn('[Router] Accès refusé - admin requis');
-    return next({ name: defaultRouteName });
   }
 
   next();
@@ -170,13 +166,15 @@ declare module 'vue-router' {
     /** Route accessible sans authentification */
     public?: boolean;
     /** Layout à utiliser (défaut: 'default') */
-    layout?: 'default' | 'auth' | 'platform' | 'admin';
-    /** Rôles requis pour accéder */
-    roles?: string[];
-    /** Requiert le statut admin */
-    requiresAdmin?: boolean;
+    layout?: 'default' | 'auth' | 'platform';
     /** Requiert le statut SuperAdmin (équipe CareLink) */
     requiresSuperAdmin?: boolean;
+    /**
+     * Permissions requises pour accéder à la route (B48 Palier 4).
+     * Sémantique OR : au moins un des codes suffit.
+     * `ADMIN_FULL` court-circuite via les getters du auth.store.
+     */
+    requiredPermissions?: string[];
     /** Titre de la page */
     title?: string;
   }

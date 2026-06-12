@@ -11,6 +11,15 @@
 -->
 <template>
   <div class="wizard-container">
+    <!-- Modale confirmation soumission -->
+    <ConfirmDialog group="submitEvaluation">
+      <template #icon>
+        <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50">
+          <SendHorizontal :size="20" :stroke-width="1.8" class="text-amber-600" />
+        </div>
+      </template>
+    </ConfirmDialog>
+
     <!-- Barre contexte patient -->
     <div class="wizard-patient-bar">
       <div class="wizard-patient-avatar">
@@ -306,6 +315,10 @@
   import PoaSocialForm from './forms/PoaSocialForm.vue';
   import PoaSanteForm from './forms/PoaSanteForm.vue';
   import PoaAutonomieForm from './forms/PoaAutonomieForm.vue';
+  import ConfirmDialog from 'primevue/confirmdialog';
+  import { useConfirm } from 'primevue/useconfirm';
+
+  const confirm = useConfirm();
 
   // ── Props ──────────────────────────────────────────────────────────────
 
@@ -412,7 +425,20 @@
   }
 
   function handleSubmit() {
-    emit('submit');
+    confirm.require({
+      group: 'submitEvaluation',
+      header: "Soumettre l'évaluation",
+      message:
+        'Une fois soumise, cette évaluation ne pourra plus être modifiée. ' +
+        'Elle sera transmise au médecin coordonnateur pour validation.',
+      acceptLabel: 'Confirmer la soumission',
+      rejectLabel: 'Annuler',
+      acceptClass: 'p-button-sm',
+      rejectClass: 'p-button-sm p-button-outlined p-button-secondary',
+      accept: () => {
+        emit('submit');
+      },
+    });
   }
 
   function handleConfirmUnchanged() {

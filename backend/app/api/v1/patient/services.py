@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     # Ils ne sont pas exécutés à runtime → pas d'import circulaire
     pass
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.patient.schemas import (
@@ -152,12 +152,8 @@ class EvaluationInProgressError(Exception):
         self.evaluation_id = evaluation_id
 
 
-class EvaluationExpiredError(Exception):
-    """L'évaluation a expiré."""
-
-
 class EvaluationNotEditableError(Exception):
-    """L'évaluation ne peut plus être modifiée (validée ou expirée)."""
+    """L'évaluation ne peut plus être modifiée (validée)."""
 
 
 class InvalidEvaluationDataError(Exception):
@@ -395,8 +391,7 @@ class PatientService:
         )
 
         self.db.add(patient)
-        self.db.commit()
-        self.db.refresh(patient)
+        self.db.flush()
         return patient
 
     def update(
@@ -456,15 +451,14 @@ class PatientService:
         if updated_by:
             patient.updated_by = updated_by
 
-        self.db.commit()
-        self.db.refresh(patient)
+        self.db.flush()
         return patient
 
     def delete(self, patient_id: int) -> None:
         """Archive un patient (soft delete)."""
         patient = self.get_by_id(patient_id)
         patient.status = "ARCHIVED"
-        self.db.commit()
+        self.db.flush()
 
     # =========================================================================
     # MÉTHODES DE RECHERCHE (BLIND INDEX)
@@ -604,16 +598,14 @@ class PatientAccessService:
         )
 
         self.db.add(access)
-        self.db.commit()
-        self.db.refresh(access)
+        self.db.flush()
         return access
 
     def revoke_access(self, access_id: int, patient_id: int, revoked_by: int) -> PatientAccess:
         """Révoque un accès."""
         access = self.get_by_id(access_id, patient_id)
         access.revoke(revoked_by)
-        self.db.commit()
-        self.db.refresh(access)
+        self.db.flush()
         return access
 
 
@@ -653,8 +645,6 @@ class PatientEvaluationService:
         """Vérifie que l'évaluation peut être modifiée."""
         if evaluation.status == "VALIDATED":
             raise EvaluationAlreadyValidatedError(f"L'évaluation {evaluation.id} est déjà validée")
-        if evaluation.is_expired:
-            raise EvaluationExpiredError(f"L'évaluation {evaluation.id} a expiré")
         if evaluation.status not in ["DRAFT", "IN_PROGRESS"]:
             raise EvaluationNotEditableError(
                 f"L'évaluation {evaluation.id} ne peut plus être modifiée (statut: {evaluation.status})"
@@ -688,18 +678,6 @@ class PatientEvaluationService:
             raise InvalidEvaluationDataError(
                 message=f"Données invalides: {e.message}", errors=e.errors
             ) from e
-
-    def _commit_with_tenant(self) -> None:
-        """
-        Commit et repositionne le tenant_id RLS pour les requêtes post-commit.
-
-        Après db.commit(), PostgreSQL démarre une nouvelle transaction implicite
-        qui ne porte plus le current_setting('app.current_tenant_id').
-        Le db.refresh() suivant échoue car le SELECT est bloqué par RLS.
-        Ce helper repositionne le setting pour que refresh() fonctionne.
-        """
-        self.db.commit()
-        self.db.execute(text("SET app.current_tenant_id = :tid"), {"tid": str(self.tenant_id)})
 
     def _compute_gir_from_data(self, aggir_variables: list) -> int | None:
         """
@@ -768,7 +746,6 @@ class PatientEvaluationService:
     def get_all_for_patient(
         self,
         patient_id: int,
-        include_expired: bool = False,
     ) -> list[PatientEvaluation]:
         """
         Liste les évaluations d'un patient.
@@ -781,9 +758,6 @@ class PatientEvaluationService:
             PatientEvaluation.patient_id == patient_id,
             PatientEvaluation.tenant_id == self.tenant_id,
         )
-
-        if not include_expired:
-            query = query.where(PatientEvaluation.status != "EXPIRED")
 
         query = query.order_by(PatientEvaluation.evaluation_date.desc())
         evaluations = list(self.db.execute(query).scalars().all())
@@ -814,9 +788,6 @@ class PatientEvaluationService:
         if not evaluation:
             raise EvaluationNotFoundError(f"Évaluation {evaluation_id} non trouvée")
 
-        # Vérifier expiration
-        evaluation.check_expiration()
-
         # Déchiffrer evaluation_data
         if evaluation.evaluation_data:
             evaluation.evaluation_data = decrypt_evaluation_data(evaluation.evaluation_data)
@@ -832,8 +803,10 @@ class PatientEvaluationService:
         Utilisé pour pré-remplir une nouvelle évaluation avec les sections
         stables (usager, contacts, social, matériels, dispositifs).
 
-        Statuts considérés comme "soumis" :
-        PENDING_MEDICAL, PENDING_DEPARTMENT, VALIDATED.
+        Statuts considérés comme "soumis" (workflow B40-J1 — Phase 4 bis) :
+        PENDING_INTERNAL_REVIEW, PENDING_MEDICAL, AWAITING_FUNDING_DECISION,
+        VALIDATED. `DRAFT` / `IN_PROGRESS` sont exclus (saisie en cours),
+        `FUNDING_REJECTED` / `OBSOLETE` aussi (états non-réutilisables).
 
         CHIFFREMENT: evaluation_data est déchiffré avant retour.
 
@@ -842,7 +815,12 @@ class PatientEvaluationService:
         """
         self._verify_patient_access(patient_id)
 
-        SUBMITTED_STATUSES = ["PENDING_MEDICAL", "PENDING_DEPARTMENT", "VALIDATED"]  # noqa: N806
+        SUBMITTED_STATUSES = [  # noqa: N806
+            "PENDING_INTERNAL_REVIEW",
+            "PENDING_MEDICAL",
+            "AWAITING_FUNDING_DECISION",
+            "VALIDATED",
+        ]
 
         evaluation = (
             self.db.execute(
@@ -916,9 +894,6 @@ class PatientEvaluationService:
             completion_percent=0,
         )
 
-        # Définir expiration J+7
-        evaluation.set_expiration(days=7)
-
         # Calculer complétion initiale (besoin des données EN CLAIR)
         evaluation.update_completion()
 
@@ -930,8 +905,7 @@ class PatientEvaluationService:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
         self.db.add(evaluation)
-        self._commit_with_tenant()
-        self.db.refresh(evaluation)
+        self.db.flush()
 
         # Déchiffrer pour le retour API
         if evaluation.evaluation_data:
@@ -985,8 +959,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self._commit_with_tenant()
-        self.db.refresh(evaluation)
+        self.db.flush()
 
         # NOUVEAU: Déchiffrer pour le retour API
         if evaluation.evaluation_data:
@@ -1004,25 +977,47 @@ class PatientEvaluationService:
             raise EvaluationNotEditableError("Seules les évaluations DRAFT peuvent être supprimées")
 
         self.db.delete(evaluation)
-        self.db.commit()
+        self.db.flush()
 
     # =========================================================================
     # WORKFLOW DE VALIDATION
     # =========================================================================
 
-    def submit(self, evaluation_id: int, patient_id: int) -> PatientEvaluation:
+    def submit(
+        self,
+        evaluation_id: int,
+        patient_id: int,
+        current_user: User,
+    ) -> PatientEvaluation:
         """
-        Soumet l'évaluation pour validation médicale.
+        Soumet l'évaluation au workflow de validation (Phase 4 bis — B40-J1+).
 
         Étapes :
         1. Calcul de tous les tests cliniques (injection dans sante.blocs[].test[])
         2. Calcul du score GIR via calculator.py (décret 1997)
         3. Mise à jour du current_gir du patient
         4. Validation JSON Schema COMPLÈTE
-        5. Transition de statut → PENDING_MEDICAL
-        6. Chiffrement + persistance
+        5. Chiffrement de evaluation_data
+        6. Délégation à ValidationRequestService (B40-J2) :
+             - création d'une ValidationRequest INTERNAL_REVIEW
+             - transition eval.status → PENDING_INTERNAL_REVIEW
+             - notification admin GCSMS
+             - audit horodaté
 
-        CHIFFREMENT: get_by_id() déchiffre, on re-chiffre avant commit.
+        🔄 B40-J2 — refacto (Voie B / Option C) : la transition de statut et la
+        création de la VR sont déléguées à `ValidationRequestService.submit_evaluation`
+        (workflow long AGGIR_FUNDING via étape interne admin GCSMS). Les anciennes
+        méthodes modèle `submit_for_validation` / `validate_medical` / `validate_department`
+        ont été supprimées, l'écriture du statut passe désormais exclusivement par
+        la nouvelle couche de validation (décision Session 27, point « Option C statut »).
+
+        CHIFFREMENT: get_by_id() déchiffre, on re-chiffre AVANT la délégation
+        (ValidationRequestService ne touche pas evaluation_data).
+
+        Exceptions remontées par la délégation (à mapper côté router) :
+        - `PermissionDeniedError` (validation) si l'user n'a pas VALIDATION_SUBMIT
+        - `EvaluationNotSubmittableError` si statut ≠ DRAFT / IN_PROGRESS
+        - `PendingValidationExistsError` si une VR pending existe déjà
         """
         # get_by_id() retourne evaluation_data DÉCHIFFRÉ
         evaluation = self.get_by_id(evaluation_id, patient_id)
@@ -1082,92 +1077,38 @@ class PatientEvaluationService:
         )
 
         # =====================================================================
-        # 5) Transition de statut
+        # 5) Chiffrement AVANT délégation
         # =====================================================================
-        evaluation.submit_for_validation()
-
-        # =====================================================================
-        # 6) Chiffrement + persistance
-        # =====================================================================
+        # ValidationRequestService.submit_evaluation ne touche pas evaluation_data ;
+        # on chiffre maintenant pour que l'éval soit prête à être committée à la
+        # fin de la requête HTTP (commit délégué à get_db, convention #97).
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self._commit_with_tenant()
-        self.db.refresh(evaluation)
+        # =====================================================================
+        # 6) Délégation à ValidationRequestService (B40-J2)
+        # =====================================================================
+        # Imports locaux pour éviter tout risque de cycle (le module validation
+        # importe `PatientEvaluation` modèle mais pas `PatientEvaluationService`).
+        from app.api.v1.validation.schemas import ValidationSubmitRequest
+        from app.api.v1.validation.services import ValidationRequestService
 
-        # Déchiffrer pour le retour API
-        if evaluation.evaluation_data:
-            evaluation.evaluation_data = decrypt_evaluation_data(evaluation.evaluation_data)
+        validation_service = ValidationRequestService(self.db, self.tenant_id)
+        validation_service.submit_evaluation(
+            evaluation_id=evaluation_id,
+            payload=ValidationSubmitRequest(notes=""),
+            submitted_by=current_user,
+        )
+        # submit_evaluation a déjà :
+        # - écrit evaluation.status = PENDING_INTERNAL_REVIEW
+        # - créé la VR INTERNAL_REVIEW
+        # - notifié les admin GCSMS
+        # - posé l'audit horodaté
+        # - flushé deux fois (vr.id requis pour audit + notification)
 
-        return evaluation
-
-    def validate_medical(
-        self,
-        evaluation_id: int,
-        patient_id: int,
-        validator_id: int,
-    ) -> PatientEvaluation:
-        """
-        Validation par le médecin coordonnateur.
-
-        CHIFFREMENT: get_by_id() déchiffre, on re-chiffre avant commit.
-        """
-        # get_by_id() retourne evaluation_data DÉCHIFFRÉ
-        evaluation = self.get_by_id(evaluation_id, patient_id)
-
-        if evaluation.status != "PENDING_MEDICAL":
-            raise EvaluationNotEditableError(
-                "L'évaluation doit être en attente de validation médicale"
-            )
-
-        evaluation.validate_medical(validator_id)
-
-        # NOUVEAU: Re-chiffrer avant commit
-        if evaluation.evaluation_data:
-            evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
-
-        self._commit_with_tenant()
-        self.db.refresh(evaluation)
-
-        # NOUVEAU: Déchiffrer pour le retour API
-        if evaluation.evaluation_data:
-            evaluation.evaluation_data = decrypt_evaluation_data(evaluation.evaluation_data)
-
-        return evaluation
-
-    def validate_department(
-        self,
-        evaluation_id: int,
-        patient_id: int,
-        validator_name: str,
-        validator_reference: str,
-    ) -> PatientEvaluation:
-        """
-        Validation par le Conseil Départemental.
-
-        CHIFFREMENT: get_by_id() déchiffre, on re-chiffre avant commit.
-        """
-        # get_by_id() retourne evaluation_data DÉCHIFFRÉ
-        evaluation = self.get_by_id(evaluation_id, patient_id)
-
-        if evaluation.status != "PENDING_DEPARTMENT":
-            raise EvaluationNotEditableError("L'évaluation doit être en attente de validation CD")
-
-        evaluation.validate_department(validator_name, validator_reference)
-
-        # Mettre à jour le GIR du patient
-        patient = self._verify_patient_access(patient_id)
-        if evaluation.gir_score:
-            patient.current_gir = evaluation.gir_score
-
-        # NOUVEAU: Re-chiffrer avant commit
-        if evaluation.evaluation_data:
-            evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
-
-        self._commit_with_tenant()
-        self.db.refresh(evaluation)
-
-        # NOUVEAU: Déchiffrer pour le retour API
+        # =====================================================================
+        # 7) Déchiffrer pour le retour API
+        # =====================================================================
         if evaluation.evaluation_data:
             evaluation.evaluation_data = decrypt_evaluation_data(evaluation.evaluation_data)
 
@@ -1219,8 +1160,7 @@ class PatientEvaluationService:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
         self.db.add(session)
-        self._commit_with_tenant()
-        self.db.refresh(session)
+        self.db.flush()
         return session
 
     def end_session(
@@ -1260,8 +1200,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self._commit_with_tenant()
-        self.db.refresh(session)
+        self.db.flush()
         return session
 
     # =========================================================================
@@ -1310,8 +1249,7 @@ class PatientEvaluationService:
         if evaluation.evaluation_data:
             evaluation.evaluation_data = encrypt_evaluation_data(evaluation.evaluation_data)
 
-        self._commit_with_tenant()
-        self.db.refresh(evaluation)
+        self.db.flush()
 
         # NOUVEAU: Déchiffrer pour le retour API
         if evaluation.evaluation_data:
@@ -1412,8 +1350,7 @@ class PatientThresholdService:
         )
 
         self.db.add(threshold)
-        self.db.commit()
-        self.db.refresh(threshold)
+        self.db.flush()
         return threshold
 
     def update(
@@ -1429,15 +1366,14 @@ class PatientThresholdService:
         for field, value in update_data.items():
             setattr(threshold, field, value)
 
-        self.db.commit()
-        self.db.refresh(threshold)
+        self.db.flush()
         return threshold
 
     def delete(self, threshold_id: int, patient_id: int) -> None:
         """Supprime un seuil."""
         threshold = self.get_by_id(threshold_id, patient_id)
         self.db.delete(threshold)
-        self.db.commit()
+        self.db.flush()
 
 
 # =============================================================================
@@ -1574,15 +1510,14 @@ class PatientVitalsService:
         )
 
         self.db.add(vital)
-        self.db.commit()
-        self.db.refresh(vital)
+        self.db.flush()
         return vital
 
     def delete(self, vital_id: int, patient_id: int) -> None:
         """Supprime une mesure."""
         vital = self.get_by_id(vital_id, patient_id)
         self.db.delete(vital)
-        self.db.commit()
+        self.db.flush()
 
 
 # =============================================================================
@@ -1667,8 +1602,7 @@ class PatientDeviceService:
         )
 
         self.db.add(device)
-        self.db.commit()
-        self.db.refresh(device)
+        self.db.flush()
         return device
 
     def update(
@@ -1684,24 +1618,21 @@ class PatientDeviceService:
         for field, value in update_data.items():
             setattr(device, field, value)
 
-        self.db.commit()
-        self.db.refresh(device)
+        self.db.flush()
         return device
 
     def deactivate(self, device_id: int, patient_id: int) -> PatientDevice:
         """Désactive un device."""
         device = self.get_by_id(device_id, patient_id)
         device.deactivate()
-        self.db.commit()
-        self.db.refresh(device)
+        self.db.flush()
         return device
 
     def update_sync_time(self, device_id: int, patient_id: int) -> PatientDevice:
         """Met à jour le timestamp de dernière synchronisation."""
         device = self.get_by_id(device_id, patient_id)
         device.update_sync_time()
-        self.db.commit()
-        self.db.refresh(device)
+        self.db.flush()
         return device
 
 
@@ -1811,8 +1742,7 @@ class PatientDocumentService:
         )
 
         self.db.add(document)
-        self.db.commit()
-        self.db.refresh(document)
+        self.db.flush()
         return document
 
     def delete(self, document_id: int, patient_id: int) -> None:
@@ -1823,4 +1753,4 @@ class PatientDocumentService:
         """
         document = self.get_by_id(document_id, patient_id)
         self.db.delete(document)
-        self.db.commit()
+        self.db.flush()

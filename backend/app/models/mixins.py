@@ -39,17 +39,18 @@ class TimestampMixin:
             id: Mapped[int] = mapped_column(primary_key=True)
     """
 
+    # lambda évaluée à chaque INSERT/UPDATE
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),  # <-- TIMESTAMP WITH TIME ZONE
-        default=datetime.now(UTC),
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
         doc="Date et heure de création",
         info={"description": "Timestamp de création", "auto_generated": True},
     )
 
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),  # <-- TIMESTAMP WITH TIME ZONE
+        DateTime(timezone=True),
         default=None,
-        onupdate=datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         doc="Date et heure de dernière modification",
         info={"description": "Timestamp de mise à jour", "auto_generated": True},
     )

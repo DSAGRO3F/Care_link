@@ -122,7 +122,7 @@
   // Adresse formatée pour la racine
   const formattedAddress = computed(() => {
     const parts: string[] = [];
-    if (props.node.address_line1) parts.push(props.node.address_line1);
+    if (props.node.address) parts.push(props.node.address);
     const cityPart = [props.node.postal_code, props.node.city].filter(Boolean).join(' ');
     if (cityPart) parts.push(cityPart);
     return parts.join(', ');
@@ -324,7 +324,7 @@
               :class="dark ? 'text-slate-200' : 'text-slate-700'"
               class="info-value font-mono truncate"
             >
-              {{ node.finess_geo || '—' }}
+              {{ node.finess_et || '—' }}
             </div>
           </div>
         </div>
@@ -502,11 +502,11 @@
                   {{ node.postal_code ? node.postal_code + ' ' : '' }}{{ node.city }}
                 </span>
                 <span
-                  v-if="node.finess_geo"
+                  v-if="node.finess_et"
                   :class="dark ? 'text-slate-600' : 'text-zinc-300'"
                   class="text-xs font-mono"
                 >
-                  ET {{ node.finess_geo }}
+                  ET {{ node.finess_et }}
                 </span>
                 <span
                   v-if="node.siret"

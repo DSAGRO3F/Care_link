@@ -27,6 +27,7 @@ from app.models import (
     INITIAL_PROFESSIONS,
     INITIAL_ROLE_PERMISSIONS,  # AJOUT S1 — fix seed permissions
     INITIAL_ROLES,
+    INITIAL_SERVICE_TEMPLATES,
     BillingCycle,
     ContractType,
     # Référence
@@ -41,6 +42,9 @@ from app.models import (
     Role,
     RoleName,
     RolePermission,  # AJOUT v4.3
+    ServiceCategory,
+    ServiceDomain,
+    ServiceTemplate,
     Subscription,
     SubscriptionPlan,
     SubscriptionStatus,
@@ -53,6 +57,9 @@ from app.models import (
     UserEntity,
     UserRole,
 )
+
+# 🆕 B40-J1 — Import direct du référentiel permissions (cf. init_permissions())
+from app.models.user.permission import INITIAL_PERMISSIONS
 from app.services.encryption import get_user_search_blind, user_encryptor
 
 
@@ -173,8 +180,218 @@ def init_professions(db: Session) -> list[Profession]:
 
 
 # =============================================================================
+# 3. FONCTION init_service_templates
+# =============================================================================
+
+
+def init_service_templates(db: "Session") -> list:
+    """
+    Crée ou met à jour le catalogue national de services (v4.17).
+
+    Seed de 44 services répartis en 3 domaines / 10 catégories (SERAFIN-PH).
+    Pattern identique à init_professions() : upsert par `code`.
+
+    La résolution `required_profession_code` → `required_profession_id`
+    se fait dynamiquement via la table `professions`.
+
+    Args:
+        db: Session SQLAlchemy
+
+    Returns:
+        Liste des ServiceTemplate créés/mis à jour
+    """
+    from app.models.user.profession import Profession
+
+    logger.info("📚 Initialisation du catalogue de services (v4.17 — SERAFIN-PH)...")
+
+    # Cache des professions par code pour éviter N+1 queries
+    profession_cache: dict[str, int] = {}
+    all_professions = db.query(Profession).filter(Profession.status == "active").all()
+    for prof in all_professions:
+        if prof.code:
+            profession_cache[prof.code] = prof.id
+
+        # Alias pour les professions sociales sans code RPPS
+        name_to_alias = {
+            "Auxiliaire de vie sociale": "AVS",
+            "Assistant de service social": "ASS",
+        }
+        for prof in all_professions:
+            alias = name_to_alias.get(prof.name)
+            if alias:
+                profession_cache[alias] = prof.id
+
+        logger.info(f"   📋 {len(profession_cache)} professions en cache")
+
+    templates = []
+    created_count = 0
+    updated_count = 0
+
+    for svc_data in INITIAL_SERVICE_TEMPLATES:
+        code = svc_data["code"]
+
+        # Résoudre la profession requise
+        profession_code = svc_data.pop("required_profession_code", None)
+        profession_id = None
+        if profession_code:
+            profession_id = profession_cache.get(profession_code)
+            if not profession_id:
+                logger.warning(
+                    f"   ⚠️ Profession '{profession_code}' non trouvée pour {code} — polyvalent"
+                )
+
+        # Préparer les valeurs
+        values = {
+            "name": svc_data["name"],
+            "domain": ServiceDomain(svc_data["domain"]),
+            "category": ServiceCategory(svc_data["category"]),
+            "description": svc_data.get("description"),
+            "default_duration_minutes": svc_data.get("default_duration_minutes", 30),
+            "requires_prescription": svc_data.get("requires_prescription", False),
+            "is_medical_act": svc_data.get("is_medical_act", False),
+            "apa_eligible": svc_data.get("apa_eligible", True),
+            "display_order": svc_data.get("display_order", 100),
+            "required_profession_id": profession_id,
+            "status": "active",
+        }
+
+        # Upsert par code
+        existing = db.query(ServiceTemplate).filter(ServiceTemplate.code == code).first()
+
+        if existing:
+            # Mise à jour des champs (sauf code et id)
+            for key, value in values.items():
+                setattr(existing, key, value)
+            templates.append(existing)
+            updated_count += 1
+            logger.debug(f"   🔄 {code} mis à jour")
+        else:
+            template = ServiceTemplate(code=code, **values)
+            db.add(template)
+            templates.append(template)
+            created_count += 1
+            logger.info(f"   ✅ {code} créé")
+
+    db.flush()
+
+    # Stats par domaine
+    domain_counts: dict[str, int] = {}
+    for t_data in INITIAL_SERVICE_TEMPLATES:
+        d = t_data["domain"]
+        domain_counts[d] = domain_counts.get(d, 0) + 1
+
+    logger.info(
+        f"✅ {len(templates)} services catalogue "
+        f"({created_count} nouveaux, {updated_count} mis à jour)"
+    )
+    for domain_name, count in domain_counts.items():
+        logger.info(f"   📁 {domain_name}: {count} services")
+
+    return templates
+
+
+# =============================================================================
 # 3. INITIALISATION DES RÔLES
 # =============================================================================
+
+
+def init_permissions(db: Session) -> list[Permission]:
+    """
+    Crée ou met à jour les permissions système depuis INITIAL_PERMISSIONS.
+
+    🆕 B40-J1 (Phase 4 bis) — Réconciliation référentiel ↔ base.
+
+    Avant B40-J1, les permissions étaient créées à la volée par
+    get_or_create_permission() dans init_roles(), ce qui laissait des
+    incohérences :
+        - VALIDATION_MEDICAL_REVIEW : présente dans profession_permissions
+          mais jamais en base (aucun rôle ne la référence)
+        - EVALUATION_EDIT : présente dans INITIAL_PERMISSIONS, jamais en
+          base (volontairement non distribuée à un rôle, court-circuit
+          ADMIN_FULL)
+        - VITALS_CREATE, CATALOG_CREATE/EDIT/DELETE : présentes en base
+          mais avec name/description issus du fallback auto-généré de
+          get_or_create_permission() au lieu des valeurs officielles
+          de INITIAL_PERMISSIONS
+
+    Cette fonction restaure la cohérence en upsertant chaque entrée
+    du référentiel `INITIAL_PERMISSIONS` (cf. permission.py).
+    Idempotente : peut être rejouée sans effet de bord.
+
+    Args:
+        db: Session SQLAlchemy
+
+    Returns:
+        Liste des permissions créées/mises à jour
+    """
+    logger.info("🔑 Initialisation des permissions système (B40-J1)...")
+
+    created_count = 0
+    updated_count = 0
+    permissions: list[Permission] = []
+
+    for perm_data in INITIAL_PERMISSIONS:
+        # Normalisation de la catégorie : INITIAL_PERMISSIONS porte des strings,
+        # la colonne Permission.category attend un PermissionCategory (enum).
+        category_enum = PermissionCategory(perm_data["category"])
+
+        existing = (
+            db.query(Permission)
+            .filter(
+                Permission.code == perm_data["code"],
+                Permission.tenant_id.is_(None),  # Permissions système uniquement
+            )
+            .first()
+        )
+
+        if existing:
+            # Upsert : met à jour si name/description/category/display_order divergent
+            changed = False
+            if existing.name != perm_data["name"]:
+                existing.name = perm_data["name"]
+                changed = True
+            if existing.description != perm_data["description"]:
+                existing.description = perm_data["description"]
+                changed = True
+            if existing.category != category_enum:
+                existing.category = category_enum
+                changed = True
+            new_display_order = perm_data.get("display_order")
+            if existing.display_order != new_display_order:
+                existing.display_order = new_display_order
+                changed = True
+            new_is_system = perm_data.get("is_system", True)
+            if existing.is_system != new_is_system:
+                existing.is_system = new_is_system
+                changed = True
+
+            if changed:
+                updated_count += 1
+                logger.debug(f"      🔄 {perm_data['code']} mise à jour")
+            permissions.append(existing)
+        else:
+            # Créer la permission
+            perm = Permission(
+                code=perm_data["code"],
+                name=perm_data["name"],
+                description=perm_data["description"],
+                category=category_enum,
+                is_system=perm_data.get("is_system", True),
+                display_order=perm_data.get("display_order"),
+            )
+            db.add(perm)
+            db.flush()  # Pour obtenir l'ID immédiatement
+            permissions.append(perm)
+            created_count += 1
+            logger.debug(f"      📝 {perm_data['code']} créée")
+
+    db.flush()
+    logger.info(
+        f"✅ {len(permissions)} permissions système "
+        f"({created_count} créées, {updated_count} mises à jour)"
+    )
+
+    return permissions
 
 
 def init_roles(db: Session) -> list[Role]:
@@ -230,6 +447,9 @@ def init_roles(db: Session) -> list[Role]:
                 cat = PermissionCategory.COORDINATION
             elif perm_code.startswith("ADMIN"):
                 cat = PermissionCategory.ADMIN
+            elif perm_code.startswith("VALIDATION"):
+                # 🆕 B40-J1 — Portail valideur générique (Phase 4 bis)
+                cat = PermissionCategory.VALIDATION
             else:
                 cat = PermissionCategory.ADMIN
 
@@ -679,12 +899,24 @@ def init_database(
                 return False
             logger.info("")
 
+            # 4b. 🆕 B40-J1 — Permissions (référentiel INITIAL_PERMISSIONS)
+            # Doit précéder init_roles() pour que les permissions soient
+            # disponibles quand les rôles sont créés/mis à jour.
+            init_permissions(db)
+            logger.info("")
+
             # 5. Rôles
             roles = init_roles(db)
             if not roles:
                 logger.error("❌ Échec de l'initialisation des rôles")
                 return False
             logger.info("")
+
+            # 5b. Catalogue de services
+            service_templates = init_service_templates(db)
+            if not service_templates:
+                logger.warning("⚠️ Aucun service catalogue créé")
+                logger.info("")
 
             # 6. Pays
             country = init_default_country(db)
@@ -732,7 +964,7 @@ def init_database(
    - Entité : SSIAD CareLink Paris
    - Admin : {admin_email}
 
-📊 Tables créées (24 tables) :
+📊 Tables créées (27 tables) :
 
    🏛️ MODULE TENANT (nouveau v4.1)
    - tenants            : Clients/locataires de la plateforme
@@ -773,6 +1005,13 @@ def init_database(
    📅 MODULE COORDINATION
    - coordination_entries    : Carnet de coordination
    - scheduled_interventions : Planning des interventions
+
+   🛡️ MODULE VALIDATION (B40-J1 / Phase 4 bis)
+   - validation_requests     : Demandes de validation (workflow polymorphe éval/plan)
+   - notifications           : Notifications in-app (RLS atypique par destinataire, #130)
+
+   👪 MODULE FAMILY (B40-J1 / Phase 4 bis)
+   - family_referent_links   : Liens famille référente ↔ patient
 
 🚀 Prochaine étape :
    uvicorn app.main:app --reload

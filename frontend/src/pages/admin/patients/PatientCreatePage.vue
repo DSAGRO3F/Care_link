@@ -11,13 +11,14 @@
    *   - Toast de confirmation soigné après création
    *   - Fix superposition calendrier (z-index)
    *
-   * Route : /admin/patients/new
-   * Layout : AdminLayout
+   * Routes : /admin/patients/new (admin-patient-create)
+   *          /soins/patients/new (soins-patient-create) — B48 Palier 2, Lot A
+   * Layout : DefaultLayout (/admin et /soins — B48 Palier 3)
    *
    * Destination : src/pages/admin/patients/PatientCreatePage.vue
    */
   import { ref, computed } from 'vue';
-  import { useRouter } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
   import { useToast } from 'primevue/usetoast';
 
   // PrimeVue Components
@@ -38,9 +39,27 @@
   import { usePatientStore } from '@/stores';
   import type { PatientCreate } from '@/types';
 
+  const route = useRoute();
   const router = useRouter();
   const patientStore = usePatientStore();
   const toast = useToast();
+
+  // =============================================================================
+  // NAVIGATION — espace-aware (admin vs soins)
+  // =============================================================================
+
+  /**
+   * Ce composant est référencé par admin-patient-create ET soins-patient-create.
+   * La navigation (post-création, annulation) doit rester dans l'espace courant
+   * pour ne pas éjecter un coordinateur Soins vers /admin — détection via
+   * route.path, même pattern que PatientsPage (B48 Palier 2, Lot A).
+   */
+  const isInSoinsSpace = computed(() => route.path.startsWith('/soins'));
+  const routeNames = computed(() =>
+    isInSoinsSpace.value
+      ? { detail: 'soins-patient-detail', list: 'soins-patients' }
+      : { detail: 'admin-patient-detail', list: 'admin-patients' },
+  );
 
   // =============================================================================
   // STATE
@@ -178,7 +197,7 @@
         life: 4000,
       });
 
-      router.push({ name: 'admin-patient-detail', params: { id: result.id } });
+      router.push({ name: routeNames.value.detail, params: { id: result.id } });
     } else {
       toast.add({
         severity: 'error',
@@ -191,7 +210,7 @@
   }
 
   function cancel() {
-    router.push({ name: 'admin-patients' });
+    router.push({ name: routeNames.value.list });
   }
 </script>
 

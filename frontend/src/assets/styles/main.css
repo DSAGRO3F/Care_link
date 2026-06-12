@@ -1602,11 +1602,47 @@ textarea.p-inputtext {
   @apply text-xs text-red-500 mt-0.5;
 }
 
+/* Compteur de caractères pour textarea/input avec maxLength.
+   Format type : « 142 / 1000 caractères ». Aligné à droite, discret.
+   Utilisé par : CarePlanDetailPage (dialog F5 motif révision).
+   Réutilisable par tout textarea/input avec contrainte de longueur.
+   Ajouté : 04/05/2026 (F5 B28b) */
+.form-field-counter {
+  @apply text-xs text-slate-400 text-right;
+  margin: 0;
+}
+
 /* ── Bandeau informatif pré-remplissage ──────────────────────────────── */
 
 .form-prefill-banner {
   @apply flex items-center gap-2.5 px-4 py-3 bg-blue-50 border border-blue-100
          rounded-xl text-sm text-blue-700;
+}
+
+/* ── Message PrimeVue avec icône Lucide alignée ────────────────────────
+ * Pattern pour mettre une icône Lucide à gauche du contenu d'un
+ * <Message severity="..."> PrimeVue. Wrappe icône + texte avec alignement
+ * vertical correct (l'icône Lucide se centre mal sans wrapper).
+ *
+ * Usage :
+ *   <Message severity="info" :closable="false">
+ *     <div class="message-with-lucide-icon">
+ *       <Info :size="16" :stroke-width="1.8" class="message-with-lucide-icon__icon" />
+ *       <span>Texte de l'alerte...</span>
+ *     </div>
+ *   </Message>
+ *
+ * Utilisé par : CarePlanDetailPage (dialog F5 motif révision).
+ * Ajouté : 04/05/2026 (F5 B28b)
+ * ────────────────────────────────────────────────────────────────────── */
+
+.message-with-lucide-icon {
+  @apply flex items-start gap-2 text-sm leading-relaxed;
+}
+
+.message-with-lucide-icon__icon {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
 }
 
 /* ── Listes dynamiques (seuils, comorbidités, matériels, dispositifs) ─

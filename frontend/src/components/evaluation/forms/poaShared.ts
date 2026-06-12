@@ -44,13 +44,32 @@ export const STATUT_OPTIONS = [
   { label: 'Inactif', value: 'Inactif' },
 ];
 
+/**
+ * Échelle de préoccupation — miroir strict de l'enum `preoccupationPatient` /
+ * `preoccupationProfessionel` d'evaluation_v1.json : échelle à choix forcé
+ * sans point médian (Faible / Assez faible / Assez élevée / Élevée, '' = non
+ * renseigné). 🔧 S7 (05/06/2026) : « Moyenne » retirée — hors enum, rejetée
+ * par la validation schéma au submit.
+ */
 export const PREOCCUPATION_OPTIONS = [
   { label: 'Élevée', value: 'Élevée' },
   { label: 'Assez élevée', value: 'Assez élevée' },
-  { label: 'Moyenne', value: 'Moyenne' },
   { label: 'Assez faible', value: 'Assez faible' },
   { label: 'Faible', value: 'Faible' },
 ];
+
+const PREOCCUPATION_VALUES: readonly string[] = PREOCCUPATION_OPTIONS.map((o) => o.value);
+
+/**
+ * Remap d'une valeur de préoccupation vers l'enum du schéma : toute valeur
+ * hors enum (ex. « Moyenne » saisie avant le retrait S7) est ramenée à ''
+ * (re-saisie demandée — on n'invente pas une réponse clinique). Utilisé à
+ * l'hydratation par les trois formulaires POA.
+ */
+export function sanitizePreoccupation(v: unknown): string {
+  const s = typeof v === 'string' ? v : '';
+  return PREOCCUPATION_VALUES.includes(s) ? s : '';
+}
 
 export const MOMENT_JOURNEE_OPTIONS = [
   'Lever',
@@ -111,11 +130,9 @@ export function hydrateProbleme(raw: Record<string, unknown>): PoaProbleme {
     statut: str(raw.statut, 'Actif'),
     problemePose: str(raw.problemePose),
     objectifs: str(raw.objectifs),
-    preoccupationPatient: str(raw.preoccupationPatient),
-    preoccupationProfessionel: str(raw.preoccupationProfessionel),
-    planActions: Array.isArray(raw.planActions)
-      ? raw.planActions.map(hydrateAction)
-      : [],
+    preoccupationPatient: sanitizePreoccupation(raw.preoccupationPatient),
+    preoccupationProfessionel: sanitizePreoccupation(raw.preoccupationProfessionel),
+    planActions: Array.isArray(raw.planActions) ? raw.planActions.map(hydrateAction) : [],
     critereEvaluation: str(raw.critereEvaluation),
     resultatActions: str(raw.resultatActions),
     message: str(raw.message),
@@ -133,9 +150,7 @@ export function hydrateAction(raw: Record<string, unknown>): PoaAction {
     dateDebutAnnee: annee,
     dureeAction: str(raw.dureeAction),
     recurrenceAction: str(raw.recurrenceAction),
-    momentJournee: Array.isArray(raw.momentJournee)
-      ? (raw.momentJournee as string[])
-      : [],
+    momentJournee: Array.isArray(raw.momentJournee) ? (raw.momentJournee as string[]) : [],
   };
 }
 

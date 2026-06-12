@@ -3,6 +3,7 @@
 Routes CRUD pour les Subscriptions.
 
 Toutes les routes sont réservées aux SuperAdmins (équipe CareLink).
+Module tenants/ : opérations SuperAdmin scopées à un tenant donné (cf. tenants/init.py)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

@@ -354,8 +354,12 @@
   }
 
   /* ── Track principal ──────────────────────────────────────────────────── */
+  /* items-start (et non items-center) : les cercles restent alignés sur une
+     même ligne quelle que soit la hauteur des labels (1 ou 2 lignes —
+     « Dispositifs », « POA Autonomie »…). Le connecteur se centre sur le
+     cercle via margin-top (voir .eval-chain-connector). */
   .eval-chain-track {
-    @apply flex items-center;
+    @apply flex items-start;
     min-width: max-content;
     padding-top: 4px;
   }
@@ -435,8 +439,11 @@
     height: 2px;
     width: 20px;
     flex-shrink: 0;
-    /* Décalage vertical pour centrer sur les cercles (avant le label de 24px) */
-    margin-bottom: 24px;
+    /* Track en items-start : on centre le connecteur sur les cercles (36px)
+       par le haut → 18px (centre) − 1px (demi-hauteur) = 17px.
+       Indépendant de la hauteur des labels, contrairement à l'ancien
+       margin-bottom calibré sur un label d'une ligne. */
+    margin-top: 17px;
     border-radius: 1px;
   }
 

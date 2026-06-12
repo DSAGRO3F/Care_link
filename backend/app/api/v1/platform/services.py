@@ -208,8 +208,7 @@ class TenantService:
             },
         )
 
-        self.db.commit()
-        self.db.refresh(tenant)
+        self.db.flush()
         return tenant
 
     def update(
@@ -245,8 +244,7 @@ class TenantService:
                 details={"changes": changes},
             )
 
-        self.db.commit()
-        self.db.refresh(tenant)
+        self.db.flush()
         return tenant
 
     def delete(self, tenant_id: int, deleted_by_id: int | None = None) -> bool:
@@ -272,7 +270,7 @@ class TenantService:
             },
         )
 
-        self.db.commit()
+        self.db.flush()
         return True
 
     def suspend(self, tenant_id: int, reason: str, suspended_by_id: int | None = None) -> Tenant:
@@ -293,8 +291,7 @@ class TenantService:
             details={"reason": reason},
         )
 
-        self.db.commit()
-        self.db.refresh(tenant)
+        self.db.flush()
         return tenant
 
     def reactivate(self, tenant_id: int, reactivated_by_id: int | None = None) -> Tenant:
@@ -316,8 +313,7 @@ class TenantService:
             details={},
         )
 
-        self.db.commit()
-        self.db.refresh(tenant)
+        self.db.flush()
         return tenant
 
     def get_stats(self, tenant_id: int) -> dict:
@@ -471,8 +467,7 @@ class SuperAdminService:
             details={"email": admin.email, "role": admin.role.value},
         )
 
-        self.db.commit()
-        self.db.refresh(admin)
+        self.db.flush()
         return admin
 
     def update(
@@ -519,8 +514,7 @@ class SuperAdminService:
                 details={"changes": changes},
             )
 
-        self.db.commit()
-        self.db.refresh(admin)
+        self.db.flush()
         return admin
 
     def delete(self, admin_id: int, deleted_by_id: int | None = None) -> bool:
@@ -541,7 +535,7 @@ class SuperAdminService:
             details={"email": admin.email},
         )
 
-        self.db.commit()
+        self.db.flush()
         return True
 
     def change_password(
@@ -565,7 +559,7 @@ class SuperAdminService:
             details={},
         )
 
-        self.db.commit()
+        self.db.flush()
         return True
 
     def authenticate(self, email: str, password: str) -> SuperAdmin | None:
@@ -588,12 +582,12 @@ class SuperAdminService:
         if not verify_password(password, admin.password_hash):
             # Enregistrer l'échec
             admin.record_login_failure()
-            self.db.commit()
+            self.db.flush()
             return None
 
         # Succès : enregistrer et réinitialiser les compteurs
         admin.record_login_success()
-        self.db.commit()
+        self.db.flush()
 
         return admin
 
@@ -835,8 +829,7 @@ class UserTenantAssignmentService:
             },
         )
 
-        self.db.commit()
-        self.db.refresh(assignment)
+        self.db.flush()
         return assignment
 
     def update(
@@ -873,8 +866,7 @@ class UserTenantAssignmentService:
                 details={"changes": changes},
             )
 
-        self.db.commit()
-        self.db.refresh(assignment)
+        self.db.flush()
         return assignment
 
     def delete(self, assignment_id: int, deleted_by_id: int | None = None) -> bool:
@@ -893,7 +885,7 @@ class UserTenantAssignmentService:
             details={"user_id": assignment.user_id},
         )
 
-        self.db.commit()
+        self.db.flush()
         return True
 
     def _log_action(

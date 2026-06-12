@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.patient.schemas import (
-    DepartmentValidation,
     EvaluationSessionCreate,
     EvaluationSessionList,
     EvaluationSessionResponse,
@@ -77,7 +76,6 @@ from app.api.v1.patient.services import (
     DuplicateThresholdError,
     EntityNotFoundError,
     EvaluationAlreadyValidatedError,
-    EvaluationExpiredError,
     EvaluationNotEditableError,
     EvaluationNotFoundError,
     InvalidEvaluationDataError,
@@ -657,8 +655,6 @@ def sync_evaluation_changes(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except EvaluationExpiredError as e:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(e)) from e
 
 
 # =============================================================================
@@ -681,13 +677,26 @@ def submit_evaluation_for_validation(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Soumet l'évaluation pour validation médicale.
+    Soumet l'évaluation pour validation interne (workflow B40-J1 — Phase 4 bis).
 
     ⚠️ Validation COMPLÈTE du JSON Schema requise.
+
+    🔄 B40-J2 — la transition de statut + création de la ValidationRequest +
+    notification GCSMS sont déléguées à `ValidationRequestService.submit_evaluation`.
+    L'évaluation passe directement en `PENDING_INTERNAL_REVIEW` (étape de relecture
+    interne admin GCSMS), plus en `PENDING_MEDICAL` direct.
     """
+    # Imports locaux des exceptions remontées par ValidationRequestService
+    # (éviter cycle module + clash de nom avec PermissionDeniedError éventuel ailleurs)
+    from app.api.v1.validation.services import (
+        EvaluationNotSubmittableError,
+        PendingValidationExistsError,
+        PermissionDeniedError as ValidationPermissionDeniedError,
+    )
+
     try:
         service = PatientEvaluationService(db, tenant_id)
-        return service.submit(evaluation_id, patient_id)
+        return service.submit(evaluation_id, patient_id, current_user)
     except PatientNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except EvaluationNotFoundError as e:
@@ -698,6 +707,15 @@ def submit_evaluation_for_validation(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"detail": e.message, "errors": e.errors},
+        ) from e
+    except ValidationPermissionDeniedError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e)) from e
+    except EvaluationNotSubmittableError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+    except PendingValidationExistsError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"detail": str(e), "existing_vr_id": e.existing_vr_id},
         ) from e
 
 
@@ -767,59 +785,6 @@ def compute_gir_preview(
     gir_score, _ = calculator.calculer_gir(evaluations)
 
     return GirComputeResponse(gir_score=gir_score)
-
-
-@patients_router.post(
-    "/{patient_id}/evaluations/{evaluation_id}/validate/medical",
-    response_model=PatientEvaluationResponse,
-)
-def validate_evaluation_medical(
-    patient_id: int,
-    evaluation_id: int,
-    db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_current_tenant_id),
-    current_user: User = Depends(require_role("MEDECIN")),  # Restreint aux médecins
-):
-    """Validation par le médecin coordonnateur."""
-    try:
-        service = PatientEvaluationService(db, tenant_id)
-        evaluation = service.get_by_id(evaluation_id, patient_id)
-        evaluation.validate_medical(current_user.id)
-        db.commit()
-        db.refresh(evaluation)
-        return evaluation
-    except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-
-@patients_router.post(
-    "/{patient_id}/evaluations/{evaluation_id}/validate/department",
-    response_model=PatientEvaluationResponse,
-)
-def validate_evaluation_department(
-    patient_id: int,
-    evaluation_id: int,
-    data: DepartmentValidation,
-    db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_current_tenant_id),
-    current_user: User = Depends(require_role("ADMIN")),  # Restreint aux admins
-):
-    """Validation par le Conseil Départemental."""
-    try:
-        service = PatientEvaluationService(db, tenant_id)
-        evaluation = service.get_by_id(evaluation_id, patient_id)
-        evaluation.validate_department(data.validator_name, data.reference)
-        # Calculer le GIR final
-        evaluation.update_gir_score()
-        db.commit()
-        db.refresh(evaluation)
-        return evaluation
-    except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except EvaluationNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # =============================================================================
@@ -954,7 +919,7 @@ def get_patient_latest_vital(
     """Récupère la dernière mesure d'un type de constante."""
     try:
         service = PatientVitalsService(db, tenant_id)
-        vital = service.get_latest_by_type(patient_id, vital_type)
+        vital = service.get_latest(patient_id, vital_type)
         if not vital:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

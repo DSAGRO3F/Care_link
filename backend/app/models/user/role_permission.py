@@ -141,7 +141,7 @@ class RolePermission(Base):
 
 INITIAL_ROLE_PERMISSIONS = {
     "ADMIN": [
-        "ADMIN_FULL"  # Donne accès à tout
+        "ADMIN_FULL"  # Donne accès à tout — court-circuit appliqué dans User.effective_permission_codes
     ],
     "COORDINATEUR": [
         "PATIENT_VIEW",
@@ -161,6 +161,17 @@ INITIAL_ROLE_PERMISSIONS = {
         "ACCESS_REVOKE",
         "ROLE_VIEW",
         "ROLE_ASSIGN",
+        # 🆕 B48 Palier 0 — Orchestration planning + lecture catalogue
+        "CATALOG_VIEW",
+        "SCHEDULE_VIEW",
+        "SCHEDULE_CREATE",
+        "SCHEDULE_EDIT",
+        "SCHEDULE_EXECUTE",
+        # 🆕 B40-J1 — Lecture du portail valideur (cf. cadrage Phase 4 bis §8)
+        "VALIDATION_VIEW",
+        # 🆕 B40-J2 — Soumission + retrait de soumission (cycle interne, D14 v2)
+        "VALIDATION_SUBMIT",
+        "VALIDATION_WITHDRAW",
     ],
     "REFERENT": [
         "PATIENT_VIEW",
@@ -171,6 +182,11 @@ INITIAL_ROLE_PERMISSIONS = {
         "COORDINATION_CREATE",
         "COORDINATION_EDIT",
         "CAREPLAN_VIEW",
+        # 🆕 B48 Palier 0 — Lecture catalogue + lecture planning des patients référés
+        "CATALOG_VIEW",
+        "SCHEDULE_VIEW",
+        # 🆕 B40-J1 — Lecture du portail valideur (cf. cadrage Phase 4 bis §8)
+        "VALIDATION_VIEW",
     ],
     "EVALUATEUR": [
         "PATIENT_VIEW",
@@ -178,10 +194,39 @@ INITIAL_ROLE_PERMISSIONS = {
         "EVALUATION_CREATE",
         "EVALUATION_VALIDATE",
         "VITALS_VIEW",
+        # 🆕 B48 Palier 0 — Consultation pendant évaluation
+        "CATALOG_VIEW",
+        "SCHEDULE_VIEW",
+        # 🆕 B40-J1 — Lecture du portail valideur (cf. cadrage Phase 4 bis §8)
+        "VALIDATION_VIEW",
     ],
     "INTERVENANT": [
         "PATIENT_VIEW",
         "VITALS_VIEW",
         "COORDINATION_VIEW",
+        # 🆕 B48 Palier 0 — Lecture explicite (les actions EXECUTE viennent de la profession)
+        "CATALOG_VIEW",
+        "SCHEDULE_VIEW",
+    ],
+    # 🆕 B40-J1 — Profils externes Phase 4 bis (portail valideur générique)
+    "VALIDATEUR_DEPARTMENT": [
+        # Agent département : voit les demandes APA en FUNDING_REVIEW et tranche
+        # (validation/refus/demande info). Pas d'accès à PATIENT/EVALUATION
+        # complète — la fiche évaluation est consultée depuis ValidationRequest.
+        "VALIDATION_VIEW",
+        # 🆕 B40-J2 — Décision financement département. Gating uniforme par étape :
+        # decide() vérifie VALIDATION_{stage}_REVIEW selon le stage de la VR
+        # (cf. cadrage §8 / §7.3). Remplace la note J1 qui s'appuyait sur un
+        # check stage-only dans le service, au profit d'une permission dédiée.
+        "VALIDATION_FUNDING_REVIEW",
+    ],
+    "FAMILY_REFERENT": [
+        # Compte famille : lecture minimisée d'un patient + notifications.
+        # Le filtrage par patient est porté par family_referent_links (RLS).
+        # PATIENT_VIEW_MINIMAL est défini en V1 comme un sous-ensemble logique
+        # de PATIENT_VIEW — pour V1 on accorde PATIENT_VIEW et le service
+        # backend applique la minimisation côté serializer (cf. plan B40-J7).
+        "PATIENT_VIEW",
+        "VALIDATION_VIEW",
     ],
 }

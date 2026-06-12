@@ -49,6 +49,13 @@ from app.models.coordination.scheduled_intervention import (
 )  # dépend de CarePlanService, Patient, User, Tenant
 
 # =============================================================================
+# 12. Tables de validation (Phase 4 bis B40-J1)
+# =============================================================================
+from app.models.family.family_referent_link import (
+    FamilyReferentLink,
+)  # dépend de User, Patient, Tenant
+
+# =============================================================================
 # 5. Tables d'organisation
 # =============================================================================
 from app.models.organization.entity import Entity  # dépend de Country, Tenant
@@ -117,6 +124,12 @@ from app.models.user.user_availability import UserAvailability  # dépend de Use
 from app.models.user.user_tenant_assignment import (
     UserTenantAssignment,
 )  # Déplacé depuis platform/ v4.3
+from app.models.validation.notification import (
+    Notification,
+)  # dépend de User, PatientEvaluation, CarePlan, ValidationRequest, Tenant
+from app.models.validation.validation_request import (
+    ValidationRequest,
+)  # dépend de PatientEvaluation, CarePlan, User, Tenant
 
 
 # Import de tous les modèles pour enregistrer leurs métadonnées
@@ -140,6 +153,9 @@ __all__ = [
     "Entity",
     "EntityService",
     "EvaluationSession",
+    # Validation et famille (Phase 4 bis B40-J1)
+    "FamilyReferentLink",
+    "Notification",
     # Patients
     "Patient",
     "PatientAccess",
@@ -168,4 +184,5 @@ __all__ = [
     "UserEntity",
     "UserRole",
     "UserTenantAssignment",
+    "ValidationRequest",
 ]

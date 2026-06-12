@@ -22,10 +22,20 @@ import type { EntityResponse, EntityCreate, EntityUpdate } from '@/types';
 const TENANT_BASE = '/organizations/entities';
 
 /**
- * Liste toutes les entités du tenant courant
+ * Liste toutes les entités du tenant courant.
+ *
+ * ⚠️ Défaut `size=100` (plafond backend) pour couvrir les tenants
+ * multi-agences sans pagination. La cible CareLink (6 entités par tenant)
+ * tient très largement dans cette limite. Si un tenant dépasse 100 entités
+ * (cas extrême, Phase 6+), étendre en boucle paginée côté store.
  */
-export async function listEntities(): Promise<EntityResponse[]> {
-  const response = await api.get(TENANT_BASE);
+export async function listEntities(params?: {
+  size?: number;
+  page?: number;
+}): Promise<EntityResponse[]> {
+  const response = await api.get(TENANT_BASE, {
+    params: { size: 100, ...params },
+  });
   return response.data.items ?? response.data;
 }
 

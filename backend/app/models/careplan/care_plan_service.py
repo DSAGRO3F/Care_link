@@ -10,24 +10,28 @@ individuels d'un plan d'aide avec leurs caractéristiques :
 
 C'est la table pivot entre le plan d'aide (care_plans) et le catalogue
 de services (service_templates).
+
+Destination : backend/app/models/careplan/care_plan_service.py
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, time
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import JSON, DateTime, Enum as SQLEnum, ForeignKey, Integer, Text, Time
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.enums import AssignmentStatus, FrequencyType, ServicePriority
+from app.models.enums import AssignmentStatus, CarePlanServiceStatus, FrequencyType, ServicePriority
 from app.models.mixins import TimestampMixin
 
 
 if TYPE_CHECKING:
     from app.models.careplan.care_plan import CarePlan
+    from app.models.catalog.entity_service import EntityService
     from app.models.catalog.service_template import ServiceTemplate
     from app.models.coordination.scheduled_intervention import ScheduledIntervention
     from app.models.user.user import User
@@ -111,6 +115,18 @@ class CarePlanService(TimestampMixin, Base):
         doc="Type de service du catalogue",
         info={
             "description": "FK vers service_templates. RESTRICT car le service doit exister",
+            "example": 1,
+        },
+    )
+
+    entity_service_id: Mapped[int | None] = mapped_column(
+        ForeignKey("entity_services.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        doc="Offre entité sélectionnée (template + entité + tarif personnalisé)",
+        info={
+            "description": "FK vers entity_services. Lien vers l'offre du catalogue consolidé. "
+            "Nullable : permet un service sans entité attribuée",
             "example": 1,
         },
     )
@@ -249,15 +265,17 @@ class CarePlanService(TimestampMixin, Base):
 
     # === Statut ===
 
-    status: Mapped[str] = mapped_column(
-        String(20),
+    status: Mapped[CarePlanServiceStatus] = mapped_column(
+        SQLEnum(
+            CarePlanServiceStatus, name="care_plan_service_status_enum", create_constraint=True
+        ),
         nullable=False,
-        default="active",
+        default=CarePlanServiceStatus.ACTIVE,
         doc="Statut du service",
         info={
             "description": "État du service dans le plan",
-            "values": ["active", "paused", "completed"],
-            "default": "active",
+            "values": ["ACTIVE", "PAUSED", "COMPLETED"],
+            "default": "ACTIVE",
         },
     )
 
@@ -271,6 +289,12 @@ class CarePlanService(TimestampMixin, Base):
         "ServiceTemplate",
         back_populates="care_plan_services",
         doc="Template du service (catalogue national)",
+    )
+
+    entity_service: Mapped[EntityService | None] = relationship(
+        "EntityService",
+        back_populates="care_plan_services",
+        doc="Offre entité avec tarif personnalisé (catalogue consolidé)",
     )
 
     assigned_user: Mapped[User | None] = relationship(
@@ -325,12 +349,12 @@ class CarePlanService(TimestampMixin, Base):
     @property
     def is_active(self) -> bool:
         """Indique si le service est actif."""
-        return self.status == "active"
+        return self.status == CarePlanServiceStatus.ACTIVE
 
     @property
     def is_paused(self) -> bool:
         """Indique si le service est en pause."""
-        return self.status == "paused"
+        return self.status == CarePlanServiceStatus.PAUSED
 
     # === Propriétés d'affichage ===
 
@@ -372,6 +396,52 @@ class CarePlanService(TimestampMixin, Base):
     def total_weekly_hours(self) -> float:
         """Calcule le total d'heures par semaine pour ce service."""
         return self.total_weekly_minutes / 60
+
+    # =========================================================================
+    # PROJECTIONS DE RELATIONS — Champs enrichis exposés via model_validate
+    # =========================================================================
+    # Convention #109 (à créer) : exposer comme @property les projections
+    # déterministes de relations chargées via selectinload. Permet à Pydantic
+    # CarePlanServiceResponse.model_validate(svc) de récupérer automatiquement
+    # ces champs via from_attributes=True, sans dupliquer la logique de
+    # projection dans des helpers de router (_build_service_response).
+    #
+    # Garde de relation chargée : les @property utilisent `if self.xxx is None`
+    # plutôt que `getattr(self, "xxx", None)` car les relations Mapped sont
+    # toujours définies (None nullable pour entity_service, jamais absent).
+    # Risque N+1 : nul si selectinload est utilisé en amont (CarePlanCRUDService
+    # garantit le chargement eager).
+
+    @property
+    def service_name(self) -> str | None:
+        """Nom du template de service (projection depuis service_template)."""
+        if self.service_template is None:
+            return None
+        return self.service_template.name
+
+    @property
+    def service_code(self) -> str | None:
+        """Code du template de service (projection depuis service_template)."""
+        if self.service_template is None:
+            return None
+        return getattr(self.service_template, "code", None)
+
+    @property
+    def entity_name(self) -> str | None:
+        """Nom de l'entité fournisseuse (projection depuis entity_service.entity)."""
+        if self.entity_service is None:
+            return None
+        entity = getattr(self.entity_service, "entity", None)
+        if entity is None:
+            return None
+        return getattr(entity, "name", None)
+
+    @property
+    def effective_tarif(self) -> Decimal | None:
+        """Tarif effectif de l'offre entité (custom_tarif depuis entity_service)."""
+        if self.entity_service is None:
+            return None
+        return getattr(self.entity_service, "custom_tarif", None)
 
     # === Méthodes d'affectation ===
 
@@ -424,12 +494,12 @@ class CarePlanService(TimestampMixin, Base):
 
     def pause(self) -> None:
         """Met le service en pause."""
-        self.status = "paused"
+        self.status = CarePlanServiceStatus.PAUSED
 
     def resume(self) -> None:
         """Reprend un service en pause."""
-        self.status = "active"
+        self.status = CarePlanServiceStatus.ACTIVE
 
     def complete(self) -> None:
         """Marque le service comme terminé."""
-        self.status = "completed"
+        self.status = CarePlanServiceStatus.COMPLETED

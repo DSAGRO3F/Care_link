@@ -31,12 +31,6 @@ from app.models.user.user import User
 def get_current_tenant_id(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ) -> int:
-    """
-    Extrait le tenant_id principal de l'utilisateur courant et configure RLS.
-
-    Raises:
-        HTTPException 403: Si l'utilisateur n'est pas rattaché à un tenant
-    """
     if not current_user.tenant_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Utilisateur non rattaché à un tenant"
@@ -44,7 +38,16 @@ def get_current_tenant_id(
 
     # Configure RLS PostgreSQL pour cette session
     db.execute(text(f"SET app.current_tenant_id = '{current_user.tenant_id}'"))
+    db.execute(text(f"SET app.current_user_id = '{current_user.id}'"))   # 🆕 B40-J1 — symétrie RLS recipient-scoped
     db.execute(text("SET app.is_super_admin = 'false'"))
+
+    # 🆕 B40-J1 — mémoriser le contexte COMPLET pour le listener after_begin,
+    # sinon une transaction ultérieure ré-applique '' depuis un db.info figé trop tôt
+    db.info["rls_context"] = {
+        "tenant_id": current_user.tenant_id,
+        "user_id": current_user.id,
+        "is_super_admin": False,
+    }
 
     return current_user.tenant_id
 
@@ -61,7 +64,15 @@ def get_optional_tenant_id(
     if current_user.tenant_id:
         # Configure RLS PostgreSQL pour cette session
         db.execute(text(f"SET app.current_tenant_id = '{current_user.tenant_id}'"))
+        db.execute(text(f"SET app.current_user_id = '{current_user.id}'"))   # 🆕 B40-J1 — symétrie RLS recipient-scoped
         db.execute(text("SET app.is_super_admin = 'false'"))
+
+        # 🆕 B40-J1 — mémoriser le contexte COMPLET pour le listener after_begin
+        db.info["rls_context"] = {
+            "tenant_id": current_user.tenant_id,
+            "user_id": current_user.id,
+            "is_super_admin": False,
+        }
 
     return current_user.tenant_id
 

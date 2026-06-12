@@ -691,9 +691,37 @@
 
   // ── Chargement depuis un brouillon existant (prioritaire sur patient) ──
 
+  // Clés plates du format wizard (sous-ensemble discriminant — cf. serializeFormData).
+  // Sert de garde : un initialData sans aucune de ces clés (format étranger ou
+  // adapté non re-traduit) ne doit pas court-circuiter le fallback fiche patient.
+  const WIZARD_FLAT_KEYS = [
+    'civilite',
+    'sexe',
+    'nomFamille',
+    'nomUtilise',
+    'prenomUtilise',
+    'prenomsActeNaissance',
+    'dateNaissance',
+    'communeNaissance',
+    'communeNaissanceCP',
+    'communeNaissanceLibelle',
+    'adresseLigne',
+    'codePostal',
+    'commune',
+    'telMobile',
+    'telDomicile',
+    'email',
+    'nir',
+    'ins',
+  ] as const;
+
   function loadFromBrouillon() {
     const d = props.initialData;
     if (!d || Object.keys(d).length === 0) return false;
+
+    // Garde D-δ (option C) : aucune clé plate reconnue → on signale l'absence
+    // de brouillon exploitable pour réarmer prefillFromPatient() au montage.
+    if (!WIZARD_FLAT_KEYS.some((k) => k in d)) return false;
 
     // État civil
     if (d.civilite) form.civilite = d.civilite;

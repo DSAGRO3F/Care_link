@@ -181,10 +181,9 @@
         // et recharger les données saisies lors d'une session précédente.
         try {
           const listResponse = await evaluationService.getAll(patientId.value);
-          const evaluations: PatientEvaluationResponse[] = listResponse?.data?.items ?? listResponse?.data ?? [];
-          const draft = evaluations.find(
-            (e) => e.status === 'DRAFT' || e.status === 'IN_PROGRESS',
-          );
+          const evaluations: PatientEvaluationResponse[] =
+            listResponse?.data?.items ?? listResponse?.data ?? [];
+          const draft = evaluations.find((e) => e.status === 'DRAFT' || e.status === 'IN_PROGRESS');
           if (draft) {
             targetEvaluationId = draft.id;
             if (import.meta.env.DEV) {
@@ -193,10 +192,9 @@
             }
           } else {
             // Pas de brouillon → pré-remplir depuis la dernière évaluation soumise
-            // (endpoint dédié : retourne PENDING_MEDICAL, PENDING_DEPARTMENT ou VALIDATED)
-            const latestResponse = await evaluationService.getLatestSubmitted(
-              patientId.value,
-            );
+            // (endpoint dédié : démarre le workflow de validation AGGIR → PENDING_INTERNAL_REVIEW,
+            //  puis PENDING_MEDICAL → AWAITING_FUNDING_DECISION → VALIDATED | FUNDING_REJECTED)
+            const latestResponse = await evaluationService.getLatestSubmitted(patientId.value);
             if (latestResponse?.data?.evaluation_data) {
               prefillFromPreviousEvaluation(latestResponse.data.evaluation_data);
               toast.add({
@@ -234,10 +232,7 @@
 
       // 3. Charger les données de l'évaluation trouvée
       if (targetEvaluationId) {
-        const evalResponse = await evaluationService.get(
-          patientId.value,
-          targetEvaluationId,
-        );
+        const evalResponse = await evaluationService.get(patientId.value, targetEvaluationId);
         const evaluation = evalResponse?.data ?? evalResponse;
 
         wizardState.evaluationId = evaluation.id;

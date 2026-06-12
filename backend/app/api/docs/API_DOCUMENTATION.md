@@ -1095,13 +1095,13 @@ L'API CareLink est consommée par une **interface utilisateur web** développée
 
 ### Profils utilisateurs et cas d'usage
 
-| Profil | Appareil | Modules API utilisés | Actions principales |
-|--------|----------|---------------------|---------------------|
-| **SuperAdmin** | PC Bureau | Platform, Tenants | Gérer tenants, consulter audit, créer affectations cross-tenant |
-| **Administrateur** | PC Bureau | Organization, User | Créer structures, gérer professionnels, définir rôles et permissions |
-| **Coordinateur** | PC Bureau | Patient, CarePlan, Coordination, Catalog | Créer dossiers patients, élaborer plans d'aide, affecter professionnels aux services |
-| **Professionnel évaluateur** | Tablette | Patient (évaluations) | Réaliser évaluations AGGIR sur le terrain, saisir grilles de dépendance |
-| **Professionnel intervenant** | Tablette/Mobile | Coordination | Consulter planning, démarrer/terminer interventions, remplir carnet de coordination |
+| Profil                        | Appareil        | Modules API utilisés                     | Actions principales                                                                  |
+|-------------------------------|-----------------|------------------------------------------|--------------------------------------------------------------------------------------|
+| **SuperAdmin**                | PC Bureau       | Platform, Tenants                        | Gérer tenants, consulter audit, créer affectations cross-tenant                      |
+| **Administrateur**            | PC Bureau       | Organization, User                       | Créer structures, gérer professionnels, définir rôles et permissions                 |
+| **Coordinateur**              | PC Bureau       | Patient, CarePlan, Coordination, Catalog | Créer dossiers patients, élaborer plans d'aide, affecter professionnels aux services |
+| **Professionnel évaluateur**  | Tablette        | Patient (évaluations)                    | Réaliser évaluations AGGIR sur le terrain, saisir grilles de dépendance              |
+| **Professionnel intervenant** | Tablette/Mobile | Coordination                             | Consulter planning, démarrer/terminer interventions, remplir carnet de coordination  |
 
 ### Format des réponses
 

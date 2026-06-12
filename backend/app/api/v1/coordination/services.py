@@ -205,8 +205,7 @@ class CoordinationEntryService:
         )
 
         self.db.add(entry)
-        self.db.commit()
-        self.db.refresh(entry)
+        self.db.flush()
         return entry
 
     def update(
@@ -224,8 +223,7 @@ class CoordinationEntryService:
         for field, value in update_data.items():
             setattr(entry, field, value)
 
-        self.db.commit()
-        self.db.refresh(entry)
+        self.db.flush()
         return entry
 
     def delete(self, entry_id: int) -> None:
@@ -236,7 +234,7 @@ class CoordinationEntryService:
             raise EntryAlreadyDeletedError("Entrée déjà supprimée")
 
         entry.soft_delete()
-        self.db.commit()
+        self.db.flush()
 
     def restore(self, entry_id: int) -> CoordinationEntry:
         """Restaure une entrée supprimée."""
@@ -246,8 +244,7 @@ class CoordinationEntryService:
             raise EntryAlreadyDeletedError("L'entrée n'est pas supprimée")
 
         entry.restore()
-        self.db.commit()
-        self.db.refresh(entry)
+        self.db.flush()
         return entry
 
 
@@ -413,8 +410,7 @@ class ScheduledInterventionService:
         )
 
         self.db.add(intervention)
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def update(
@@ -436,8 +432,7 @@ class ScheduledInterventionService:
         for field, value in update_data.items():
             setattr(intervention, field, value)
 
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def delete(self, intervention_id: int) -> None:
@@ -448,7 +443,7 @@ class ScheduledInterventionService:
             raise InterventionStatusError("Seule une intervention en attente peut être supprimée")
 
         self.db.delete(intervention)
-        self.db.commit()
+        self.db.flush()
 
     # === Actions de workflow ===
 
@@ -461,8 +456,7 @@ class ScheduledInterventionService:
         except ValueError as e:
             raise InterventionStatusError(str(e)) from e
 
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def start(
@@ -480,8 +474,7 @@ class ScheduledInterventionService:
         except ValueError as e:
             raise InterventionStatusError(str(e)) from e
 
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def complete(
@@ -500,8 +493,7 @@ class ScheduledInterventionService:
         except ValueError as e:
             raise InterventionStatusError(str(e)) from e
 
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def cancel(
@@ -517,8 +509,7 @@ class ScheduledInterventionService:
         except ValueError as e:
             raise InterventionStatusError(str(e)) from e
 
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def mark_missed(
@@ -534,8 +525,7 @@ class ScheduledInterventionService:
         except ValueError as e:
             raise InterventionStatusError(str(e)) from e
 
-        self.db.commit()
-        self.db.refresh(intervention)
+        self.db.flush()
         return intervention
 
     def reschedule(
@@ -571,6 +561,5 @@ class ScheduledInterventionService:
         if data.reason:
             intervention.cancellation_reason = data.reason
 
-        self.db.commit()
-        self.db.refresh(new_intervention)
+        self.db.flush()
         return new_intervention

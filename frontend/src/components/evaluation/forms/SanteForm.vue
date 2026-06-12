@@ -105,6 +105,17 @@
           Aucun seuil défini. Cliquez sur "+ Ajouter" pour en créer un.
         </div>
 
+        <!-- S7 (option C) : ligne entamée mais incomplète — l'évaluateur choisit -->
+        <div
+          v-if="blocSeuilIncomplet(bloc)"
+          class="flex items-center gap-1.5 text-xs text-amber-600 mb-3 px-1"
+        >
+          <AlertTriangle :size="13" class="flex-shrink-0" />
+          <span>
+            Seuil incomplet : renseignez Paramètre, Min, Max et Unité, ou supprimez la ligne.
+          </span>
+        </div>
+
         <button type="button" class="wizard-add-row" @click="addSeuil(blocIdx)">
           <Plus :size="14" />
           Ajouter un seuil
@@ -239,7 +250,9 @@
         <!-- Questions/Réponses principales (exclut les sous-blocs) -->
         <div class="space-y-4">
           <template v-for="(qr, qrIdx) in bloc.questionReponse" :key="qrIdx">
-            <template v-if="!isSubBlocQuestion(qr.question) && isQuestionVisible(bloc, qr.question)">
+            <template
+              v-if="!isSubBlocQuestion(qr.question) && isQuestionVisible(bloc, qr.question)"
+            >
               <!-- Champ commentaire → Textarea pleine largeur -->
               <div v-if="getFieldType(qr.question) === 'textarea'" class="form-group">
                 <label class="form-label">{{ qr.question }}</label>
@@ -692,41 +705,31 @@
     'Déficit moteur — origine :': ['Vasculaire', 'Dégénérative', 'Traumatique', 'Autre'],
 
     'Mode de préparation des médicaments :': [
-    'Boîtes d\'origine (pas de reconditionnement)',
-    'Pilulier / semainier manuel',
-    'Pilulier connecté',
-    'PDA en pharmacie (sachets-doses)',
-    'Autre',
+      "Boîtes d'origine (pas de reconditionnement)",
+      'Pilulier / semainier manuel',
+      'Pilulier connecté',
+      'PDA en pharmacie (sachets-doses)',
+      'Autre',
     ],
     'Qui prépare les médicaments ?': [
-    'Le patient lui-même',
-    'Un aidant familial / proche',
-    'Infirmière (IDEL)',
-    'Pharmacie d\'officine (PDA)',
-    'Aide-soignant(e)',
-    'Autre',
+      'Le patient lui-même',
+      'Un aidant familial / proche',
+      'Infirmière (IDEL)',
+      "Pharmacie d'officine (PDA)",
+      'Aide-soignant(e)',
+      'Autre',
     ],
 
     'Type de douleur :': [
-    'Nociceptive (mécanique)',
-    'Nociceptive (inflammatoire)',
-    'Neuropathique',
-    'Mixte',
-    'Non déterminé',
+      'Nociceptive (mécanique)',
+      'Nociceptive (inflammatoire)',
+      'Neuropathique',
+      'Mixte',
+      'Non déterminé',
     ],
-  'Évolution temporelle :': [
-    'Aiguë (< 3 mois)',
-    'Chronique (> 3 mois)',
-    ],
-  'Rythme de la douleur :': [
-    'Continue',
-    'Intermittente',
-    'Par accès',
-    'Nocturne prédominante',
-    ],
-  'Intensité (EN 0-10) :': [
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
-    ],
+    'Évolution temporelle :': ['Aiguë (< 3 mois)', 'Chronique (> 3 mois)'],
+    'Rythme de la douleur :': ['Continue', 'Intermittente', 'Par accès', 'Nocturne prédominante'],
+    'Intensité (EN 0-10) :': ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
   };
 
   // ── Visibilité conditionnelle ─────────────────────────────────────────
@@ -757,79 +760,79 @@
       showWhen: 'OUI',
     },
     // ── B9 — Polymédication : masquer polymédication si pas de médicaments
-    "Le patient prend-il plus de 5 médicaments par jour ? (prescrits ou non)": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
+    'Le patient prend-il plus de 5 médicaments par jour ? (prescrits ou non)': {
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
     "L'ordonnance comprend-elle 1 benzodiazépine ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
     "L'ordonnance comprend-elle 1 neuroleptique ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
     "L'ordonnance comprend-elle 1 antidépresseur ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
     "L'ordonnance comprend-elle 1 AINS per os ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
-    "Le patient prend-il des antalgiques de palier 2 ou 3 ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
-    "Le patient prend-il des anticholinergiques ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
-    "Le patient prend-il des anticoagulants ?": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
-    "Ajouter un commentaire :": {
-    dependsOn: 'Le patient prend-il des médicaments ?',
-    showWhen: 'OUI',
-  },
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
+    'Le patient prend-il des antalgiques de palier 2 ou 3 ?': {
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
+    'Le patient prend-il des anticholinergiques ?': {
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
+    'Le patient prend-il des anticoagulants ?': {
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
+    'Ajouter un commentaire :': {
+      dependsOn: 'Le patient prend-il des médicaments ?',
+      showWhen: 'OUI',
+    },
     // ── B8 — Douleur : masquer les dimensions si pas de douleurs signalées
-  'Localisation de la douleur :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Type de douleur :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Évolution temporelle :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Rythme de la douleur :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Intensité (EN 0-10) :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Facteurs aggravants / soulageants :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Manifestations somatiques de la douleur :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  'Description  des manifestations somatiques de la douleur :': {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
-  "Ajouter un commentaire (localisation, description, mode d'apparition, etc..) :": {
-    dependsOn: 'Le patient signale-t-il des douleurs ?',
-    showWhen: 'OUI',
-  },
+    'Localisation de la douleur :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Type de douleur :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Évolution temporelle :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Rythme de la douleur :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Intensité (EN 0-10) :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Facteurs aggravants / soulageants :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Manifestations somatiques de la douleur :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    'Description  des manifestations somatiques de la douleur :': {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
+    "Ajouter un commentaire (localisation, description, mode d'apparition, etc..) :": {
+      dependsOn: 'Le patient signale-t-il des douleurs ?',
+      showWhen: 'OUI',
+    },
   };
 
   function isQuestionVisible(bloc: BlocSante, question: string): boolean {
@@ -1398,6 +1401,36 @@
     state.blocs[blocIdx].seuil!.splice(seuilIdx, 1);
   }
 
+  /**
+   * Ligne de seuil totalement vide : aucun champ saisi — jamais une intention,
+   * purgée silencieusement à la sérialisation (S7, option C).
+   */
+  function isSeuilVide(s: Seuil): boolean {
+    return (
+      s.typeConstante === '' &&
+      s.min === '' &&
+      s.max === '' &&
+      s.unit.trim() === '' &&
+      s.surveillance.trim() === ''
+    );
+  }
+
+  /**
+   * Ligne entamée mais incomplète au sens du schéma (`seuilVital.required` :
+   * typeConstante, min, max, unit — surveillance libre). Signalée à
+   * l'évaluateur et plafonne la section à 'partial' (S7, option C).
+   */
+  function isSeuilIncomplet(s: Seuil): boolean {
+    return (
+      !isSeuilVide(s) &&
+      (s.typeConstante === '' || s.min === '' || s.max === '' || s.unit.trim() === '')
+    );
+  }
+
+  function blocSeuilIncomplet(bloc: BlocSante): boolean {
+    return !!bloc.seuil && bloc.seuil.some(isSeuilIncomplet);
+  }
+
   function addComorbidie(blocIdx: number) {
     const dp = prefillDateParts();
     state.blocs[blocIdx].comorbidites!.push({
@@ -1427,11 +1460,17 @@
     const blocs = state.blocs.map((bloc) => {
       const out: Record<string, unknown> = { ...bloc };
       if (bloc.nom === 'Seuils' && bloc.seuil) {
-        out.seuil = bloc.seuil.map((s) => ({
-          ...s,
-          min: s.min !== '' ? parseFloat(s.min) : null,
-          max: s.max !== '' ? parseFloat(s.max) : null,
-        }));
+        // S7 (option C) : les lignes totalement vides ne partent jamais au
+        // backend (le schéma seuilVital les refuse) ; les lignes entamées
+        // sont conservées telles quelles — l'incomplétude est signalée dans
+        // l'UI et plafonne le statut, le schéma reste juge au submit.
+        out.seuil = bloc.seuil
+          .filter((s) => !isSeuilVide(s))
+          .map((s) => ({
+            ...s,
+            min: s.min !== '' ? parseFloat(s.min) : null,
+            max: s.max !== '' ? parseFloat(s.max) : null,
+          }));
       }
       // Préserver test[] s'il existe (retourné par le backend après soumission)
       if (bloc.test && bloc.test.length > 0) {
@@ -1456,11 +1495,17 @@
         const hasAnswer = bloc.questionReponse.some((qr) => qr.reponse.trim() !== '');
         if (hasAnswer) blocsRenseignes++;
       }
-      if (bloc.seuil && bloc.seuil.length > 0) blocsRenseignes++;
+      // S7 : un bloc Seuils n'est « renseigné » que s'il porte au moins une
+      // ligne non vide (une ligne fantôme ne compte pas).
+      if (bloc.seuil && bloc.seuil.some((s) => !isSeuilVide(s))) blocsRenseignes++;
       if (bloc.comorbidites && bloc.comorbidites.length > 0) blocsRenseignes++;
     }
 
-    if (blocsRenseignes >= 5) return 'complete';
+    // S7 (option C) : une ligne de seuil entamée mais incomplète plafonne la
+    // section à 'partial' — visible dans le navigateur de sections.
+    const seuilIncomplet = state.blocs.some(blocSeuilIncomplet);
+
+    if (blocsRenseignes >= 5) return seuilIncomplet ? 'partial' : 'complete';
     if (blocsRenseignes > 0) return 'partial';
     return 'empty';
   }

@@ -158,8 +158,7 @@ class CountryService:
 
         country = Country(**data.model_dump())
         self.db.add(country)
-        self.db.commit()
-        self.db.refresh(country)
+        self.db.flush()
         return country
 
     def update(self, country_id: int, data: CountryUpdate) -> Country:
@@ -177,15 +176,14 @@ class CountryService:
         for field, value in update_data.items():
             setattr(country, field, value)
 
-        self.db.commit()
-        self.db.refresh(country)
+        self.db.flush()
         return country
 
     def delete(self, country_id: int) -> None:
         """Supprime un pays (soft delete via is_active)."""
         country = self.get_by_id(country_id)
         country.is_active = False
-        self.db.commit()
+        self.db.flush()
 
 
 # =============================================================================
@@ -373,8 +371,7 @@ class EntityService:
             **data.model_dump(),
         )
         self.db.add(entity)
-        self.db.commit()
-        self.db.refresh(entity)
+        self.db.flush()
 
         # Recharger avec les relations
         return self.get_by_id(entity.id)
@@ -413,8 +410,7 @@ class EntityService:
         for field, value in update_data.items():
             setattr(entity, field, value)
 
-        self.db.commit()
-        self.db.refresh(entity)
+        self.db.flush()
 
         # Recharger avec les relations
         return self.get_by_id(entity.id)
@@ -427,7 +423,7 @@ class EntityService:
         """
         entity = self.get_by_id(entity_id, load_relations=False)
         entity.is_active = False
-        self.db.commit()
+        self.db.flush()
 
     def get_hierarchy(self, root_id: int | None = None) -> list[Entity]:
         """

@@ -193,6 +193,9 @@ class AuthenticatedUser(BaseModel):
     profession: str | None = Field(None, description="Profession")
     speciality: str | None = Field(None, description="Spécialité")
     roles: list[str] = Field(default_factory=list, description="Rôles")
+    effective_permissions: list[str] = Field(
+        default_factory=list, description="Permissions effectives (profession ∪ rôles)"
+    )
     is_admin: bool = Field(default=False, description="Est administrateur")
     must_change_password: bool = Field(default=False, description="Doit changer son mot de passe")
     tenant_id: int = Field(..., description="ID du tenant")

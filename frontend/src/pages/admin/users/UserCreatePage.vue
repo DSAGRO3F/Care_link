@@ -27,7 +27,7 @@
    *
    * Thème : Admin light (slate/blue)
    * Route : /admin/users/new
-   * Layout : AdminLayout
+   * Layout : DefaultLayout
    *
    * Destination : src/pages/admin/users/UserCreatePage.vue
    */

@@ -233,4 +233,15 @@ INITIAL_ROLES = [
         "description": "Intervenant ponctuel (lecture seule)",
         "is_system_role": True,
     },
+    # 🆕 B40-J1 — Profils externes Phase 4 bis (portail valideur générique)
+    {
+        "name": "VALIDATEUR_DEPARTMENT",
+        "description": "Agent département - validateur APA externe",
+        "is_system_role": True,
+    },
+    {
+        "name": "FAMILY_REFERENT",
+        "description": "Compte famille référent (lecture minimisée d'un patient)",
+        "is_system_role": True,
+    },
 ]

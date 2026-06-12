@@ -22,7 +22,7 @@ from sqlalchemy import Date, DateTime, Enum as SQLEnum, ForeignKey, Integer, Num
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
-from app.models.enums import CarePlanStatus
+from app.models.enums import CarePlanStatus, RevisionReason
 from app.models.mixins import AuditMixin, TimestampMixin
 
 
@@ -203,6 +203,19 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         },
     )
 
+    # === Budget ===
+
+    budget_allocated: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2),
+        nullable=True,
+        doc="Plafond budgétaire alloué au plan",
+        info={
+            "description": "Montant plafond saisi par le coordinateur (APA, PCH, autre)",
+            "unit": "euros",
+            "example": "1250.00",
+        },
+    )
+
     # === Validation ===
 
     validated_by_id: Mapped[int | None] = mapped_column(
@@ -228,6 +241,58 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         info={"description": "Notes libres, contexte, recommandations particulières"},
     )
 
+    # === B28b — Filiation plan d'aide (révision de plan) ===
+
+    supersedes_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("care_plans.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        doc="Plan parent dont celui-ci est une révision (B28b)",
+        info={
+            "description": "FK self-référentielle vers care_plans. NULL pour les plans "
+            "créés ex nihilo, renseigné pour les plans issus d'un POST /revise. "
+            "ON DELETE SET NULL : la suppression du parent ne casse pas la révision.",
+            "example": 7,
+        },
+    )
+
+    revision_reason: Mapped[RevisionReason | None] = mapped_column(
+        SQLEnum(RevisionReason, name="revision_reason_enum", create_constraint=True),
+        nullable=True,
+        doc="Motif de révision (B28b)",
+        info={
+            "description": "Motif obligatoire à la création d'une révision via /revise, "
+            "NULL pour les plans non issus d'une révision. Enum v1 — note de cadrage B28 §5.1.",
+            "enum": [e.value for e in RevisionReason],
+        },
+    )
+
+    revision_comment: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        doc="Commentaire libre du coordinateur sur la révision (B28b)",
+        info={
+            "description": "Précision libre saisie au moment de la révision. "
+            "Particulièrement utile quand revision_reason = OTHER.",
+            "max_length": 1000,
+        },
+    )
+
+    gir_inherited_from_evaluation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("patient_evaluations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        doc="Évaluation source du GIR hérité en cas de révision sans nouvelle évaluation (B28b)",
+        info={
+            "description": "FK vers patient_evaluations. Renseigné automatiquement par "
+            "le service revise() : `parent.source_evaluation_id` si l'IDEC ne référence pas "
+            "de nouvelle évaluation. Garantit la traçabilité AGGIR (décision 24, note de "
+            "cadrage §3.2). ON DELETE SET NULL : pas de cascade, l'évaluation peut "
+            "disparaître sans casser le plan.",
+            "example": 12,
+        },
+    )
+
     # === Relations ===
 
     patient: Mapped[Patient] = relationship(
@@ -237,6 +302,7 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
     source_evaluation: Mapped[PatientEvaluation | None] = relationship(
         "PatientEvaluation",
         back_populates="care_plans",
+        foreign_keys=[source_evaluation_id],
         doc="Évaluation source ayant généré ce plan",
     )
 
@@ -257,6 +323,24 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         cascade="all, delete-orphan",
         order_by="CarePlanService.id",
         doc="Services composant ce plan d'aide",
+    )
+
+    # === B28b — Relations de filiation ===
+
+    supersedes_plan: Mapped[CarePlan | None] = relationship(
+        "CarePlan",
+        remote_side=[id],
+        back_populates="revisions",
+        foreign_keys=[supersedes_plan_id],
+        doc="Plan parent dont celui-ci est une révision (B28b)",
+    )
+
+    revisions: Mapped[list[CarePlan]] = relationship(
+        "CarePlan",
+        back_populates="supersedes_plan",
+        foreign_keys="[CarePlan.supersedes_plan_id]",
+        order_by="CarePlan.created_at",
+        doc="Liste des révisions issues de ce plan (B28b)",
     )
 
     # === Méthodes ===
@@ -290,6 +374,23 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
         return self.validated_at is not None
 
     @property
+    def is_revision(self) -> bool:
+        """Indique si ce plan est une révision d'un plan parent (B28b)."""
+        return self.supersedes_plan_id is not None
+
+    # B28c/B51 — `has_pending_revision` et `pending_revision_draft_id` sont
+    # exposés comme attributs transitoires posés par
+    # CarePlanCRUDService.get_by_id() via une query SQL filtrée par tenant
+    # (pattern aligné sur superseded_plan_id pour B28a). Pas de @property
+    # ici : la relation `revisions` lazy/selectinload pouvait renvoyer une
+    # collection vide à cause du contexte RLS post-transaction. Le calcul
+    # explicite côté service est plus robuste et le pattern est cohérent
+    # avec le reste du module.
+    # Schéma Pydantic : CarePlanResponse expose les deux champs avec
+    # défauts (False / None) pour les endpoints qui ne posent pas ces
+    # attributs (list, summary).
+
+    @property
     def services_count(self) -> int:
         """Nombre de services dans le plan."""
         return len(self.services) if self.services else 0
@@ -317,6 +418,32 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
     def is_fully_assigned(self) -> bool:
         """Indique si tous les services sont affectés."""
         return self.assignment_completion_rate == 1.0
+
+    @property
+    def budget_consumed(self) -> Decimal | None:
+        """
+        Budget consommé estimé = Σ (tarif × quantity_per_week × 4.33) pour chaque service actif.
+
+        Retourne None si aucun service n'a de tarif renseigné.
+        Le coefficient 4.33 convertit la fréquence hebdomadaire en mensuelle.
+        """
+        if not self.services:
+            return Decimal("0.00")
+
+        total = Decimal("0.00")
+        has_any_tarif = False
+
+        for s in self.services:
+            if s.status != "active":
+                continue
+            tarif = None
+            if s.entity_service and s.entity_service.price_euros is not None:
+                tarif = s.entity_service.price_euros
+            if tarif is not None:
+                has_any_tarif = True
+                total += tarif * Decimal(str(s.quantity_per_week)) * Decimal("4.33")
+
+        return total if has_any_tarif else None
 
     def validate(self, user: User) -> None:
         """
@@ -353,9 +480,19 @@ class CarePlan(TimestampMixin, AuditMixin, Base):
             raise ValueError("Seul un plan suspendu peut être réactivé")
         self.status = CarePlanStatus.ACTIVE
 
-    def complete(self) -> None:
-        """Marque le plan comme terminé."""
+    def complete(self, reason: str | None = None) -> None:
+        """
+        Marque le plan comme terminé.
+
+        Args:
+            reason: Raison de la fermeture, ajoutée au champ `notes` si fournie.
+                    Cas d'usage principal (B28a) : transition automatique lors de
+                    l'activation d'un nouveau plan ACTIVE pour le même patient.
+        """
         self.status = CarePlanStatus.COMPLETED
+        if reason:
+            completion_note = f"\n[FERMETURE AUTO B28a {datetime.now(UTC).isoformat()}] {reason}"
+            self.notes = (self.notes or "") + completion_note
 
     def cancel(self, reason: str | None = None) -> None:
         """

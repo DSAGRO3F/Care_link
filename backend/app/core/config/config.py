@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     # === Base de données PostgreSQL ===
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/dbname"
 
+    # Pool de connexions (voir backend/app/database/session.py)
+    #   Dev    : 5 + 10 = 15 max   (défaut, suffisant pour 1 développeur)
+    #   Prod   : 20 + 30 = 50 max  (150 tenants concurrents)
+    #   NB     : pool_size × nb_workers ne doit pas dépasser max_connections PG
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+
     # === Redis ===
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
@@ -77,6 +85,15 @@ class Settings(BaseSettings):
     PSC_TOKEN_URL_OVERRIDE: str | None = None
     PSC_USERINFO_URL_OVERRIDE: str | None = None
     PSC_JWKS_URL_OVERRIDE: str | None = None
+
+    # === Dérogations DEV/TEST ===
+    # S8-B : autorise le login local (email/mot de passe) pour les professions
+    # de santé (requires_rpps=True), normalement réservées à Pro Santé Connect.
+    # Affordance DEV/TEST uniquement — voir property `local_login_for_health_pro_enabled`
+    # qui l'ignore hors environnement dev/test. Défaut False = règle stricte
+    # PSC-only en production. À activer via .env de dev tant que PSC n'est pas
+    # raccordé (E2E valideurs externes).
+    ALLOW_LOCAL_LOGIN_FOR_HEALTH_PROFESSIONALS: bool = False
 
     # === CORS ===
     CORS_ORIGINS: list[str] = ["http://localhost:8000", "http://localhost:3000"]
@@ -152,6 +169,18 @@ class Settings(BaseSettings):
     def psc_configured(self) -> bool:
         """Retourne True si Pro Santé Connect est configuré"""
         return bool(self.PSC_CLIENT_ID and self.PSC_CLIENT_SECRET)
+
+    @property
+    def local_login_for_health_pro_enabled(self) -> bool:
+        """
+        Dérogation S8-B : le login local des professions de santé (requires_rpps)
+        n'est honoré que si le flag est explicitement activé ET l'environnement
+        est dev/test. Garde-fou : même mis à True par erreur, le flag reste sans
+        effet en staging/production → la règle PSC-only y est inviolable.
+        """
+        return self.ALLOW_LOCAL_LOGIN_FOR_HEALTH_PROFESSIONALS and (
+            self.is_development or self.is_test
+        )
 
     @property
     def encryption_configured(self) -> bool:

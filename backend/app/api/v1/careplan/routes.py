@@ -2,44 +2,44 @@
 Routes FastAPI pour le module CarePlan.
 
 Endpoints pour :
-- /care-plans : Plans d'aide
-- /care-plans/{id}/services : Services du plan
-- /care-plans/{id}/services/{service_id}/assignment : Affectation
+- /care-plans : CRUD des plans d'aide
+- /care-plans/{plan_id}/submit|validate|suspend|reactivate|complete|cancel : Workflow
+
+Swagger tags (Stratégie B — tags sur sub-routers, pas le parent) :
+- « Care Plans » (11 endpoints) : CRUD + state machine
+- « Care Plan Services » (9 endpoints) : via routes_services.py
 
 Version multi-tenant : tous les endpoints filtrent par tenant_id.
 """
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.careplan.routes_services import services_router
 from app.api.v1.careplan.schemas import (
-    # CarePlan
     CarePlanCreate,
     CarePlanFilters,
     CarePlanList,
-    CarePlanResponse,
-    # CarePlanService
-    CarePlanServiceCreate,
-    CarePlanServiceList,
-    CarePlanServiceResponse,
-    CarePlanServiceUpdate,
+    CarePlanReplaceServicesRequest,
+    CarePlanReviseRequest,
     CarePlanStatusChange,
+    CarePlanSummary,
     CarePlanUpdate,
     CarePlanWithServices,
-    ServiceAssignment,
 )
 from app.api.v1.careplan.services import (
-    AssignmentStatusError,
     CarePlanCRUDService,
     CarePlanNotEditableError,
-    # Exceptions
     CarePlanNotFoundError,
-    CarePlanServiceCRUDService,
-    CarePlanServiceNotFoundError,
+    CarePlanRevisionError,
     CarePlanStatusError,
     DuplicateReferenceError,
     EntityNotFoundError,
+    EntityServiceNotFoundError,
     PatientNotFoundError,
+    PendingRevisionExistsError,  # ← B28c
     ServiceTemplateNotFoundError,
     UserNotFoundError,
 )
@@ -54,7 +54,7 @@ from app.models.user.user import User
 # ROUTERS
 # =============================================================================
 
-router = APIRouter(tags=["Care Plans"])
+router = APIRouter()  # PAS de tag parent (Stratégie B)
 plans_router = APIRouter(prefix="/care-plans", tags=["Care Plans"])
 
 
@@ -63,77 +63,45 @@ plans_router = APIRouter(prefix="/care-plans", tags=["Care Plans"])
 # =============================================================================
 
 
-def _build_service_response(service) -> CarePlanServiceResponse:
-    """Construit la réponse pour un service de plan."""
-    return CarePlanServiceResponse(
-        id=service.id,
-        care_plan_id=service.care_plan_id,
-        service_template_id=service.service_template_id,
-        quantity_per_week=service.quantity_per_week,
-        frequency_type=service.frequency_type.value
-        if hasattr(service.frequency_type, "value")
-        else service.frequency_type,
-        frequency_days=service.frequency_days,
-        preferred_time_start=service.preferred_time_start,
-        preferred_time_end=service.preferred_time_end,
-        duration_minutes=service.duration_minutes,
-        priority=service.priority.value if hasattr(service.priority, "value") else service.priority,
-        assigned_user_id=service.assigned_user_id,
-        assignment_status=service.assignment_status.value
-        if hasattr(service.assignment_status, "value")
-        else service.assignment_status,
-        assigned_at=service.assigned_at,
-        assigned_by_id=service.assigned_by_id,
-        special_instructions=service.special_instructions,
-        status=service.status,
-        is_assigned=service.is_assigned,
-        is_confirmed=service.is_confirmed,
-        time_slot_display=service.time_slot_display,
-        days_display=service.days_display,
-        frequency_display=service.frequency_display,
-        total_weekly_minutes=service.total_weekly_minutes,
-        total_weekly_hours=service.total_weekly_hours,
-        service_name=service.service_template.name if service.service_template else None,
-        service_code=service.service_template.code if service.service_template else None,
-        created_at=service.created_at,
-        updated_at=service.updated_at,
-    )
+def _build_plan_with_services(plan) -> CarePlanWithServices:
+    """Mappe ORM CarePlan → Pydantic CarePlanWithServices via model_validate.
+
+    Convention robuste : tout ajout de champ sur CarePlanWithServices se
+    propage automatiquement ici grâce à `from_attributes=True` +
+    `use_enum_values=True` sur le ConfigDict (hérité de CarePlanResponse).
+
+    Les services imbriqués (`plan.services`) sont auto-convertis en
+    `CarePlanServiceResponse` par Pydantic, qui applique récursivement
+    `model_validate` sur chaque élément. Les 4 champs enrichis
+    (service_name, service_code, entity_name, effective_tarif) sont
+    exposés comme @property sur l'ORM CarePlanService (convention 3a),
+    donc également auto-propagés.
+
+    Les attributs transient B28a/B28c (has_pending_revision,
+    pending_revision_draft_id, superseded_plan_id) sont supposés posés par
+    le service (helper `_attach_transient_defaults` dans CarePlanCRUDService).
+
+    Cf. dette technique historique du 12/05/2026 : la version précédente
+    listait 28 champs hardcodés, ce qui a piégé F8a/F8b sur l'endpoint liste
+    (3 champs B28b/F8b silencieusement à None pendant ~3 jours).
+    """
+    return CarePlanWithServices.model_validate(plan)
 
 
-def _build_plan_response(plan) -> CarePlanResponse:
-    """Construit la réponse pour un plan d'aide."""
-    return CarePlanResponse(
-        id=plan.id,
-        patient_id=plan.patient_id,
-        entity_id=plan.entity_id,
-        source_evaluation_id=plan.source_evaluation_id,
-        title=plan.title,
-        reference_number=plan.reference_number,
-        start_date=plan.start_date,
-        end_date=plan.end_date,
-        total_hours_week=plan.total_hours_week,
-        gir_at_creation=plan.gir_at_creation,
-        notes=plan.notes,
-        status=plan.status.value if hasattr(plan.status, "value") else plan.status,
-        validated_by_id=plan.validated_by_id,
-        validated_at=plan.validated_at,
-        is_active=plan.is_active,
-        is_draft=plan.is_draft,
-        is_editable=plan.is_editable,
-        is_validated=plan.is_validated,
-        services_count=plan.services_count,
-        assigned_services_count=plan.assigned_services_count,
-        unassigned_services_count=plan.unassigned_services_count,
-        assignment_completion_rate=plan.assignment_completion_rate,
-        is_fully_assigned=plan.is_fully_assigned,
-        created_at=plan.created_at,
-        updated_at=plan.updated_at,
-        created_by=plan.created_by,
-    )
+def _build_plan_summary(plan) -> CarePlanSummary:
+    """Mappe ORM CarePlan → Pydantic CarePlanSummary via model_validate.
+    Convention robuste : tout ajout de champ sur CarePlanSummary se propage
+    automatiquement ici sans modification, grâce à `from_attributes=True` +
+    `use_enum_values=True` sur le ConfigDict du schema. Cf. dette technique
+    historique du 12/05/2026 : version précédente listait 11 champs hardcodés,
+    ce qui avait silencieusement masqué gir_at_creation, supersedes_plan_id
+    et revision_reason sur l'endpoint liste pendant ~3 jours.
+    """
+    return CarePlanSummary.model_validate(plan)
 
 
 # =============================================================================
-# CARE PLAN ENDPOINTS
+# CRUD ENDPOINTS
 # =============================================================================
 
 
@@ -142,17 +110,21 @@ def list_care_plans(
     pagination: PaginationParams = Depends(),
     patient_id: int | None = Query(None, description="Filtrer par patient"),
     entity_id: int | None = Query(None, description="Filtrer par entité"),
-    status: str | None = Query(None, description="Filtrer par statut"),
+    plan_status: str | None = Query(None, alias="status", description="Filtrer par statut"),
+    start_date_from: date | None = Query(None, description="Date de début min"),
+    start_date_to: date | None = Query(None, description="Date de début max"),
     is_fully_assigned: bool | None = Query(None, description="Filtrer par affectation complète"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
-    """Liste les plans d'aide avec filtres."""
+    """Liste les plans d'aide avec pagination et filtres."""
     filters = CarePlanFilters(
         patient_id=patient_id,
         entity_id=entity_id,
-        status=status,
+        status=plan_status,
+        start_date_from=start_date_from,
+        start_date_to=start_date_to,
         is_fully_assigned=is_fully_assigned,
     )
 
@@ -163,9 +135,37 @@ def list_care_plans(
         filters=filters,
     )
     pages = (total + pagination.size - 1) // pagination.size
+
+    responses = [_build_plan_summary(p) for p in items]
     return CarePlanList(
-        items=items, total=total, page=pagination.page, size=pagination.size, pages=pages
+        items=responses, total=total, page=pagination.page, size=pagination.size, pages=pages
     )
+
+
+@plans_router.post("", response_model=CarePlanWithServices, status_code=status.HTTP_201_CREATED)
+def create_care_plan(
+    data: CarePlanCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
+):
+    """Crée un nouveau plan d'aide."""
+    try:
+        service = CarePlanCRUDService(db, tenant_id)
+        plan = service.create(data, created_by=current_user.id)
+        # Recharger avec les relations pour la réponse complète
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
+    except PatientNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except ServiceTemplateNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except EntityServiceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except DuplicateReferenceError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @plans_router.get("/{plan_id}", response_model=CarePlanWithServices)
@@ -179,41 +179,12 @@ def get_care_plan(
     try:
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.get_by_id(plan_id)
-
-        response = _build_plan_response(plan)
-        services = [_build_service_response(s) for s in plan.services]
-
-        return CarePlanWithServices(
-            **response.model_dump(),
-            services=services,
-        )
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
-@plans_router.post("", response_model=CarePlanResponse, status_code=status.HTTP_201_CREATED)
-def create_care_plan(
-    data: CarePlanCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Crée un nouveau plan d'aide."""
-    try:
-        service = CarePlanCRUDService(db, tenant_id)
-        plan = service.create(data, created_by=current_user.id)
-        return _build_plan_response(plan)
-    except PatientNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except EntityNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ServiceTemplateNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except DuplicateReferenceError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-
-@plans_router.patch("/{plan_id}", response_model=CarePlanResponse)
+@plans_router.patch("/{plan_id}", response_model=CarePlanWithServices)
 def update_care_plan(
     plan_id: int,
     data: CarePlanUpdate,
@@ -225,7 +196,9 @@ def update_care_plan(
     try:
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.update(plan_id, data)
-        return _build_plan_response(plan)
+        # Recharger avec les relations
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except CarePlanNotEditableError as e:
@@ -252,11 +225,11 @@ def delete_care_plan(
 
 
 # =============================================================================
-# CARE PLAN WORKFLOW ENDPOINTS
+# WORKFLOW ENDPOINTS (State Machine)
 # =============================================================================
 
 
-@plans_router.post("/{plan_id}/submit", response_model=CarePlanResponse)
+@plans_router.post("/{plan_id}/submit", response_model=CarePlanWithServices)
 def submit_care_plan(
     plan_id: int,
     db: Session = Depends(get_db),
@@ -267,32 +240,138 @@ def submit_care_plan(
     try:
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.submit_for_validation(plan_id)
-        return _build_plan_response(plan)
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except CarePlanStatusError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@plans_router.post("/{plan_id}/validate", response_model=CarePlanResponse)
+@plans_router.post("/{plan_id}/validate", response_model=CarePlanWithServices)
 def validate_care_plan(
     plan_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
-    """Valide le plan d'aide."""
+    """Valide et active le plan d'aide."""
     try:
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.validate(plan_id, validated_by=current_user.id)
-        return _build_plan_response(plan)
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except UserNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except CarePlanStatusError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@plans_router.post("/{plan_id}/suspend", response_model=CarePlanResponse)
+@plans_router.post(
+    "/{parent_id}/revise",
+    response_model=CarePlanWithServices,
+    status_code=status.HTTP_201_CREATED,
+)
+def revise_care_plan(
+    parent_id: int,
+    data: CarePlanReviseRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
+):
+    """
+    Crée une révision d'un plan d'aide existant (B28b — Approche 4).
+
+    Crée un nouveau plan en DRAFT issu d'un plan parent, avec ses services
+    et fréquences clonés (sans affectations professionnels). Le plan parent
+    reste actif tant que la révision n'est pas validée. La fermeture
+    automatique du parent surviendra au moment où la révision sera validée
+    via /validate (mécanisme B28a, Jalon 2).
+
+    Statuts révisables (décision 27) :
+    - ACTIVE : cas nominal (révision en cours d'exécution)
+    - SUSPENDED : reprise après suspension
+    - COMPLETED : uniquement le plus récent du patient
+
+    Statuts NON révisables :
+    - DRAFT, PENDING_VALIDATION : éditer directement le plan en cours
+    - CANCELLED : créer un nouveau plan from-scratch
+    - COMPLETED non-récent : seul le dernier COMPLETED est révisable
+    """
+    try:
+        service = CarePlanCRUDService(db, tenant_id)
+        new_plan = service.revise(parent_id, data, created_by=current_user.id)
+        new_plan = service.get_by_id(new_plan.id)
+        return _build_plan_with_services(new_plan)
+    except CarePlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except UserNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except PendingRevisionExistsError as e:
+        # B28c — payload structuré exploité par l'UI pour orienter l'IDEC
+        # vers le brouillon existant plutôt que d'en créer un nouveau.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "PENDING_REVISION_EXISTS",
+                "message": str(e),
+                "parent_id": e.parent_id,
+                "existing_draft_id": e.existing_draft_id,
+            },
+        ) from e
+    except CarePlanRevisionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+@plans_router.post(
+    "/{plan_id}/replace-services",
+    response_model=CarePlanWithServices,
+    status_code=status.HTTP_200_OK,
+)
+def replace_care_plan_services(
+    plan_id: int,
+    data: CarePlanReplaceServicesRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    tenant_id: int = Depends(get_current_tenant_id),
+):
+    """
+    Remplace l'intégralité du panier de services d'un plan DRAFT.
+
+    Sémantique « panier complet » : le payload contient la liste cible
+    finale des services. Le backend supprime tous les services existants
+    du plan et crée les nouveaux en une seule transaction
+    (delete-all + insert-all). Cf. CarePlanReplaceServicesRequest pour
+    le détail métier.
+
+    Statut éligible : DRAFT uniquement.
+    Les plans en PENDING_VALIDATION/ACTIVE/SUSPENDED/COMPLETED ont des
+    données opérationnelles à préserver — un remplacement complet y
+    serait destructeur. Pour modifier un plan dans ces statuts, utiliser
+    le mécanisme de révision (POST /{parent_id}/revise) qui crée un
+    nouveau DRAFT cloné, éditable via cet endpoint.
+
+    Cas d'usage principal : sauvegarde d'une révision (B28b/B28c) où
+    l'IDEC a édité le panier dans le wizard frontend avant soumission.
+    Cf. F6.6 du chantier B28.
+    """
+    try:
+        service = CarePlanCRUDService(db, tenant_id)
+        plan = service.replace_services(plan_id, data)
+        return _build_plan_with_services(plan)
+    except CarePlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except CarePlanNotEditableError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+    except ServiceTemplateNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except EntityServiceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+
+
+@plans_router.post("/{plan_id}/suspend", response_model=CarePlanWithServices)
 def suspend_care_plan(
     plan_id: int,
     data: CarePlanStatusChange | None = None,
@@ -305,14 +384,15 @@ def suspend_care_plan(
         reason = data.reason if data else None
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.suspend(plan_id, reason)
-        return _build_plan_response(plan)
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except CarePlanStatusError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@plans_router.post("/{plan_id}/reactivate", response_model=CarePlanResponse)
+@plans_router.post("/{plan_id}/reactivate", response_model=CarePlanWithServices)
 def reactivate_care_plan(
     plan_id: int,
     db: Session = Depends(get_db),
@@ -323,14 +403,15 @@ def reactivate_care_plan(
     try:
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.reactivate(plan_id)
-        return _build_plan_response(plan)
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except CarePlanStatusError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@plans_router.post("/{plan_id}/complete", response_model=CarePlanResponse)
+@plans_router.post("/{plan_id}/complete", response_model=CarePlanWithServices)
 def complete_care_plan(
     plan_id: int,
     db: Session = Depends(get_db),
@@ -341,12 +422,15 @@ def complete_care_plan(
     try:
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.complete(plan_id)
-        return _build_plan_response(plan)
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except CarePlanStatusError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
-@plans_router.post("/{plan_id}/cancel", response_model=CarePlanResponse)
+@plans_router.post("/{plan_id}/cancel", response_model=CarePlanWithServices)
 def cancel_care_plan(
     plan_id: int,
     data: CarePlanStatusChange | None = None,
@@ -359,236 +443,11 @@ def cancel_care_plan(
         reason = data.reason if data else None
         service = CarePlanCRUDService(db, tenant_id)
         plan = service.cancel(plan_id, reason)
-        return _build_plan_response(plan)
+        plan = service.get_by_id(plan.id)
+        return _build_plan_with_services(plan)
     except CarePlanNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-
-# =============================================================================
-# CARE PLAN SERVICE ENDPOINTS
-# =============================================================================
-
-
-@plans_router.get("/{plan_id}/services", response_model=CarePlanServiceList)
-def list_plan_services(
-    plan_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Liste les services d'un plan."""
-    try:
-        # Vérifier que le plan existe et appartient au tenant
-        plan_service = CarePlanCRUDService(db, tenant_id)
-        plan_service.get_by_id(plan_id)
-
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        services = service.get_all_for_plan(plan_id)
-        items = [_build_service_response(s) for s in services]
-        return CarePlanServiceList(items=items, total=len(items))
-    except CarePlanNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-
-@plans_router.get("/{plan_id}/services/{service_id}", response_model=CarePlanServiceResponse)
-def get_plan_service(
-    plan_id: int,
-    service_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Récupère un service de plan."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        return _build_service_response(care_plan_service)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-
-@plans_router.post(
-    "/{plan_id}/services",
-    response_model=CarePlanServiceResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_plan_service(
-    plan_id: int,
-    data: CarePlanServiceCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Ajoute un service au plan."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.create(plan_id, data)
-        return _build_service_response(care_plan_service)
-    except CarePlanNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ServiceTemplateNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except CarePlanNotEditableError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-
-@plans_router.patch("/{plan_id}/services/{service_id}", response_model=CarePlanServiceResponse)
-def update_plan_service(
-    plan_id: int,
-    service_id: int,
-    data: CarePlanServiceUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Met à jour un service de plan."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        care_plan_service = service.update(service_id, data)
-        return _build_service_response(care_plan_service)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except CarePlanNotEditableError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-
-@plans_router.delete("/{plan_id}/services/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_plan_service(
-    plan_id: int,
-    service_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Supprime un service du plan."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        service.delete(service_id)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except CarePlanNotEditableError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-
-# =============================================================================
-# SERVICE ASSIGNMENT ENDPOINTS
-# =============================================================================
-
-
-@plans_router.post(
-    "/{plan_id}/services/{service_id}/assign", response_model=CarePlanServiceResponse
-)
-def assign_service(
-    plan_id: int,
-    service_id: int,
-    data: ServiceAssignment,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Affecte un service à un professionnel."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        care_plan_service = service.assign(service_id, data, assigned_by=current_user.id)
-        return _build_service_response(care_plan_service)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except UserNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-
-@plans_router.delete(
-    "/{plan_id}/services/{service_id}/assign", response_model=CarePlanServiceResponse
-)
-def unassign_service(
-    plan_id: int,
-    service_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Retire l'affectation d'un service."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        care_plan_service = service.unassign(service_id)
-        return _build_service_response(care_plan_service)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-
-@plans_router.post(
-    "/{plan_id}/services/{service_id}/confirm", response_model=CarePlanServiceResponse
-)
-def confirm_service_assignment(
-    plan_id: int,
-    service_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Confirme l'affectation (par le professionnel)."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        care_plan_service = service.confirm_assignment(service_id)
-        return _build_service_response(care_plan_service)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except AssignmentStatusError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-
-@plans_router.post(
-    "/{plan_id}/services/{service_id}/reject", response_model=CarePlanServiceResponse
-)
-def reject_service_assignment(
-    plan_id: int,
-    service_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: int = Depends(get_current_tenant_id),
-):
-    """Rejette l'affectation (par le professionnel)."""
-    try:
-        service = CarePlanServiceCRUDService(db, tenant_id)
-        care_plan_service = service.get_by_id(service_id)
-        if care_plan_service.care_plan_id != plan_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Service non trouvé pour ce plan"
-            )
-        care_plan_service = service.reject_assignment(service_id)
-        return _build_service_response(care_plan_service)
-    except CarePlanServiceNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except AssignmentStatusError as e:
+    except CarePlanStatusError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
@@ -597,3 +456,4 @@ def reject_service_assignment(
 # =============================================================================
 
 router.include_router(plans_router)
+router.include_router(services_router)

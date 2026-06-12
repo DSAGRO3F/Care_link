@@ -24,6 +24,7 @@ from app.models.mixins import TimestampMixin
 
 
 if TYPE_CHECKING:
+    from app.models.careplan.care_plan_service import CarePlanService
     from app.models.catalog.service_template import ServiceTemplate
     from app.models.organization.entity import Entity
 
@@ -156,6 +157,12 @@ class EntityService(TimestampMixin, Base):
         "ServiceTemplate",
         back_populates="entity_services",
         doc="Template du service (catalogue national)",
+    )
+
+    care_plan_services: Mapped[list[CarePlanService]] = relationship(
+        "CarePlanService",
+        back_populates="entity_service",
+        doc="Services de plans d'aide utilisant cette offre entité",
     )
 
     # === Méthodes ===

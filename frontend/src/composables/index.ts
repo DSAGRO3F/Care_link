@@ -14,3 +14,7 @@ export type {
   SectionStatus,
   WizardState,
 } from './useEvaluationWizard';
+
+// Recherche d'entreprises (API gouv)
+export { useEnterpriseSearch } from './useEnterpriseSearch';
+export type { EnterpriseFields, MatchWarning } from './useEnterpriseSearch';

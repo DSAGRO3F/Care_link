@@ -195,7 +195,7 @@
       //   - Tableau Bachelard : [ { materiel, statut }, ... ]
       if (props.initialData.noMateriel === true) {
         noMateriel.value = true;
-      /* eslint-disable @typescript-eslint/no-explicit-any -- dual format wizard/EvalSchema, items polymorphes */
+        /* eslint-disable @typescript-eslint/no-explicit-any -- dual format wizard/EvalSchema, items polymorphes */
       } else if (Array.isArray(props.initialData.items)) {
         materiels.value = props.initialData.items.map((m: any) => ({
           materiel: m.materiel ?? '',

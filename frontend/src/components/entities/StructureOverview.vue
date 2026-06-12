@@ -48,7 +48,7 @@
    *   ✓ Dialog confirmation suppression
    *   ✓ Dual theme dark/light
    */
-  import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+  import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
   import { useToast } from 'primevue/usetoast';
 
   // PrimeVue
@@ -79,8 +79,11 @@
     type EntityCreate,
     type EntityUpdate,
     type EntrepriseSearchResult,
-    type EntrepriseSiege,
   } from '@/types';
+
+  // Composables
+  import { useEnterpriseSearch } from '@/composables';
+  import { normalizeEmail, normalizePhone, normalizeAddress } from '@/utils/normalizeText';
 
   // =============================================================================
   // PROPS
@@ -137,8 +140,8 @@
   const form = ref({
     name: '',
     entity_type: null as EntityType | null,
-    finess_geo: '',
-    finess_juridique: '',
+    finess_et: '',
+    finess_ej: '',
     siret: '',
     address: '',
     postal_code: '',
@@ -150,13 +153,12 @@
   // Erreurs de validation
   const errors = ref<Record<string, string>>({});
 
-  // Recherche entreprise (API gouv)
-  const searchQuery = ref('');
-  const searchResults = ref<EntrepriseSearchResult[]>([]);
-  const searchLoading = ref(false);
-  const showSearchResults = ref(false);
-  const searchTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
-  const searchFilled = ref(false); // true quand une entreprise a été sélectionnée
+  // Recherche entreprise (API gouv) — déléguée au composable réutilisable.
+  // `searchFilled` reste une ref locale : c'est une UX spécifique à ce composant
+  // (input verrouillé après sélection, bouton « Changer » pour relancer) qui
+  // n'a pas d'équivalent dans le wizard de création tenant.
+  const enterpriseSearch = reactive(useEnterpriseSearch());
+  const searchFilled = ref(false);
   // Suppression
   const deleteDialogVisible = ref(false);
   const entityToDelete = ref<EntityResponse | null>(null);
@@ -247,7 +249,7 @@
         entity_type: tenantType,
         country_id: props.tenantData.country_id || 1,
         ...(props.tenantData.siret && { siret: props.tenantData.siret }),
-        ...(props.tenantData.address_line1 && { address_line1: props.tenantData.address_line1 }),
+        ...(props.tenantData.address_line1 && { address: props.tenantData.address_line1 }),
         ...(props.tenantData.postal_code && { postal_code: props.tenantData.postal_code }),
         ...(props.tenantData.city && { city: props.tenantData.city }),
       };
@@ -461,14 +463,14 @@
   function openEdit(entity: EntityResponse) {
     panelMode.value = 'edit';
     panelEntity.value = entity;
-    panelParentId.value = entity.parent_id;
+    panelParentId.value = entity.parent_id ?? null;
     form.value = {
       name: entity.name,
       entity_type: entity.entity_type,
-      finess_geo: entity.finess_geo || '',
-      finess_juridique: entity.finess_juridique || '',
+      finess_et: entity.finess_et || '',
+      finess_ej: entity.finess_ej || '',
       siret: entity.siret || '',
-      address: entity.address_line1 || '',
+      address: entity.address || '',
       postal_code: entity.postal_code || '',
       city: entity.city || '',
       email: entity.email || '',
@@ -496,8 +498,8 @@
     form.value = {
       name: '',
       entity_type: null,
-      finess_geo: '',
-      finess_juridique: '',
+      finess_et: '',
+      finess_ej: '',
       siret: '',
       address: '',
       postal_code: '',
@@ -506,75 +508,44 @@
       phone: '',
     };
     errors.value = {};
-    // Reset recherche entreprise
-    searchQuery.value = '';
-    searchResults.value = [];
-    showSearchResults.value = false;
-    searchFilled.value = false;
+    // Reset recherche entreprise (composable + UX locale)
+    clearSearch();
     // Reset héritage SIRET
     siretInherited.value = false;
     parentSiret.value = '';
   }
 
   // =============================================================================
-  // RECHERCHE ENTREPRISE — API annuaire-entreprises.data.gouv.fr
+  // RECHERCHE ENTREPRISE — sélection / reset
   // =============================================================================
-
-  function onSearchInput() {
-    if (searchTimeout.value) clearTimeout(searchTimeout.value);
-
-    const q = searchQuery.value.trim();
-    if (q.length < 3) {
-      searchResults.value = [];
-      showSearchResults.value = false;
-      return;
-    }
-
-    searchLoading.value = true;
-    searchTimeout.value = setTimeout(async () => {
-      try {
-        const url = `https://recherche-entreprises.api.gouv.fr/search?q=${encodeURIComponent(q)}&per_page=6`;
-        const response = await fetch(url);
-        const data = await response.json();
-        searchResults.value = data.results || [];
-        showSearchResults.value = searchResults.value.length > 0;
-      } catch (err) {
-        console.warn('[API Entreprises] Erreur:', err);
-        searchResults.value = [];
-      } finally {
-        searchLoading.value = false;
-      }
-    }, 350);
-  }
+  // Le fetch, le debounce, la reconstruction d'adresse et le mapping sont
+  // pris en charge par le composable useEnterpriseSearch (cf. import).
+  // On ne garde ici que :
+  //   • selectEntreprise : hydratation du form + verrouillage UX local
+  //   • clearSearch : déblocage UX local + reset du composable
 
   function selectEntreprise(result: EntrepriseSearchResult) {
-    const siege = result.siege || {};
-    form.value.name = result.nom_complet || result.nom_raison_sociale || '';
-    form.value.siret = siege.siret || '';
-    form.value.address = formatAddress(siege);
-    form.value.postal_code = siege.code_postal || '';
-    form.value.city = siege.libelle_commune || '';
+    const fields = enterpriseSearch.mapResultToFields(result);
+    form.value.name = fields.name;
+    form.value.siret = fields.siret;
+    form.value.address = fields.street;
+    form.value.postal_code = fields.postal_code;
+    form.value.city = fields.city;
+    // Bonus : l'API gouv expose souvent le FINESS d'établissement dans
+    // matching_etablissements[0].liste_finess (ex. SSIAD du CCAS).
+    if (fields.finess) {
+      form.value.finess_et = fields.finess;
+    }
 
-    // Fermer le dropdown et marquer comme rempli
-    showSearchResults.value = false;
-    searchQuery.value = result.nom_complet || result.nom_raison_sociale || '';
+    // Fermer le dropdown, refléter le nom dans la query, verrouiller l'UX
+    enterpriseSearch.showSearchResults = false;
+    enterpriseSearch.searchQuery = fields.name;
     searchFilled.value = true;
-  }
-
-  /** Construit l'adresse à partir des champs du siège */
-  function formatAddress(siege: EntrepriseSiege): string {
-    const parts: string[] = [];
-    if (siege.numero_voie) parts.push(siege.numero_voie);
-    if (siege.type_voie) parts.push(siege.type_voie);
-    if (siege.libelle_voie) parts.push(siege.libelle_voie);
-    return parts.join(' ') || siege.adresse || '';
   }
 
   /** Réinitialise la recherche pour permettre une nouvelle saisie */
   function clearSearch() {
-    searchQuery.value = '';
-    searchResults.value = [];
-    showSearchResults.value = false;
+    enterpriseSearch.clearSearch();
     searchFilled.value = false;
   }
 
@@ -633,12 +604,12 @@
       }
     }
 
-    if (form.value.finess_geo && !/^\d{9}$/.test(form.value.finess_geo.trim())) {
-      errs.finess_geo = 'Le FINESS doit contenir 9 chiffres';
+    if (form.value.finess_et && !/^\d{9}$/.test(form.value.finess_et.trim())) {
+      errs.finess_et = 'Le FINESS doit contenir 9 chiffres';
     }
 
-    if (form.value.finess_juridique && !/^\d{9}$/.test(form.value.finess_juridique.trim())) {
-      errs.finess_juridique = 'Le FINESS doit contenir 9 chiffres';
+    if (form.value.finess_ej && !/^\d{9}$/.test(form.value.finess_ej.trim())) {
+      errs.finess_ej = 'Le FINESS doit contenir 9 chiffres';
     }
 
     errors.value = errs;
@@ -657,6 +628,13 @@
     if (panelSubmitting.value) return;
     if (!validate()) return;
 
+    // Filet de sécurité anti-homoglyphes Unicode (cf. utils/normalizeText.ts).
+    // Couvre les cas où l'utilisateur valide sans déclencher @blur (ex. raccourci
+    // clavier Enter sur un champ fraîchement collé).
+    form.value.address = normalizeAddress(form.value.address);
+    form.value.email = normalizeEmail(form.value.email);
+    form.value.phone = normalizePhone(form.value.phone);
+
     panelSubmitting.value = true;
 
     try {
@@ -671,12 +649,12 @@
           entity_type: form.value.entity_type!,
           parent_id: panelParentId.value || undefined,
           country_id: 1, // France par défaut
-          ...(form.value.finess_geo.trim() && { finess_geo: form.value.finess_geo.trim() }),
-          ...(form.value.finess_juridique.trim() && {
-            finess_juridique: form.value.finess_juridique.trim(),
+          ...(form.value.finess_et.trim() && { finess_et: form.value.finess_et.trim() }),
+          ...(form.value.finess_ej.trim() && {
+            finess_ej: form.value.finess_ej.trim(),
           }),
           ...(shouldSendSiret && { siret: siretClean }),
-          ...(form.value.address.trim() && { address_line1: form.value.address.trim() }),
+          ...(form.value.address.trim() && { address: form.value.address.trim() }),
           ...(form.value.postal_code.trim() && { postal_code: form.value.postal_code.trim() }),
           ...(form.value.city.trim() && { city: form.value.city.trim() }),
           ...(form.value.email.trim() && { email: form.value.email.trim() }),
@@ -692,10 +670,10 @@
       } else {
         const data: EntityUpdate = {
           name: form.value.name.trim(),
-          finess_geo: form.value.finess_geo.trim() || null,
-          finess_juridique: form.value.finess_juridique.trim() || null,
+          finess_et: form.value.finess_et.trim() || null,
+          finess_ej: form.value.finess_ej.trim() || null,
           siret: siretClean || null,
-          address_line1: form.value.address.trim() || null,
+          address: form.value.address.trim() || null,
           postal_code: form.value.postal_code.trim() || null,
           city: form.value.city.trim() || null,
           email: form.value.email.trim() || null,
@@ -846,7 +824,7 @@
   function onClickOutsideSearch(e: MouseEvent) {
     const target = e.target as HTMLElement;
     if (!target.closest('.search-dropdown-container')) {
-      showSearchResults.value = false;
+      enterpriseSearch.showSearchResults = false;
     }
   }
   onMounted(() => document.addEventListener('click', onClickOutsideSearch));
@@ -1185,20 +1163,20 @@
                     {{ EntityTypeLabels[panelEntity.entity_type] }}
                   </dd>
                 </div>
-                <div v-if="panelEntity.finess_juridique">
+                <div v-if="panelEntity.finess_ej">
                   <dt :class="dark ? 'text-slate-500' : 'text-zinc-400'" class="text-[11px]">
                     FINESS Juridique (EJ)
                   </dt>
                   <dd :class="dark ? 'text-white' : 'text-zinc-700'" class="text-sm font-mono">
-                    {{ panelEntity.finess_juridique }}
+                    {{ panelEntity.finess_ej }}
                   </dd>
                 </div>
-                <div v-if="panelEntity.finess_geo">
+                <div v-if="panelEntity.finess_et">
                   <dt :class="dark ? 'text-slate-500' : 'text-zinc-400'" class="text-[11px]">
                     FINESS Géographique (ET)
                   </dt>
                   <dd :class="dark ? 'text-white' : 'text-zinc-700'" class="text-sm font-mono">
-                    {{ panelEntity.finess_geo }}
+                    {{ panelEntity.finess_et }}
                   </dd>
                 </div>
                 <div v-if="panelEntity.siret">
@@ -1230,12 +1208,12 @@
                 Coordonnées
               </legend>
               <dl class="space-y-2.5">
-                <div v-if="panelEntity.address_line1 || panelEntity.city">
+                <div v-if="panelEntity.address || panelEntity.city">
                   <dt :class="dark ? 'text-slate-500' : 'text-zinc-400'" class="text-[11px]">
                     Adresse
                   </dt>
                   <dd :class="dark ? 'text-white' : 'text-zinc-700'" class="text-sm">
-                    <span v-if="panelEntity.address_line1">{{ panelEntity.address_line1 }}<br /></span>
+                    <span v-if="panelEntity.address">{{ panelEntity.address }}<br /></span>
                     <span v-if="panelEntity.postal_code || panelEntity.city"
                       >{{ panelEntity.postal_code }} {{ panelEntity.city }}</span
                     >
@@ -1267,7 +1245,7 @@
                 </div>
                 <div
                   v-if="
-                    !panelEntity.address_line1 &&
+                    !panelEntity.address &&
                     !panelEntity.city &&
                     !panelEntity.email &&
                     !panelEntity.phone
@@ -1416,17 +1394,20 @@
                   <div class="flex gap-2">
                     <div class="relative flex-1">
                       <InputText
-                        v-model="searchQuery"
+                        v-model="enterpriseSearch.searchQuery"
                         :placeholder="searchFilled ? '' : 'SIRET ou nom de la structure…'"
                         :class="inputClass"
                         :disabled="searchFilled"
                         class="w-full !pr-8"
-                        @input="onSearchInput"
-                        @focus="searchResults.length > 0 && (showSearchResults = true)"
+                        @input="enterpriseSearch.onSearchInput"
+                        @focus="
+                          enterpriseSearch.searchResults.length > 0 &&
+                          (enterpriseSearch.showSearchResults = true)
+                        "
                       />
                       <!-- Spinner dans le champ -->
                       <i
-                        v-if="searchLoading"
+                        v-if="enterpriseSearch.searchLoading"
                         :class="dark ? 'text-slate-500' : 'text-zinc-400'"
                         class="pi pi-spinner pi-spin absolute right-3 top-1/2 -translate-y-1/2 text-xs"
                       ></i>
@@ -1451,7 +1432,7 @@
                   <!-- Dropdown résultats -->
                   <Transition name="dropdown-fade">
                     <div
-                      v-if="showSearchResults"
+                      v-if="enterpriseSearch.showSearchResults"
                       :class="
                         dark
                           ? 'bg-slate-800 border-slate-700'
@@ -1460,7 +1441,7 @@
                       class="absolute z-50 left-0 right-0 mt-1 rounded-xl border shadow-xl overflow-hidden"
                     >
                       <button
-                        v-for="(result, idx) in searchResults"
+                        v-for="(result, idx) in enterpriseSearch.searchResults"
                         :key="idx"
                         :class="
                           dark
@@ -1508,7 +1489,10 @@
 
                       <!-- Aucun résultat -->
                       <div
-                        v-if="searchResults.length === 0 && !searchLoading"
+                        v-if="
+                          enterpriseSearch.searchResults.length === 0 &&
+                          !enterpriseSearch.searchLoading
+                        "
                         class="px-4 py-3 text-center"
                       >
                         <p :class="dark ? 'text-slate-500' : 'text-zinc-400'" class="text-xs">
@@ -1530,6 +1514,38 @@
                     <span>Champs pré-remplis — vérifiez et complétez si nécessaire.</span>
                   </div>
                 </Transition>
+
+                <!-- Bandeau de vigilance : fiabilité du mapping API gouv -->
+                <Message
+                  v-if="enterpriseSearch.matchWarning === 'closed_establishment'"
+                  :closable="false"
+                  severity="warn"
+                  class="mt-3"
+                >
+                  <strong>Établissement fermé au répertoire SIRENE</strong
+                  ><template v-if="enterpriseSearch.closedEstablishmentDate">
+                    depuis le {{ enterpriseSearch.closedEstablishmentDate }}</template
+                  >. Sa fiche peut être obsolète — vérifiez auprès de votre client avant de créer
+                  l'entité.
+                </Message>
+                <Message
+                  v-else-if="enterpriseSearch.matchWarning === 'siege_fallback'"
+                  :closable="false"
+                  severity="warn"
+                  class="mt-3"
+                >
+                  Adresse du siège affichée par défaut. Si vous cherchiez un autre établissement,
+                  vérifiez et corrigez les champs avant de valider.
+                </Message>
+                <Message
+                  v-else-if="enterpriseSearch.matchWarning === 'multiple_matches'"
+                  :closable="false"
+                  severity="warn"
+                  class="mt-3"
+                >
+                  Plusieurs établissements correspondent à votre recherche. Le premier a été
+                  sélectionné — vérifiez l'adresse et le SIRET avant de valider.
+                </Message>
               </div>
             </div>
 
@@ -1637,17 +1653,13 @@
                       FINESS Juridique (EJ)
                     </label>
                     <InputText
-                      v-model="form.finess_juridique"
-                      :class="[
-                        inputClass,
-                        'font-mono text-sm',
-                        { 'p-invalid': errors.finess_juridique },
-                      ]"
+                      v-model="form.finess_ej"
+                      :class="[inputClass, 'font-mono text-sm', { 'p-invalid': errors.finess_ej }]"
                       placeholder="9 chiffres"
                       maxlength="9"
                     />
-                    <small v-if="errors.finess_juridique" class="text-red-500 text-xs mt-1 block">
-                      {{ errors.finess_juridique }}
+                    <small v-if="errors.finess_ej" class="text-red-500 text-xs mt-1 block">
+                      {{ errors.finess_ej }}
                     </small>
                   </div>
                   <div>
@@ -1655,13 +1667,13 @@
                       FINESS Géographique (ET)
                     </label>
                     <InputText
-                      v-model="form.finess_geo"
-                      :class="[inputClass, 'font-mono text-sm', { 'p-invalid': errors.finess_geo }]"
+                      v-model="form.finess_et"
+                      :class="[inputClass, 'font-mono text-sm', { 'p-invalid': errors.finess_et }]"
                       placeholder="9 chiffres"
                       maxlength="9"
                     />
-                    <small v-if="errors.finess_geo" class="text-red-500 text-xs mt-1 block">
-                      {{ errors.finess_geo }}
+                    <small v-if="errors.finess_et" class="text-red-500 text-xs mt-1 block">
+                      {{ errors.finess_et }}
                     </small>
                   </div>
                 </div>
@@ -1717,6 +1729,7 @@
                     placeholder="Numéro, rue, complément..."
                     rows="2"
                     autoResize
+                    @blur="form.address = normalizeAddress(form.address)"
                   />
                 </div>
 
@@ -1747,6 +1760,7 @@
                       :class="[inputClass, { 'p-invalid': errors.email }]"
                       type="email"
                       placeholder="contact@structure.fr"
+                      @blur="form.email = normalizeEmail(form.email)"
                     />
                     <small v-if="errors.email" class="text-red-500 text-xs mt-1 block">
                       {{ errors.email }}
@@ -1760,6 +1774,7 @@
                       v-model="form.phone"
                       :class="inputClass"
                       placeholder="01 23 45 67 89"
+                      @blur="form.phone = normalizePhone(form.phone)"
                     />
                   </div>
                 </div>

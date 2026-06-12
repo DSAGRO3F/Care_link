@@ -6,12 +6,22 @@ Contient la logique CRUD pour :
 - EntityServiceService (services par entité - multi-tenant)
 
 Version multi-tenant : EntityServiceService filtre par tenant_id.
+v4.17 — Ajout get_by_domain(), get_domains_with_counts(), filtre domain.
 """
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.catalog.schemas import (
+    CATEGORY_LABELS,
+    DOMAIN_LABELS,
+    # Phase 3B — Consolidated Catalog
+    BestTarifInfo,
+    ConsolidatedCatalogResponse,
+    ConsolidatedCatalogSummary,
+    ConsolidatedEntitySummary,
+    ConsolidatedPrestationResponse,
+    EntityOfferResponse,
     EntityServiceCreate,
     EntityServiceUpdate,
     ServiceTemplateCreate,
@@ -80,6 +90,9 @@ class ServiceTemplateService:
         query = select(ServiceTemplate)
 
         if filters:
+            if filters.domain:
+                query = query.where(ServiceTemplate.domain == filters.domain.upper())
+
             if filters.category:
                 query = query.where(ServiceTemplate.category == filters.category.upper())
 
@@ -155,6 +168,7 @@ class ServiceTemplateService:
         template = ServiceTemplate(
             code=data.code.upper(),
             name=data.name,
+            domain=data.domain,
             category=data.category,
             description=data.description,
             required_profession_id=data.required_profession_id,
@@ -203,7 +217,7 @@ class ServiceTemplateService:
 
     @staticmethod
     def get_by_category(db: Session, category: str) -> list[ServiceTemplate]:
-        """Récupère tous les services d'une catégorie."""
+        """Récupère tous les services actifs d'une catégorie."""
         query = (
             select(ServiceTemplate)
             .where(
@@ -214,6 +228,225 @@ class ServiceTemplateService:
         )
 
         return list(db.execute(query).scalars().all())
+
+    @staticmethod
+    def get_by_domain(db: Session, domain: str) -> list[ServiceTemplate]:
+        """Récupère tous les services actifs d'un domaine."""
+        query = (
+            select(ServiceTemplate)
+            .where(
+                ServiceTemplate.domain == domain.upper(),
+                ServiceTemplate.status == "active",
+            )
+            .order_by(ServiceTemplate.category, ServiceTemplate.display_order)
+        )
+
+        return list(db.execute(query).scalars().all())
+
+    @staticmethod
+    def get_domains_with_counts(db: Session) -> list[dict]:
+        """
+        Retourne les domaines avec compteur de services actifs.
+
+        Returns:
+            Liste de dicts {domain, active_count, total_count}
+        """
+        query = select(
+            ServiceTemplate.domain,
+            func.count().label("total_count"),
+            func.count().filter(ServiceTemplate.status == "active").label("active_count"),
+        ).group_by(ServiceTemplate.domain)
+
+        rows = db.execute(query).all()
+        return [
+            {
+                "domain": row.domain.value if hasattr(row.domain, "value") else str(row.domain),
+                "total_count": row.total_count,
+                "active_count": row.active_count,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    def get_categories_with_counts(db: Session) -> list[dict]:
+        """
+        Retourne les catégories avec compteur de services actifs.
+
+        Returns:
+            Liste de dicts {category, domain, active_count, total_count}
+        """
+        query = (
+            select(
+                ServiceTemplate.category,
+                ServiceTemplate.domain,
+                func.count().label("total_count"),
+                func.count().filter(ServiceTemplate.status == "active").label("active_count"),
+            )
+            .group_by(ServiceTemplate.category, ServiceTemplate.domain)
+            .order_by(ServiceTemplate.domain, ServiceTemplate.category)
+        )
+
+        rows = db.execute(query).all()
+        return [
+            {
+                "category": row.category.value
+                if hasattr(row.category, "value")
+                else str(row.category),
+                "domain": row.domain.value if hasattr(row.domain, "value") else str(row.domain),
+                "total_count": row.total_count,
+                "active_count": row.active_count,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    def get_consolidated_catalog(db: Session, tenant_id: int) -> ConsolidatedCatalogResponse:
+        """
+        Vue consolidée cross-entités du catalogue.
+
+        Phase 3B — Agrège tous les entity_services actifs de toutes les entités
+        du tenant avec le référentiel national. Filtre explicite par tenant_id
+        (cohérent avec EntityServiceService — ne pas se reposer uniquement sur RLS).
+
+        Args:
+            db: Session SQLAlchemy (avec RLS actif)
+            tenant_id: ID du tenant pour filtrage explicite
+
+        Returns:
+            ConsolidatedCatalogResponse avec prestations groupées et summary.
+        """
+        # 1. Charger tous les templates actifs du référentiel national
+        #    selectinload pour la relation profession (évite lazy load)
+        templates_query = (
+            select(ServiceTemplate)
+            .where(ServiceTemplate.status == "active")
+            .options(selectinload(ServiceTemplate.required_profession))
+            .order_by(
+                ServiceTemplate.domain,
+                ServiceTemplate.category,
+                ServiceTemplate.display_order,
+            )
+        )
+        templates = list(db.execute(templates_query).scalars().all())
+
+        # 2. Charger les entity_services actifs avec leur entité
+        #    Filtre explicite tenant_id (cohérent avec EntityServiceService)
+        es_query = (
+            select(EntityService, Entity)
+            .join(Entity, EntityService.entity_id == Entity.id)
+            .where(
+                EntityService.is_active == True,  # noqa: E712
+                EntityService.tenant_id == tenant_id,  # filtre explicite
+            )
+            .options(selectinload(EntityService.service_template))
+        )
+        entity_services_rows = db.execute(es_query).all()
+
+        # 3. Indexer les offres par service_template_id
+        offers_by_template: dict[int, list[EntityOfferResponse]] = {}
+        entity_stats: dict[int, dict] = {}
+
+        for es, entity in entity_services_rows:
+            template_id = es.service_template_id
+            entity_type_str = (
+                entity.entity_type.value
+                if hasattr(entity.entity_type, "value")
+                else str(entity.entity_type)
+            )
+
+            offer = EntityOfferResponse(
+                entity_id=entity.id,
+                entity_name=entity.name,
+                entity_type=entity_type_str,
+                custom_tarif=(float(es.price_euros) if es.price_euros is not None else None),
+                custom_duree=es.custom_duration_minutes,
+                is_active=es.is_active,
+            )
+
+            if template_id not in offers_by_template:
+                offers_by_template[template_id] = []
+            offers_by_template[template_id].append(offer)
+
+            # Compteur par entité
+            if entity.id not in entity_stats:
+                entity_stats[entity.id] = {
+                    "name": entity.name,
+                    "entity_type": entity_type_str,
+                    "count": 0,
+                }
+            entity_stats[entity.id]["count"] += 1
+
+        # 4. Construire les prestations consolidées
+        prestations: list[ConsolidatedPrestationResponse] = []
+        active_prestations_count = 0
+
+        for tmpl in templates:
+            offers = offers_by_template.get(tmpl.id, [])
+            offer_count = len(offers)
+
+            if offer_count > 0:
+                active_prestations_count += 1
+
+            # Calcul du meilleur tarif
+            best_tarif = None
+            tarifs = [(o.custom_tarif, o.entity_name) for o in offers if o.custom_tarif is not None]
+            if tarifs:
+                min_tarif, min_entity = min(tarifs, key=lambda t: t[0])
+                best_tarif = BestTarifInfo(value=min_tarif, entity_name=min_entity)
+
+            # Nom de la profession requise
+            profession_name = None
+            if tmpl.required_profession:
+                profession_name = tmpl.required_profession.name
+
+            domain_str = tmpl.domain.value if hasattr(tmpl.domain, "value") else str(tmpl.domain)
+            category_str = (
+                tmpl.category.value if hasattr(tmpl.category, "value") else str(tmpl.category)
+            )
+
+            prestations.append(
+                ConsolidatedPrestationResponse(
+                    template_id=tmpl.id,
+                    code=tmpl.code,
+                    name=tmpl.name,
+                    domain=domain_str,
+                    domain_label=DOMAIN_LABELS.get(domain_str, domain_str),
+                    category=category_str,
+                    category_label=CATEGORY_LABELS.get(category_str, category_str),
+                    description=tmpl.description,
+                    required_profession_name=profession_name,
+                    default_duration_minutes=tmpl.default_duration_minutes,
+                    requires_prescription=tmpl.requires_prescription,
+                    is_medical_act=tmpl.is_medical_act,
+                    apa_eligible=tmpl.apa_eligible,
+                    offers=offers,
+                    offer_count=offer_count,
+                    best_tarif=best_tarif,
+                )
+            )
+
+        # 5. Summary
+        entities_summary = [
+            ConsolidatedEntitySummary(
+                id=eid,
+                name=info["name"],
+                entity_type=info["entity_type"],
+                active_services_count=info["count"],
+            )
+            for eid, info in entity_stats.items()
+        ]
+
+        summary = ConsolidatedCatalogSummary(
+            total_national=len(templates),
+            total_active_prestations=active_prestations_count,
+            entities_count=len(entity_stats),
+            entities=entities_summary,
+        )
+
+        return ConsolidatedCatalogResponse(
+            prestations=prestations,
+            summary=summary,
+        )
 
 
 # =============================================================================
@@ -337,8 +570,7 @@ class EntityServiceService:
         )
 
         self.db.add(entity_service)
-        self.db.commit()
-        self.db.refresh(entity_service)
+        self.db.flush()
         return entity_service
 
     def update(
@@ -353,15 +585,14 @@ class EntityServiceService:
         for field, value in update_data.items():
             setattr(entity_service, field, value)
 
-        self.db.commit()
-        self.db.refresh(entity_service)
+        self.db.flush()
         return entity_service
 
     def delete(self, entity_service_id: int) -> None:
         """Désactive un service d'entité."""
         entity_service = self.get_by_id(entity_service_id)
         entity_service.is_active = False
-        self.db.commit()
+        self.db.flush()
 
     def get_entities_for_service(
         self,

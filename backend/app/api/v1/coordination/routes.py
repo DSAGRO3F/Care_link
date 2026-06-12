@@ -49,7 +49,7 @@ from app.api.v1.coordination.services import (
 )
 from app.api.v1.dependencies import PaginationParams
 from app.api.v1.user.tenant_users_security import get_current_tenant_id
-from app.core.auth.user_auth import get_current_user
+from app.core.auth.user_auth import require_permission
 from app.database.session_rls import get_db
 from app.models.user.user import User
 
@@ -58,13 +58,12 @@ from app.models.user.user import User
 # ROUTERS
 # =============================================================================
 
-router = APIRouter(tags=["Coordination"])
+router = APIRouter()  # PAS de tag parent
 entries_router = APIRouter(prefix="/coordination-entries", tags=["Coordination Entries"])
 interventions_router = APIRouter(
     prefix="/scheduled-interventions", tags=["Scheduled Interventions"]
 )
 planning_router = APIRouter(prefix="/planning", tags=["Planning"])
-
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -149,7 +148,7 @@ def list_coordination_entries(
     date_to: datetime | None = Query(None, description="Date de fin"),
     include_deleted: bool = Query(False, description="Inclure les supprimées"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("COORDINATION_VIEW")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Liste les entrées de coordination."""
@@ -180,7 +179,7 @@ def list_coordination_entries(
 def get_coordination_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("COORDINATION_VIEW")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Récupère une entrée de coordination."""
@@ -198,7 +197,7 @@ def get_coordination_entry(
 def create_coordination_entry(
     data: CoordinationEntryCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("COORDINATION_CREATE")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Crée une nouvelle entrée de coordination."""
@@ -215,7 +214,7 @@ def update_coordination_entry(
     entry_id: int,
     data: CoordinationEntryUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("COORDINATION_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Met à jour une entrée de coordination."""
@@ -233,7 +232,7 @@ def update_coordination_entry(
 def delete_coordination_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("COORDINATION_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Supprime une entrée de coordination (soft delete)."""
@@ -250,7 +249,7 @@ def delete_coordination_entry(
 def restore_coordination_entry(
     entry_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("COORDINATION_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Restaure une entrée supprimée."""
@@ -277,7 +276,7 @@ def list_scheduled_interventions(
     date_to: date | None = Query(None, description="Date de fin"),
     status: str | None = Query(None, description="Filtrer par statut"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_VIEW")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Liste les interventions planifiées."""
@@ -299,7 +298,7 @@ def list_scheduled_interventions(
 def get_scheduled_intervention(
     intervention_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_VIEW")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Récupère une intervention planifiée."""
@@ -317,7 +316,7 @@ def get_scheduled_intervention(
 def create_scheduled_intervention(
     data: ScheduledInterventionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_CREATE")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Crée une nouvelle intervention planifiée."""
@@ -338,7 +337,7 @@ def update_scheduled_intervention(
     intervention_id: int,
     data: ScheduledInterventionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Met à jour une intervention planifiée."""
@@ -358,7 +357,7 @@ def update_scheduled_intervention(
 def delete_scheduled_intervention(
     intervention_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Supprime une intervention planifiée."""
@@ -382,7 +381,7 @@ def delete_scheduled_intervention(
 def confirm_intervention(
     intervention_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Confirme une intervention."""
@@ -401,7 +400,7 @@ def start_intervention(
     intervention_id: int,
     data: InterventionStart | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EXECUTE")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Démarre une intervention."""
@@ -422,7 +421,7 @@ def complete_intervention(
     intervention_id: int,
     data: InterventionComplete | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EXECUTE")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Termine une intervention."""
@@ -443,7 +442,7 @@ def cancel_intervention(
     intervention_id: int,
     data: InterventionCancel,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EXECUTE")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Annule une intervention."""
@@ -464,7 +463,7 @@ def mark_intervention_missed(
     intervention_id: int,
     reason: str | None = Query(None, description="Motif"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EXECUTE")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Marque une intervention comme manquée."""
@@ -485,7 +484,7 @@ def reschedule_intervention(
     intervention_id: int,
     data: InterventionReschedule,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_EDIT")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Reprogramme une intervention."""
@@ -509,7 +508,7 @@ def get_daily_planning(
     user_id: int,
     planning_date: date = Query(..., description="Date du planning"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_VIEW")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Récupère le planning journalier d'un professionnel."""
@@ -532,7 +531,7 @@ def get_daily_planning(
 def get_my_daily_planning(
     planning_date: date | None = Query(None, description="Date (défaut: aujourd'hui)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("SCHEDULE_VIEW")),
     tenant_id: int = Depends(get_current_tenant_id),
 ):
     """Récupère mon planning journalier."""

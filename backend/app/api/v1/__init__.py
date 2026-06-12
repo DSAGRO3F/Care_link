@@ -11,6 +11,7 @@ Usage:
 """
 
 from .dependencies import Pagination, PaginationParams
+from .dependencies_rls import bind_rls_context  # 🆕 S1 DT-RLS
 from .router import api_router
 
 
@@ -18,4 +19,5 @@ __all__ = [
     "Pagination",
     "PaginationParams",
     "api_router",
+    "bind_rls_context",  # 🆕 S1 DT-RLS
 ]

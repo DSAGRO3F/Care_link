@@ -90,7 +90,11 @@
    * Récupère un compteur depuis un endpoint paginé (size=1 → on ne veut que `total`).
    * Gère gracieusement les erreurs : la card affiche `--` en cas d'échec.
    */
-  async function fetchCount(index: number, url: string, extractTotal: (data: Record<string, unknown>) => number) {
+  async function fetchCount(
+    index: number,
+    url: string,
+    extractTotal: (data: Record<string, unknown>) => number,
+  ) {
     try {
       const { data } = await api.get(url);
       cards.value[index].count = extractTotal(data);

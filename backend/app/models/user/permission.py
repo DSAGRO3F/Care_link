@@ -244,6 +244,12 @@ INITIAL_PERMISSIONS = [
     },
     {
         "code": "EVALUATION_EDIT",
+        # ⚠️ Non distribué intentionnellement (admin-only via court-circuit ADMIN_FULL) :
+        # une évaluation AGGIR validée est un document opposable (CASF), figée
+        # par construction. Sa modification post-validation est un acte
+        # exceptionnel admin (correction de saisie). L'édition d'un BROUILLON
+        # (pré-validation) relève de EVALUATION_CREATE — même workflow,
+        # même composant frontend.
         "name": "Modifier une évaluation",
         "description": "Permet de modifier une évaluation existante",
         "category": "EVALUATION",
@@ -423,5 +429,144 @@ INITIAL_PERMISSIONS = [
         "category": "ROLE",
         "is_system": True,
         "display_order": 84,
+    },
+    # === CATALOG (Gestion du catalogue de prestations) ===
+    {
+        "code": "CATALOG_VIEW",
+        "name": "Voir le catalogue",
+        "description": "Permet de consulter le catalogue des prestations (templates et services entités)",
+        "category": "CATALOG",
+        "is_system": True,
+        "display_order": 90,
+    },
+    {
+        "code": "CATALOG_CREATE",
+        "name": "Créer une prestation au catalogue",
+        "description": "Permet d'ajouter un nouveau service template au catalogue",
+        "category": "CATALOG",
+        "is_system": True,
+        "display_order": 91,
+    },
+    {
+        "code": "CATALOG_EDIT",
+        "name": "Modifier une prestation du catalogue",
+        "description": "Permet de modifier un service template existant",
+        "category": "CATALOG",
+        "is_system": True,
+        "display_order": 92,
+    },
+    {
+        "code": "CATALOG_DELETE",
+        "name": "Désactiver une prestation du catalogue",
+        "description": "Permet de désactiver ou supprimer un service template",
+        "category": "CATALOG",
+        "is_system": True,
+        "display_order": 93,
+    },
+    # === SCHEDULE (Planification des interventions) ===
+    {
+        "code": "SCHEDULE_VIEW",
+        "name": "Voir le planning",
+        "description": "Permet de consulter les interventions planifiées",
+        "category": "SCHEDULE",
+        "is_system": True,
+        "display_order": 100,
+    },
+    {
+        "code": "SCHEDULE_CREATE",
+        "name": "Planifier une intervention",
+        "description": "Permet de créer une intervention planifiée (orchestration de la coordination)",
+        "category": "SCHEDULE",
+        "is_system": True,
+        "display_order": 101,
+    },
+    {
+        "code": "SCHEDULE_EDIT",
+        "name": "Modifier le planning",
+        "description": "Permet de modifier, reprogrammer, confirmer ou supprimer une intervention planifiée (orchestration)",
+        "category": "SCHEDULE",
+        "is_system": True,
+        "display_order": 102,
+    },
+    {
+        "code": "SCHEDULE_EXECUTE",
+        "name": "Exécuter une intervention",
+        "description": "Permet d'effectuer les actions workflow sur une intervention planifiée : démarrer, terminer, annuler, marquer manquée",
+        "category": "SCHEDULE",
+        "is_system": True,
+        "display_order": 103,
+    },
+    # === VALIDATION (Portail valideur générique — B40-J1 Phase 4 bis) ===
+    {
+        "code": "VALIDATION_VIEW",
+        "name": "Voir les demandes de validation",
+        "description": (
+            "Permet de consulter les demandes de validation (ValidationRequest) "
+            "filtrées par RLS (demandes où je suis émetteur, valideur assigné, "
+            "ou destinataire d'une copie)"
+        ),
+        "category": "VALIDATION",
+        "is_system": True,
+        "display_order": 110,
+    },
+    {
+        "code": "VALIDATION_MEDICAL_REVIEW",
+        "name": "Acter une validation médicale",
+        "description": (
+            "Permet d'acter une ValidationRequest à l'étape MEDICAL_REVIEW. "
+            "Attribuée via profession_permissions aux 5 codes profession médecin "
+            "externe (MEDECIN_GENERALISTE, MEDECIN_SPECIALISTE, "
+            "MEDECIN_COORDONNATEUR, MEDECIN_AGREE_ARS, MEDECIN_CONSEIL_CPAM)"
+        ),
+        "category": "VALIDATION",
+        "is_system": True,
+        "display_order": 111,
+    },
+    {
+        "code": "VALIDATION_SUBMIT",
+        "name": "Soumettre un document à validation",
+        "description": (
+            "Permet de créer une ValidationRequest en soumettant une évaluation "
+            "ou un dossier de coordination à l'étape de relecture interne (IDEC)"
+        ),
+        "category": "VALIDATION",
+        "is_system": True,
+        "display_order": 112,
+    },
+    {
+        "code": "VALIDATION_INTERNAL_REVIEW",
+        "name": "Acter une relecture interne",
+        "description": (
+            "Permet d'acter une ValidationRequest à l'étape INTERNAL_REVIEW "
+            "(transmettre vers l'étape suivante, invalider, demander info). "
+            "ADMIN via ADMIN_FULL ; délégable à un COORDINATEUR senior par tenant (D24)"
+        ),
+        "category": "VALIDATION",
+        "is_system": True,
+        "display_order": 113,
+    },
+    {
+        "code": "VALIDATION_FUNDING_REVIEW",
+        "name": "Acter une décision de financement",
+        "description": (
+            "Permet d'acter une ValidationRequest à l'étape FUNDING_REVIEW "
+            "(décision APA département). Rôle VALIDATEUR_DEPARTMENT (nominal) ou "
+            "ADMIN en mode dégradé via decided_on_behalf_of"
+        ),
+        "category": "VALIDATION",
+        "is_system": True,
+        "display_order": 114,
+    },
+    {
+        "code": "VALIDATION_WITHDRAW",
+        "name": "Retirer une soumission",
+        "description": (
+            "Permet de retirer sa propre ValidationRequest tant qu'elle est au "
+            "cycle interne (PENDING_INTERNAL_REVIEW). Règle service : "
+            "withdrawn_by_user_id == submitted_by_user_id (D14 v2)"
+        ),
+        "category": "VALIDATION",
+        "is_system": True,
+        "display_order": 115,
     },
 ]

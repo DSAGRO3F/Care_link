@@ -222,8 +222,10 @@ class TenantAdminService:
             },
         )
 
-        self.db.commit()
-        self.db.refresh(user)
+        # flush() au lieu de commit()+refresh() : conserve la transaction
+        # ouverte (et donc le contexte RLS) jusqu'au commit final orchestré
+        # par get_db_no_rls(). Voir session_rls.py pour le contexte du fix.
+        self.db.flush()
 
         return TenantAdminUserResponse(
             id=user.id,

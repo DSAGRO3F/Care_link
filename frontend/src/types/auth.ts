@@ -60,6 +60,7 @@ export interface AuthenticatedUser {
   profession?: string;
   speciality?: string;
   roles: string[];
+  effective_permissions: string[];
   is_admin: boolean;
   must_change_password: boolean;
   tenant_id: number;

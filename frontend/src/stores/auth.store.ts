@@ -37,11 +37,21 @@ export const useAuthStore = defineStore('auth', () => {
   /** Rôles de l'utilisateur */
   const userRoles = computed(() => user.value?.roles ?? []);
 
+  /** Permissions effectives de l'utilisateur (profession ∪ rôles) */
+  const userPermissions = computed(() => user.value?.effective_permissions ?? []);
+
   /** ID du tenant courant */
   const currentTenantId = computed(() => user.value?.tenant_id);
 
   /** Nom complet de l'utilisateur */
   const fullName = computed(() => user.value?.full_name ?? '');
+
+  /**
+   * L'utilisateur peut-il créer un plan d'aide ?
+   * Gating par permission CAREPLAN_CREATE (accordée à ADMIN + COORDINATEUR).
+   * Migré depuis isAdmin || hasAnyRole(['ADMIN','COORDINATEUR']) — B48 Palier 1.
+   */
+  const canCreateCarePlan = computed(() => hasPermission('CAREPLAN_CREATE'));
 
   /** Forcer chgt. mot de passe après 1ère auth. */
   const mustChangePassword = computed(() => user.value?.must_change_password ?? false);
@@ -235,6 +245,18 @@ export const useAuthStore = defineStore('auth', () => {
     return roles.some((role) => userRoles.value.includes(role));
   }
 
+  /** Vérifier si l'utilisateur détient une permission spécifique */
+  function hasPermission(code: string): boolean {
+    if (isAdmin.value) return true;                              // étage 1 — drapeau SuperAdmin
+    if (userPermissions.value.includes('ADMIN_FULL')) return true; // étage 2 — joker rôle ADMIN
+    return userPermissions.value.includes(code);
+  }
+
+  /** Vérifier si l'utilisateur détient au moins une des permissions */
+  function hasAnyPermission(codes: string[]): boolean {
+    return codes.some((code) => hasPermission(code));
+  }
+
   // ===========================================================================
   // RETURN
   // ===========================================================================
@@ -252,9 +274,11 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     isAdmin,
     userRoles,
+    userPermissions,
     currentTenantId,
     fullName,
     mustChangePassword,
+    canCreateCarePlan,
 
     // Actions
     loginWithCredentials,
@@ -266,6 +290,8 @@ export const useAuthStore = defineStore('auth', () => {
     initialize,
     hasRole,
     hasAnyRole,
+    hasPermission,
+    hasAnyPermission,
     changePassword,
   };
 });

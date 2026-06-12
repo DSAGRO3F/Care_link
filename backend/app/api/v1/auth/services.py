@@ -172,7 +172,16 @@ class AuthService:
                 )
 
             # ATTENTION ! : Vérifier que la profession ne nécessite pas PSC
-            if user.profession and user.profession.requires_rpps:
+            # Dérogation S8-B : en dev/test, si la config l'autorise explicitement,
+            # on laisse passer le login local des professions de santé (valideurs
+            # externes en E2E, avant raccordement PSC). En staging/production,
+            # settings.local_login_for_health_pro_enabled est toujours False
+            # → règle stricte PSC-only inchangée.
+            if (
+                user.profession
+                and user.profession.requires_rpps
+                and not settings.local_login_for_health_pro_enabled
+            ):
                 raise InvalidCredentialsError(
                     "Les professionnels de santé doivent utiliser Pro Santé Connect. "
                     "Veuillez vous connecter avec votre e-CPS."
@@ -190,7 +199,7 @@ class AuthService:
             # Vérifier le mot de passe
             if not verify_password(password, password_hash):
                 user.record_login_failure()
-                self.db.commit()
+                self.db.flush()
                 raise InvalidCredentialsError("Email ou mot de passe incorrect")
 
             # Vérifier que le compte est actif
@@ -204,16 +213,19 @@ class AuthService:
             self.db.execute(text(f"SET app.current_tenant_id = '{user.tenant_id}'"))
             self.db.execute(text("SET app.is_super_admin = 'false'"))
 
-            self.db.commit()
+            self.db.flush()
             # Re-set RLS context after commit (context lost on commit)
             self.db.execute(text(f"SET app.current_tenant_id = '{user.tenant_id}'"))
-            self.db.refresh(user)
 
             # Forcer le chargement des relations avant détachement
             _ = user.role_associations
             for ra in user.role_associations:
                 _ = ra.role  # 🔄 S5 fix — charger le Role imbriqué (évite DetachedInstanceError)
             _ = user.profession
+
+            # B48 P1 : cache des permissions effectives avant détachement —
+            # effective_permission_codes traverse profession + roles (convention #108)
+            user._cached_effective_permissions = sorted(user.effective_permission_codes)
 
             # v4.8 : Pattern expunge+decrypt via decrypt_model
             self.db.expunge(user)  # Détacher → plus de tracking
@@ -250,14 +262,16 @@ class AuthService:
         db_user.password_hash = hash_password(new_password)
         db_user.must_change_password = False
 
-        self.db.commit()
-        self.db.refresh(db_user)
+        self.db.flush()
 
         # Charger les relations avant détachement
         _ = db_user.role_associations
         for ra in db_user.role_associations:
             _ = ra.role  # 🔄 S5 fix — charger le Role imbriqué
         _ = db_user.profession
+
+        # B48 P1 : cache des permissions effectives avant détachement (convention #108)
+        db_user._cached_effective_permissions = sorted(db_user.effective_permission_codes)
 
         # v4.8 : Pattern expunge+decrypt via decrypt_model
         self.db.expunge(db_user)
@@ -427,8 +441,7 @@ class AuthService:
 
             user.last_login = datetime.now(UTC)
 
-            self.db.commit()
-            self.db.refresh(user)
+            self.db.flush()
 
         else:
             # === Création d'un nouvel utilisateur ===
@@ -475,8 +488,7 @@ class AuthService:
             if default_role:
                 user.roles.append(default_role)
 
-            self.db.commit()
-            self.db.refresh(user)
+            self.db.flush()
 
         return user
 
@@ -660,7 +672,7 @@ class AuthService:
         )
 
         self.db.add(access)
-        self.db.commit()
+        self.db.flush()
 
     def revoke_patient_access(self, patient_id: int, user_id: int) -> bool:
         """
@@ -687,7 +699,7 @@ class AuthService:
 
         if access:
             access.revoked_at = datetime.now(UTC)
-            self.db.commit()
+            self.db.flush()
             return True
 
         return False
@@ -755,6 +767,13 @@ class AuthService:
         if user.profession:
             profession_name = user.profession.name
 
+        # B48 P1 : permissions effectives — cache si présent (login / change-password,
+        # objet détaché), sinon calcul à la volée (PSC / /auth/me, objet attaché).
+        if hasattr(user, "_cached_effective_permissions"):
+            effective_permissions = user._cached_effective_permissions
+        else:
+            effective_permissions = sorted(user.effective_permission_codes)
+
         # user.email et user.rpps utilisent les properties rétro-compat
         return AuthenticatedUser(
             id=user.id,
@@ -766,6 +785,7 @@ class AuthService:
             profession=profession_name,
             speciality=getattr(user, "speciality", None),
             roles=role_names,
+            effective_permissions=effective_permissions,
             is_admin=user.is_admin,
             must_change_password=user.must_change_password,
             tenant_id=user.tenant_id,

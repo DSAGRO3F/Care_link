@@ -317,8 +317,7 @@ class RoleService:
         # Créer les associations RolePermission (v4.3)
         self._set_role_permissions(role, permission_codes)
 
-        self.db.commit()
-        self.db.refresh(role)
+        self.db.flush()
         return role
 
     def _get_or_create_permission(self, code: str) -> Permission:
@@ -400,8 +399,7 @@ class RoleService:
         if permission_codes is not None:
             self._set_role_permissions(role, permission_codes)
 
-        self.db.commit()
-        self.db.refresh(role)
+        self.db.flush()
         return role
 
     def delete(self, role_id: int) -> None:
@@ -412,7 +410,7 @@ class RoleService:
             raise SystemRoleModificationError("Les rôles système ne peuvent pas être supprimés")
 
         self.db.delete(role)
-        self.db.commit()
+        self.db.flush()
 
 
 # =============================================================================
@@ -660,7 +658,7 @@ class UserService:
             user.password_hash = hash_password(data.password)
 
         self.db.add(user)
-        self.db.commit()
+        self.db.flush()
 
         # Recharger avec les relations nécessaires à la sérialisation
         user = self.db.execute(
@@ -732,7 +730,7 @@ class UserService:
 
             user.password_hash = hash_password(data.password)
 
-        self.db.commit()
+        self.db.flush()
 
         # S4 : Recharger avec relations pour calculer effective_permissions
         # (remplace le simple refresh qui ne chargeait pas les relations)
@@ -757,7 +755,7 @@ class UserService:
         """Désactive un utilisateur (soft delete)."""
         user = self._get_raw(user_id)
         user.is_active = False
-        self.db.commit()
+        self.db.flush()
 
     # ----------Ajouter un rôle--------------
 
@@ -785,8 +783,7 @@ class UserService:
             assigned_at=datetime.now(UTC),
         )
         self.db.add(user_role)
-        self.db.commit()
-        self.db.refresh(user_role)
+        self.db.flush()
         return user_role
 
     # ----------Enlever un rôle--------------
@@ -801,7 +798,7 @@ class UserService:
             raise RoleNotFoundError("L'utilisateur n'a pas ce rôle")
 
         self.db.delete(user_role)
-        self.db.commit()
+        self.db.flush()
 
     # ----------Ajout entité--------------
 
@@ -833,14 +830,16 @@ class UserService:
         if data.is_primary:
             self.db.execute(
                 select(UserEntity).where(
-                    UserEntity.user_id == user_id, UserEntity.is_primary == True  # noqa: E712
+                    UserEntity.user_id == user_id,
+                    UserEntity.is_primary == True,  # noqa: E712
                 )
             )
             # Retirer le flag primaire des autres
             for ue in (
                 self.db.execute(
                     select(UserEntity).where(
-                        UserEntity.user_id == user_id, UserEntity.is_primary == True  # noqa: E712
+                        UserEntity.user_id == user_id,
+                        UserEntity.is_primary == True,  # noqa: E712
                     )
                 )
                 .scalars()
@@ -854,8 +853,7 @@ class UserService:
             **data.model_dump(),
         )
         self.db.add(user_entity)
-        self.db.commit()
-        self.db.refresh(user_entity)
+        self.db.flush()
         return user_entity
 
     # ----------Mise à jour entité--------------
@@ -891,8 +889,7 @@ class UserService:
         for field, value in update_data.items():
             setattr(user_entity, field, value)
 
-        self.db.commit()
-        self.db.refresh(user_entity)
+        self.db.flush()
         return user_entity
 
     # ----------Enlever entité--------------
@@ -909,7 +906,7 @@ class UserService:
             raise EntityNotFoundError("Rattachement non trouvé")
 
         self.db.delete(user_entity)
-        self.db.commit()
+        self.db.flush()
 
 
 # =============================================================================
@@ -1004,8 +1001,7 @@ class UserAvailabilityService:
             **data.model_dump(),
         )
         self.db.add(availability)
-        self.db.commit()
-        self.db.refresh(availability)
+        self.db.flush()
         return availability
 
     def update(
@@ -1031,12 +1027,11 @@ class UserAvailabilityService:
         for field, value in update_data.items():
             setattr(availability, field, value)
 
-        self.db.commit()
-        self.db.refresh(availability)
+        self.db.flush()
         return availability
 
     def delete(self, availability_id: int, user_id: int) -> None:
         """Supprime une disponibilité."""
         availability = self.get_by_id(availability_id, user_id)
         self.db.delete(availability)
-        self.db.commit()
+        self.db.flush()

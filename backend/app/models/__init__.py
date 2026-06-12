@@ -37,6 +37,8 @@ from app.models.coordination.scheduled_intervention import ScheduledIntervention
 
 # === Enums ===
 from app.models.enums import (
+    CATEGORY_DOMAIN_MAP,
+    DOMAIN_CATEGORY_MAP,
     # Patients
     AccessType,
     AssignmentStatus,
@@ -63,6 +65,7 @@ from app.models.enums import (
     ProfessionCategory,
     RoleName,
     ServiceCategory,
+    ServiceDomain,
     ServicePriority,
     ServiceType,
     ServiceUnit,
@@ -135,6 +138,8 @@ from app.models.user.user_tenant_assignment import (
 
 # === Export explicite ===
 __all__ = [
+    "CATEGORY_DOMAIN_MAP",
+    "DOMAIN_CATEGORY_MAP",
     "INITIAL_PERMISSIONS",
     "INITIAL_PROFESSIONS",
     "INITIAL_ROLES",
@@ -197,6 +202,7 @@ __all__ = [
     "RolePermission",
     "ScheduledIntervention",
     "ServiceCategory",
+    "ServiceDomain",
     "ServicePriority",
     # Catalogue
     "ServiceTemplate",

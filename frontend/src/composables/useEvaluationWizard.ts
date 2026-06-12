@@ -9,8 +9,12 @@
 import { ref, reactive, computed, type Ref } from 'vue';
 import axios from 'axios';
 import { evaluationService } from '@/services';
-import { adaptSectionData, reverseAdaptSectionData, sanitizePhone } from '@/components/evaluation/evaluationAdapters';
-import type { PatientResponse } from '@/types/patient';
+import {
+  adaptSectionData,
+  reverseAdaptSectionData,
+  sanitizePhone,
+} from '@/components/evaluation/evaluationAdapters';
+import type { PatientResponse } from '@/types';
 
 // =============================================================================
 // TYPES
@@ -24,7 +28,7 @@ export type SectionStatus = 'empty' | 'partial' | 'complete';
  * Le typage précis vit à l'intérieur de chaque formulaire ;
  * au niveau du hub wizard, le contenu reste opaque.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export type WizardSectionData = Record<string, any>;
 
 export interface WizardSectionConfig {
@@ -450,11 +454,15 @@ export function useEvaluationWizard(patientId: Ref<number>) {
     // Persister les statuts de section pour restauration au rechargement.
     // Clé préfixée _ pour signaler qu'il s'agit de métadonnées internes,
     // pas de données cliniques exportables.
+    // `format` trace le format de persistance ('wizard' flat | 'adapted'
+    // EvalSchema) — posé à 'adapted' par submitEvaluation() après adaptation.
+    // La lecture (loadEvaluationData) reste robuste sans le marqueur :
+    // les reverse adapters sont idempotents (brouillons antérieurs au marqueur).
     const statuses: Record<string, SectionStatus> = {};
     for (const section of WIZARD_SECTIONS) {
       statuses[section.id] = sectionStates[section.id]?.status ?? 'empty';
     }
-    data._wizard_meta = { sectionStatuses: statuses };
+    data._wizard_meta = { sectionStatuses: statuses, format: 'wizard' };
 
     return data;
   }
@@ -467,8 +475,25 @@ export function useEvaluationWizard(patientId: Ref<number>) {
       evaluationData._wizard_meta?.sectionStatuses ?? null;
 
     for (const section of WIZARD_SECTIONS) {
-      const sectionData = evaluationData[section.id];
-      if (sectionData && typeof sectionData === 'object' && Object.keys(sectionData).length > 0) {
+      const rawSectionData = evaluationData[section.id];
+      if (
+        rawSectionData &&
+        typeof rawSectionData === 'object' &&
+        Object.keys(rawSectionData).length > 0
+      ) {
+        // Normalisation systématique vers le format wizard flat (D-δ, A+B+C).
+        // Cause racine : submitEvaluation() réécrit le brouillon en format
+        // adapté (EvalSchema) avant le POST submit ; si la soumission échoue,
+        // le brouillon reste en base dans ce format et les formulaires
+        // (loadFromBrouillon) ne reconnaissent plus leurs clés plates.
+        // Les reverse adapters sont idempotents : un brouillon déjà flat
+        // passe tel quel, un brouillon adapté est re-traduit.
+        const adapted = reverseAdaptSectionData(section.id, rawSectionData);
+        const sectionData =
+          adapted && typeof adapted === 'object' && !Array.isArray(adapted)
+            ? (adapted as WizardSectionData)
+            : (rawSectionData as WizardSectionData);
+
         sectionStates[section.id].data = { ...sectionData };
         // Utiliser le statut persisté si disponible, sinon estimer depuis les données.
         // L'estimation est un fallback pour les brouillons sauvegardés avant l'ajout
@@ -659,6 +684,14 @@ export function useEvaluationWizard(patientId: Ref<number>) {
       for (const [key, value] of Object.entries(rawData)) {
         adaptedData[key] = adaptSectionData(key, value);
       }
+      // Marqueur de format (D-δ option B) : le brouillon persiste désormais en
+      // format adapté. Si le POST submit échoue, loadEvaluationData saura à la
+      // reprise que les sections doivent repasser par les reverse adapters
+      // (lecture robuste même sans marqueur — adapters idempotents).
+      adaptedData._wizard_meta = {
+        ...(rawData._wizard_meta as Record<string, unknown>),
+        format: 'adapted',
+      };
 
       await evaluationService.update(wizardState.patientId, wizardState.evaluationId!, {
         evaluation_data: adaptedData,

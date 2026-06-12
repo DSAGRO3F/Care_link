@@ -1,6 +1,6 @@
 /**
  * Types TypeScript pour la gestion des Entités
- * Alignés avec les schemas Pydantic du backend
+ * Alignés strictement sur app/api/v1/organization/schemas.py (Pydantic v2)
  *
  * Architecture : 1 tenant = 1 racine (GCSMS/GTSMS) = 1 arbre
  * Les entités enfants (SSIAD, SAAD, SPASAD, EHPAD) sont
@@ -8,9 +8,27 @@
  * Les sous-entités (ANTENNE, BUREAU, AGENCE) partagent le
  * SIRET de leur parent (même établissement juridique).
  *
- * v2 — Ajout types niveau 3 (ANTENNE, BUREAU, AGENCE)
- *      + SUB_ENTITY_TYPES
- *      + patients_count / users_count dans EntityResponse
+ * IMPORTANT — tenant_id volontairement absent de EntityResponse :
+ *   En base, entities.tenant_id existe et porte le RLS, mais le
+ *   schéma Pydantic EntityResponse ne l'expose PAS car toute requête
+ *   API est déjà tenant-scopée par construction (RLS + filtre
+ *   explicite). Le client n'a donc pas besoin de cette information :
+ *   tout ce qu'il reçoit appartient déjà à son tenant.
+ *   Si un besoin SuperAdmin émerge un jour (vue multi-tenant),
+ *   l'ajout se fera D'ABORD côté backend dans un schéma dédié
+ *   (PlatformEntityResponse), puis seulement ici. Jamais l'inverse.
+ *   Référence backlog : Phase 6+ — exposition tenant_id SuperAdmin.
+ *
+ * v3 — Session 3bis (08/04/2026) : alignement strict org_schemas.py
+ *   • Renommages : finess_geo→finess_et, finess_juridique→finess_ej,
+ *     address_line1→address, suppression address_line2
+ *   • Suppression du champ fantôme tenant_id (jamais exposé par l'API)
+ *   • Ajouts : short_name, integration_type, siren, authorized_capacity,
+ *     authorization_date, authorization_reference, website,
+ *     latitude, longitude, default_intervention_radius_km, country_id
+ *   • Ajout type EntitySummary (pour parent_entity imbriqué)
+ *   • Ajout type minimal CountryResponse (pour country imbriqué)
+ *   • Ajout enum IntegrationType
  */
 
 // =============================================================================
@@ -35,6 +53,16 @@ export enum EntityType {
   AGENCE = 'AGENCE', // Agence de proximité
 }
 
+/**
+ * Type de rattachement d'une entité au tenant.
+ * Aligné sur app.models.enums.IntegrationType.
+ */
+export enum IntegrationType {
+  MANAGED = 'MANAGED', // Entité gérée directement par le tenant
+  FEDERATED = 'FEDERATED', // Entité fédérée (autonomie partielle)
+  CONVENTION = 'CONVENTION', // Convention de coopération
+}
+
 /** Types autorisés pour les entités racines */
 export const ROOT_ENTITY_TYPES: EntityType[] = [EntityType.GCSMS, EntityType.GTSMS];
 
@@ -54,65 +82,210 @@ export const SUB_ENTITY_TYPES: EntityType[] = [
 ];
 
 // =============================================================================
-// INTERFACES
+// INTERFACES — RÉFÉRENCES IMBRIQUÉES
 // =============================================================================
 
-/** Réponse d'une entité (GET) */
+/**
+ * Réponse minimale pour un pays (référence imbriquée dans EntityResponse.country).
+ * Aligné sur CountryResponse Pydantic.
+ */
+export interface CountryResponse {
+  id: number;
+  name: string;
+  country_code: string; // ISO 3166-1 alpha-2 (FR, BE, CH...)
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+/**
+ * Version allégée d'une entité, utilisée pour les relations
+ * (parent_entity) et les listes courtes.
+ * Aligné sur EntitySummary Pydantic.
+ */
+export interface EntitySummary {
+  id: number;
+  name: string;
+  short_name?: string | null;
+  entity_type: EntityType;
+  city?: string | null;
+}
+
+// =============================================================================
+// INTERFACES — ENTITY
+// =============================================================================
+
+/**
+ * Réponse complète d'une entité (GET).
+ * Aligné strictement sur EntityResponse Pydantic.
+ *
+ * Note Decimal : latitude/longitude sont des Decimal côté Pydantic.
+ * En JSON, Pydantic v2 les sérialise par défaut en string. Le frontend
+ * doit donc les coercer si calcul numérique nécessaire (parseFloat).
+ * Type retenu : number pour faciliter l'usage UI ; à valider runtime
+ * lors de la première consommation effective (Phase 4+).
+ */
 export interface EntityResponse {
   id: number;
-  tenant_id: number;
+
+  // Identification
   name: string;
+  short_name?: string | null;
   entity_type: EntityType;
-  parent_id: number | null;
-  finess_geo?: string | null;
-  finess_juridique?: string | null;
+  integration_type?: IntegrationType | null;
+  parent_id?: number | null; // alias backend de parent_entity_id
+
+  // Identifiants légaux
   siret?: string | null;
-  address_line1?: string | null;
-  address_line2?: string | null;
+  siren?: string | null;
+  finess_ej?: string | null; // FINESS Entité Juridique (ex-finess_juridique)
+  finess_et?: string | null; // FINESS Établissement / géographique (ex-finess_geo)
+
+  // Autorisation et capacité
+  authorized_capacity?: number | null;
+  authorization_date?: string | null; // ISO date
+  authorization_reference?: string | null;
+
+  // Coordonnées
+  address?: string | null; // chaîne libre unique (ex-address_line1, address_line2 absorbé)
   postal_code?: string | null;
   city?: string | null;
   phone?: string | null;
   email?: string | null;
+  website?: string | null;
+
+  // Géolocalisation
+  latitude?: number | null;
+  longitude?: number | null;
+  default_intervention_radius_km?: number | null;
+
+  // Références
+  country_id: number;
+  country?: CountryResponse | null;
+  parent_entity?: EntitySummary | null;
+
+  // Métadonnées
   is_active: boolean;
   created_at: string;
   updated_at?: string | null;
+
   // Statistiques (propriétés calculées côté backend)
-  patients_count?: number;
-  users_count?: number;
-  // Enfants (si chargés)
-  children?: EntityResponse[];
+  patients_count?: number | null;
+  users_count?: number | null; // alias backend de active_users_count
 }
 
-/** Données pour créer une entité */
+/**
+ * Entité avec ses sous-entités, pour affichage hiérarchique.
+ * Aligné sur EntityWithChildren Pydantic.
+ *
+ * Note : le champ s'appelle child_entities (pas children) pour
+ * matcher exactement le schéma Pydantic.
+ */
+export interface EntityWithChildren extends EntityResponse {
+  child_entities: EntitySummary[];
+}
+
+/**
+ * Données pour créer une entité (POST).
+ * Aligné strictement sur EntityCreate Pydantic.
+ *
+ * country_id est REQUIS (contrainte backend).
+ * Validation backend : SIRET 14 chiffres, SIREN 9 chiffres,
+ * FINESS 9 caractères alphanumériques.
+ */
 export interface EntityCreate {
+  // Identification
   name: string;
+  short_name?: string;
   entity_type: EntityType;
-  parent_id?: number | null;
-  country_id?: number;
-  finess_geo?: string;
-  finess_juridique?: string;
+
+  // Rattachement
+  integration_type?: IntegrationType;
+  parent_id?: number | null; // alias backend
+
+  // Identifiants légaux
   siret?: string;
-  address_line1?: string;
-  address_line2?: string;
+  siren?: string;
+  finess_ej?: string;
+  finess_et?: string;
+
+  // Autorisation
+  authorized_capacity?: number;
+  authorization_date?: string;
+  authorization_reference?: string;
+
+  // Coordonnées
+  address?: string;
   postal_code?: string;
   city?: string;
   phone?: string;
   email?: string;
+  website?: string;
+
+  // Géolocalisation
+  latitude?: number;
+  longitude?: number;
+  default_intervention_radius_km?: number;
+
+  // Pays (REQUIS côté backend)
+  country_id: number;
 }
 
-/** Données pour modifier une entité */
+/**
+ * Données pour modifier une entité (PATCH).
+ * Aligné sur EntityUpdate Pydantic — TOUS les champs optionnels.
+ *
+ * NOTE PRODUIT — entity_type volontairement OMIS :
+ *   Le backend accepte techniquement la modification d'entity_type,
+ *   mais nous ne l'exposons PAS dans l'UI standard. Raison :
+ *   transformer un EHPAD en SSIAD (par exemple) implique une refonte
+ *   complète des autorisations administratives (ARS, conseil
+ *   départemental, FINESS, capacité, tarification…) et n'arrive
+ *   quasiment jamais dans la vraie vie. Permettre ce changement via
+ *   un Dropdown standard ferait courir un risque produit majeur
+ *   (clic accidentel = corruption métier).
+ *   Si un cas réel émerge, ajouter le champ avec une UX dédiée
+ *   (modale de confirmation, double validation, traçabilité audit).
+ *   Référence backlog : Phase 6+.
+ */
 export interface EntityUpdate {
+  // Identification
   name?: string;
+  short_name?: string | null;
+  // entity_type : volontairement omis (voir note ci-dessus)
+
+  // Rattachement
+  integration_type?: IntegrationType | null;
   parent_id?: number | null;
-  finess_geo?: string | null;
-  finess_juridique?: string | null;
+
+  // Identifiants légaux
   siret?: string | null;
-  address_line1?: string | null;
-  address_line2?: string | null;
+  siren?: string | null;
+  finess_ej?: string | null;
+  finess_et?: string | null;
+
+  // Autorisation
+  authorized_capacity?: number | null;
+  authorization_date?: string | null;
+  authorization_reference?: string | null;
+
+  // Coordonnées
+  address?: string | null;
   postal_code?: string | null;
   city?: string | null;
   phone?: string | null;
   email?: string | null;
+  website?: string | null;
+
+  // Géolocalisation
+  latitude?: number | null;
+  longitude?: number | null;
+  default_intervention_radius_km?: number | null;
+
+  // Pays
+  country_id?: number;
+
+  // Métadonnées
   is_active?: boolean;
 }
 
@@ -233,6 +406,45 @@ export interface EntrepriseSiege {
   type_voie?: string;
   libelle_voie?: string;
   adresse?: string;
+  liste_finess?: string[];
+  liste_enseignes?: string[];
+  /**
+   * État administratif au répertoire SIRENE.
+   *   • 'A' : actif
+   *   • 'F' : fermé (déclaration de fermeture prise en compte par l'INSEE)
+   * Utilisé pour détecter les établissements obsolètes et alerter l'utilisateur
+   * (voir incident UX 15/04/2026 sur FONDATION SANTE SERVICE — SIRET fermé
+   * hydraté sans warning).
+   */
+  etat_administratif?: 'A' | 'F';
+  /** Date de fermeture de l'établissement (ISO date, uniquement si etat_administratif='F'). */
+  date_fermeture?: string | null;
+}
+
+/**
+ * Établissement matchant la requête (présent dans matching_etablissements[]).
+ *
+ * Utile quand l'utilisateur cherche par SIRET d'un établissement secondaire :
+ * l'API renvoie le siège dans `siege` (ex. mairie d'un CCAS), MAIS aussi
+ * l'établissement précis dans `matching_etablissements[0]` (ex. SSIAD avec
+ * sa propre adresse, son SIRET et son FINESS).
+ *
+ * Différences notables avec EntrepriseSiege :
+ *   • pas de champs structurés (numero_voie/type_voie/libelle_voie) : seule
+ *     la chaîne agrégée `adresse` est disponible. Le composable retombe sur
+ *     son fallback regex pour extraire la voie.
+ */
+export interface EntrepriseEtablissement {
+  siret?: string;
+  code_postal?: string;
+  libelle_commune?: string;
+  adresse?: string;
+  liste_finess?: string[];
+  liste_enseignes?: string[];
+  /** Voir EntrepriseSiege.etat_administratif — même sémantique. */
+  etat_administratif?: 'A' | 'F';
+  /** Voir EntrepriseSiege.date_fermeture — même sémantique. */
+  date_fermeture?: string | null;
 }
 
 /** Résultat de recherche API Entreprises */
@@ -241,4 +453,5 @@ export interface EntrepriseSearchResult {
   nom_raison_sociale?: string;
   nature_juridique?: string;
   siege?: EntrepriseSiege;
+  matching_etablissements?: EntrepriseEtablissement[];
 }

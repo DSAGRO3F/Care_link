@@ -12,6 +12,11 @@ Important :
 Changelog :
     S2 : Ajout display_order, status. Référentiel étendu à 27 professions
          (6 MEDICAL, 12 PARAMEDICAL, 6 SOCIAL, 3 ADMINISTRATIVE).
+    B48 P0 (16/05/2026) : Référentiel étendu à 30 professions
+         (6 MEDICAL, 12 PARAMEDICAL, 9 SOCIAL, 3 ADMINISTRATIVE) — ajout
+         de 3 professions sociales : Assistant de vie aux familles,
+         Aide à domicile, Garde à domicile. Vecteur d'attribution :
+         capacité (cf. convention CONVENTIONS #124).
 """
 
 from typing import TYPE_CHECKING
@@ -352,6 +357,27 @@ INITIAL_PROFESSIONS = [
         "category": "SOCIAL",
         "requires_rpps": False,
         "display_order": 350,
+    },
+    {
+        "name": "Assistant de vie aux familles",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 335,
+    },
+    {
+        "name": "Aide à domicile",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 360,
+    },
+    {
+        "name": "Garde à domicile",
+        "code": None,
+        "category": "SOCIAL",
+        "requires_rpps": False,
+        "display_order": 370,
     },
     # ── ADMINISTRATIVE (display_order 400-420) ───────────────────────
     {

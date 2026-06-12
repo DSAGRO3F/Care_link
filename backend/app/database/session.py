@@ -24,10 +24,15 @@ logger = logging.getLogger(__name__)
 engine = create_engine(
     settings.DATABASE_URL,
     # === Pool de connexions ===
+    # Dimensionnement :
+    #   - Dev         : pool_size=5,  max_overflow=10  → 15 max (défaut)
+    #   - Production  : pool_size=20, max_overflow=30  → 50 max (150 tenants)
+    #   - Scaling     : pool_size ≈ workers × 2, max_overflow ≈ pool_size × 1.5
+    #   NB : ne pas dépasser max_connections PostgreSQL (défaut 100, voir pg HBA)
     poolclass=QueuePool,  # Type de pool (file d'attente)
-    pool_size=5,  # Nombre de connexions permanentes
-    max_overflow=10,  # Connexions supplémentaires si besoin (temporaires)
-    pool_timeout=30,  # Timeout pour obtenir une connexion (secondes)
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
     pool_recycle=1800,  # Recycler les connexions après 30 min (évite déconnexions)
     pool_pre_ping=True,  # Vérifier que la connexion est vivante avant utilisation
     # === Options de connexion ===

@@ -397,6 +397,7 @@
   import type { PatientResponse } from '@/types';
   import type { SectionStatus, WizardSectionData } from '@/composables/useEvaluationWizard';
   import { parseDateParts, joinDateParts, getCurrentMonth, getCurrentYear } from './dateHelpers';
+  import { PREOCCUPATION_OPTIONS, sanitizePreoccupation } from './poaShared';
 
   // ── Types ────────────────────────────────────────────────────────────
 
@@ -441,13 +442,8 @@
 
   // ── Référentiels ─────────────────────────────────────────────────────
 
-  const PREOCCUPATION_OPTIONS = [
-    { label: 'Élevée', value: 'Élevée' },
-    { label: 'Assez élevée', value: 'Assez élevée' },
-    { label: 'Moyenne', value: 'Moyenne' },
-    { label: 'Assez faible', value: 'Assez faible' },
-    { label: 'Faible', value: 'Faible' },
-  ];
+  // 🔧 S7 (05/06/2026) : liste locale dupliquée supprimée au profit du
+  // référentiel partagé (miroir de l'enum schéma, sans « Moyenne »).
 
   const TYPE_ACTION_OPTIONS = [
     { label: 'Aide à domicile', value: 'Aide à domicile' },
@@ -596,8 +592,8 @@
     const source = props.initialData;
 
     if (source) {
-      preoccupationPatient.value = source.preoccupationPatient ?? '';
-      preoccupationProfessionel.value = source.preoccupationProfessionel ?? '';
+      preoccupationPatient.value = sanitizePreoccupation(source.preoccupationPatient);
+      preoccupationProfessionel.value = sanitizePreoccupation(source.preoccupationProfessionel);
 
       if (Array.isArray(source.actions)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- type propagé depuis hydrateIntervention

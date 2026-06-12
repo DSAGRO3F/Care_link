@@ -5,10 +5,10 @@ Ce module définit la table `patient_evaluations` qui stocke les évaluations
 des patients au format JSON (validées par JSON Schema).
 """
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base_class import Base
@@ -199,6 +199,43 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         info={"description": "Référence vers le validateur"},
     )
 
+    # === B40-J1 — Filiation évaluation et recours (Phase 4 bis) ===
+
+    is_under_appeal: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        doc="Drapeau recours en cours sur cette évaluation (B40-J1, D21)",
+        info={
+            "description": (
+                "Activé quand un recours administratif est en cours suite à un "
+                "refus APA. Permet d'ajouter un encart visuel dans l'UI sans "
+                "changer le statut terminal de l'évaluation."
+            ),
+        },
+    )
+
+    appeal_notes: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        doc="Notes libres sur le recours en cours (B40-J1)",
+    )
+
+    superseded_by_evaluation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("patient_evaluations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        doc="Évaluation supersédant celle-ci (B40-J1, filiation type B28b)",
+        info={
+            "description": (
+                "FK self-référentielle. NULL pour les évaluations non supersédées. "
+                "Renseigné automatiquement quand une nouvelle évaluation rend "
+                "obsolète celle-ci. ON DELETE SET NULL : pas de cascade, la "
+                "supersédance peut disparaître sans casser l'évaluation."
+            ),
+        },
+    )
+
     # === Relations ===
 
     patient: Mapped["Patient"] = relationship(
@@ -218,7 +255,10 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
     )
 
     care_plans: Mapped[list["CarePlan"]] = relationship(
-        "CarePlan", back_populates="source_evaluation", doc="Plans d'aide issus de cette évaluation"
+        "CarePlan",
+        back_populates="source_evaluation",
+        foreign_keys="[CarePlan.source_evaluation_id]",
+        doc="Plans d'aide issus de cette évaluation",
     )
 
     # Relation vers les sessions de saisie (NOUVEAU)
@@ -228,6 +268,24 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         order_by="EvaluationSession.started_at",
         doc="Sessions de saisie de l'évaluation",
+    )
+
+    # === B40-J1 — Relations de filiation (mirror B28b CarePlan.supersedes_plan / revisions) ===
+
+    superseded_by_evaluation: Mapped["PatientEvaluation | None"] = relationship(
+        "PatientEvaluation",
+        remote_side="[PatientEvaluation.id]",
+        back_populates="supersedes_evaluations",
+        foreign_keys="[PatientEvaluation.superseded_by_evaluation_id]",
+        doc="Évaluation supersédant celle-ci (B40-J1)",
+    )
+
+    supersedes_evaluations: Mapped[list["PatientEvaluation"]] = relationship(
+        "PatientEvaluation",
+        back_populates="superseded_by_evaluation",
+        foreign_keys="[PatientEvaluation.superseded_by_evaluation_id]",
+        order_by="PatientEvaluation.created_at",
+        doc="Évaluations supersédées par celle-ci (B40-J1)",
     )
 
     # === Propriétés ===
@@ -257,16 +315,6 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
         if self.evaluation_data and "sante" in self.evaluation_data:
             return self.evaluation_data["sante"]
         return None
-
-    @property
-    def is_expired(self) -> bool:
-        """Retourne True si l'évaluation a expiré."""
-        if self.expires_at and self.status == "DRAFT":
-            expires = self.expires_at
-            if expires.tzinfo is None:
-                expires = expires.replace(tzinfo=UTC)
-            return datetime.now(UTC) > expires
-        return False
 
     @property
     def is_complete(self) -> bool:
@@ -319,43 +367,6 @@ class PatientEvaluation(VersionedMixin, TimestampMixin, Base):
     def update_gir_score(self) -> None:
         """Met à jour gir_score depuis les données JSON."""
         self.gir_score = self.extract_gir_score()
-
-    def set_expiration(self, days: int = 7) -> None:
-        """Définit la date d'expiration (J+X)."""
-        self.expires_at = datetime.now(UTC) + timedelta(days=days)
-
-    def check_expiration(self) -> bool:
-        """Vérifie et met à jour le statut si expiré."""
-        if self.is_expired and self.status == "DRAFT":
-            self.status = "EXPIRED"
-            return True
-        return False
-
-    def submit_for_validation(self) -> None:
-        """
-        Soumet l'évaluation pour validation médicale.
-
-        Note: La validation JSON Schema est effectuée dans le service.
-        Cette méthode ne fait que changer le statut.
-        """
-        if self.status not in ["DRAFT", "IN_PROGRESS", "PENDING_COMPLETION", "COMPLETE"]:
-            raise ValueError(f"Impossible de soumettre depuis le statut {self.status}")
-
-        self.status = "PENDING_MEDICAL"
-
-    def validate_medical(self, user_id: int) -> None:
-        """Validation par le médecin coordonnateur."""
-        self.medical_validated_at = datetime.now(UTC)
-        self.medical_validated_by = user_id
-        self.status = "PENDING_DEPARTMENT"
-
-    def validate_department(self, validator_name: str, reference: str) -> None:
-        """Validation par le Conseil Départemental."""
-        self.department_validated_at = datetime.now(UTC)
-        self.department_validator_name = validator_name
-        self.department_validator_reference = reference
-        self.validated_at = datetime.now(UTC)
-        self.status = "VALIDATED"
 
     def update_completion(self) -> None:
         """Recalcule le pourcentage de complétion."""

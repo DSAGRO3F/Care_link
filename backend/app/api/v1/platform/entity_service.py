@@ -6,7 +6,7 @@ les validations spécifiques au contexte SuperAdmin :
 - Vérification de l'existence du tenant avant toute opération
 - Création de racines (GCSMS/GTSMS) avec unicité par tenant
 - Protection contre la suppression de racines avec enfants
-- Pas de RLS (session sans Row-Level Security)
+- Bypass RLS via session SuperAdmin (cf. session_rls.py event listener)
 """
 
 from sqlalchemy import func, select
@@ -338,8 +338,10 @@ class PlatformEntityService:
             **entity_data,
         )
         self.db.add(entity)
-        self.db.commit()
-        self.db.refresh(entity)
+        # flush() au lieu de commit()+refresh() : conserve la transaction
+        # ouverte (et donc le contexte RLS) jusqu'au commit final orchestré
+        # par get_db_no_rls(). Voir session_rls.py pour le contexte du fix.
+        self.db.flush()
 
         # Recharger avec relations
         return self.get_by_id(entity.id)
@@ -389,8 +391,8 @@ class PlatformEntityService:
         for field, value in update_data.items():
             setattr(entity, field, value)
 
-        self.db.commit()
-        self.db.refresh(entity)
+        # flush() au lieu de commit()+refresh() : cf. create() ci-dessus
+        self.db.flush()
 
         # Recharger avec relations
         return self.get_by_id(entity.id)
@@ -415,4 +417,5 @@ class PlatformEntityService:
                 raise CannotDeleteRootWithChildrenError(entity_id, children_count)
 
         entity.is_active = False
-        self.db.commit()
+        # flush() au lieu de commit() : cf. create() ci-dessus
+        self.db.flush()

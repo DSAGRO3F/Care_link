@@ -116,6 +116,9 @@ class RoleName(StrEnum):
     REFERENT = "REFERENT"  # Référent patient désigné
     EVALUATEUR = "EVALUATEUR"  # Habilité aux évaluations AGGIR
     INTERVENANT = "INTERVENANT"  # Intervenant ponctuel (lecture seule)
+    # 🆕 B40-J1 — Profils externes Phase 4 bis (cf. note_cadrage_phase4bis §6.6.2)
+    VALIDATEUR_DEPARTMENT = "VALIDATEUR_DEPARTMENT"  # Agent département (instructeur APA)
+    FAMILY_REFERENT = "FAMILY_REFERENT"  # Compte famille référent (lecture minimisée)
 
 
 class ContractType(StrEnum):
@@ -143,9 +146,12 @@ class PermissionCategory(StrEnum):
     VITALS = "VITALS"  # Constantes vitales
     USER = "USER"  # Gestion des utilisateurs
     COORDINATION = "COORDINATION"  # Carnet de coordination
+    CATALOG = "CATALOG"
+    SCHEDULE = "SCHEDULE"
     CAREPLAN = "CAREPLAN"  # Plans d'aide
     ACCESS = "ACCESS"  # Gestion des accès RGPD
     ROLE = "ROLE"  # Gestion des rôles
+    VALIDATION = "VALIDATION"  # 🆕 B40-J1 — Portail valideur générique (Phase 4 bis)
 
 
 # =============================================================================
@@ -235,63 +241,49 @@ class EvaluationSchemaType(StrEnum):
     CUSTOM = "CUSTOM"  # Grille personnalisée
 
 
-class DocumentType(StrEnum):
-    """Types de documents du dossier patient."""
-
-    PRESCRIPTION = "PRESCRIPTION"  # Ordonnance
-    CARE_PROTOCOL = "CARE_PROTOCOL"  # Protocole de soins
-    LAB_RESULT = "LAB_RESULT"  # Résultat de laboratoire
-    IMAGING = "IMAGING"  # Imagerie médicale
-    CORRESPONDENCE = "CORRESPONDENCE"  # Courrier médical
-    CONSENT = "CONSENT"  # Formulaire de consentement
-    ID_DOCUMENT = "ID_DOCUMENT"  # Pièce d'identité
-    INSURANCE = "INSURANCE"  # Document d'assurance
-    OTHER = "OTHER"  # Autre
-
-
-class DocumentFormat(StrEnum):
-    """Formats de fichiers autorisés."""
-
-    PDF = "PDF"
-    JPEG = "JPEG"
-    PNG = "PNG"
-    DICOM = "DICOM"
-    HL7 = "HL7"
-
-
-# =============================================================================
-# MODULE: EVALUATION - Évaluations patient
-# =============================================================================
-
-
 class EvaluationStatus(StrEnum):
-    """Statuts d'une évaluation."""
+    """
+    Statuts d'une évaluation patient — workflow long AGGIR_FUNDING (B40-J1).
 
-    IN_PROGRESS = "IN_PROGRESS"  # En cours de saisie
-    COMPLETED = "COMPLETED"  # Terminée
-    VALIDATED = "VALIDATED"  # Validée par un responsable
-    CANCELLED = "CANCELLED"  # Annulée
+    Workflow : IN_PROGRESS → PENDING_INTERNAL_REVIEW → PENDING_MEDICAL
+    → AWAITING_FUNDING_DECISION → VALIDATED | FUNDING_REJECTED.
+
+    Convention sémantique (D4) :
+    - PENDING_* : attente active dans CareLink (un acteur doit y agir)
+    - AWAITING_* : attente passive (décision se prend hors CareLink)
+
+    Note métier (§2.1 cadrage Phase 4 bis) : l'évaluation AGGIR dans CareLink
+    est un objet interne de coordination, jointe en pièce d'instruction au
+    dossier APA traité par le département. L'étape AWAITING_FUNDING_DECISION
+    n'est pas une attente de validation de l'évaluation, mais une attente
+    de la décision APA prise au niveau département.
+
+    Référence : note_cadrage_phase4bis_22_05_2026.md (D3, D4, D5, D9).
+    """
+
+    DRAFT = "DRAFT"  # Brouillon en cours de saisie
+    IN_PROGRESS = "IN_PROGRESS"  # Évaluation commencée, pas terminée
+    PENDING_INTERNAL_REVIEW = (
+        "PENDING_INTERNAL_REVIEW"  # 🆕 B40-J1 — Soumise à relecture interne admin GCSMS
+    )
+    PENDING_MEDICAL = "PENDING_MEDICAL"  # En attente de validation médicale externe
+    AWAITING_FUNDING_DECISION = "AWAITING_FUNDING_DECISION"  # 🔄 B40-J1 (ex-PENDING_DEPARTMENTAL) — Décision APA en cours d'instruction au département
+    VALIDATED = "VALIDATED"  # Terminal positif — document opposable (D19)
+    FUNDING_REJECTED = "FUNDING_REJECTED"  # 🆕 B40-J1 — Terminal négatif (refus APA département)
+    OBSOLETE = "OBSOLETE"  # 🆕 B40-J1 — Supersédée par une nouvelle évaluation (filiation B28-like)
 
 
 class EvaluationSessionStatus(StrEnum):
     """Statuts d'une session d'évaluation."""
 
-    DRAFT = "DRAFT"  # Brouillon
-    IN_PROGRESS = "IN_PROGRESS"  # En cours
-    COMPLETED = "COMPLETED"  # Terminée
-    VALIDATED = "VALIDATED"  # Validée
-
-
-class SyncStatus(StrEnum):
-    """Statuts de synchronisation."""
-
-    PENDING = "PENDING"  # En attente
-    SYNCED = "SYNCED"  # Synchronisé
-    ERROR = "ERROR"  # Erreur de synchronisation
+    ACTIVE = "ACTIVE"  # Session en cours
+    COMPLETED = "COMPLETED"  # Session terminée normalement
+    EXPIRED = "EXPIRED"  # Session expirée (timeout)
+    CANCELLED = "CANCELLED"  # Session annulée
 
 
 class AggirVariableCode(StrEnum):
-    """Codes des variables discriminantes AGGIR."""
+    """Codes des 17 variables AGGIR."""
 
     COHERENCE = "COHERENCE"
     ORIENTATION = "ORIENTATION"
@@ -300,35 +292,67 @@ class AggirVariableCode(StrEnum):
     ALIMENTATION = "ALIMENTATION"
     ELIMINATION = "ELIMINATION"
     TRANSFERTS = "TRANSFERTS"
-    DEPLACEMENT_INTERIEUR = "DEPLACEMENT_INTERIEUR"
-    DEPLACEMENT_EXTERIEUR = "DEPLACEMENT_EXTERIEUR"
+    DEPLACEMENTS_INTERIEURS = "DEPLACEMENTS_INTERIEURS"
+    DEPLACEMENTS_EXTERIEURS = "DEPLACEMENTS_EXTERIEURS"
     COMMUNICATION = "COMMUNICATION"
+    GESTION = "GESTION"
+    CUISINE = "CUISINE"
+    MENAGE = "MENAGE"
+    TRANSPORTS = "TRANSPORTS"
+    ACHATS = "ACHATS"
+    SUIVI_TRAITEMENT = "SUIVI_TRAITEMENT"
+    ACTIVITES_TEMPS_LIBRE = "ACTIVITES_TEMPS_LIBRE"
 
 
 class AggirSubVariableCode(StrEnum):
-    """Codes des sous-variables AGGIR."""
+    """Codes des sous-variables AGGIR (adverbes)."""
 
-    # Toilette
-    TOILETTE_HAUT = "TOILETTE_HAUT"
-    TOILETTE_BAS = "TOILETTE_BAS"
-    # Habillage
-    HABILLAGE_HAUT = "HABILLAGE_HAUT"
-    HABILLAGE_MOYEN = "HABILLAGE_MOYEN"
-    HABILLAGE_BAS = "HABILLAGE_BAS"
-    # Alimentation
-    ALIMENTATION_SE_SERVIR = "ALIMENTATION_SE_SERVIR"
-    ALIMENTATION_MANGER = "ALIMENTATION_MANGER"
-    # Élimination
-    ELIMINATION_URINAIRE = "ELIMINATION_URINAIRE"
-    ELIMINATION_FECALE = "ELIMINATION_FECALE"
+    SPONTANEMENT = "SPONTANEMENT"
+    TOTALEMENT = "TOTALEMENT"
+    HABITUELLEMENT = "HABITUELLEMENT"
+    CORRECTEMENT = "CORRECTEMENT"
+    HAUT = "HAUT"
+    BAS = "BAS"
+    MOYEN = "MOYEN"
+    URINAIRE = "URINAIRE"
+    FECALE = "FECALE"
+    SE_SERVIR = "SE_SERVIR"
+    MANGER = "MANGER"
 
 
 class AggirResultLetter(StrEnum):
-    """Lettres de résultat AGGIR (A, B, C)."""
+    """Résultats possibles d'une variable AGGIR."""
 
-    A = "A"  # Fait seul, spontanément, totalement, habituellement, correctement
+    A = "A"  # Fait seul, totalement, habituellement, correctement
     B = "B"  # Fait partiellement, ou non habituellement, ou non correctement
     C = "C"  # Ne fait pas
+
+
+class DocumentType(StrEnum):
+    """Types de documents générés."""
+
+    PPA = "PPA"  # Plan Personnalisé d'Accompagnement
+    PPCS = "PPCS"  # Plan Personnalisé de Coordination en Santé
+    EVALUATION_REPORT = "EVALUATION_REPORT"  # Rapport d'évaluation
+    COORDINATION_REPORT = "COORDINATION_REPORT"  # Rapport de coordination
+    CUSTOM = "CUSTOM"  # Document personnalisé
+
+
+class DocumentFormat(StrEnum):
+    """Formats de documents."""
+
+    PDF = "PDF"
+    DOCX = "DOCX"
+    HTML = "HTML"
+
+
+class SyncStatus(StrEnum):
+    """Statuts de synchronisation des appareils."""
+
+    CONNECTED = "CONNECTED"  # Connecté et synchronisé
+    DISCONNECTED = "DISCONNECTED"  # Déconnecté
+    ERROR = "ERROR"  # Erreur de synchronisation
+    PENDING = "PENDING"  # En attente de première synchronisation
 
 
 # =============================================================================
@@ -346,20 +370,84 @@ class CoordinationCategory(StrEnum):
 
 
 # =============================================================================
-# MODULE: CATALOG - Services de soins
+# MODULE: CATALOG - Services de soins (🔄 v4.17 — SERAFIN-PH)
 # =============================================================================
 
 
-class ServiceCategory(StrEnum):
-    """Catégories de services."""
+class ServiceDomain(StrEnum):
+    """
+    Domaines de prestations — niveau 1 de la hiérarchie catalogue.
 
-    NURSING = "NURSING"  # Soins infirmiers
-    PERSONAL_CARE = "PERSONAL_CARE"  # Aide à la personne (toilette, habillage)
-    DOMESTIC = "DOMESTIC"  # Aide domestique (ménage, courses)
-    REHABILITATION = "REHABILITATION"  # Rééducation (kiné, ergo)
-    SOCIAL = "SOCIAL"  # Accompagnement social
-    MEDICAL = "MEDICAL"  # Actes médicaux
-    COORDINATION = "COORDINATION"  # Coordination de parcours
+    Aligné sur la nomenclature SERAFIN-PH (3 grands domaines).
+    Chaque domaine regroupe plusieurs catégories de services.
+
+    🆕 v4.17 — Ajout pour structure à 2 niveaux du catalogue.
+    """
+
+    SOINS_SANTE = "SOINS_SANTE"  # Soins & Santé (soins infirmiers, médicaux, rééducation)
+    AUTONOMIE = "AUTONOMIE"  # Autonomie (hygiène, alimentation, mobilité)
+    PARTICIPATION_SOCIALE = "PARTICIPATION_SOCIALE"  # Participation sociale (cadre de vie, administratif, loisirs, transport)
+
+
+class ServiceCategory(StrEnum):
+    """
+    Catégories de services — niveau 2 de la hiérarchie catalogue.
+
+    10 catégories alignées SERAFIN-PH, remplaçant les 7 catégories anglaises
+    initiales (NURSING, PERSONAL_CARE, DOMESTIC, etc.).
+
+    🔄 v4.17 — Refonte complète pour alignement SERAFIN-PH.
+
+    Correspondance domaine → catégories :
+    - SOINS_SANTE : SOINS_INFIRMIERS, SOINS_MEDICAUX, REEDUCATION
+    - AUTONOMIE : HYGIENE_ENTRETIEN_PERSONNEL, ALIMENTATION, MOBILITE_TRANSFERTS
+    - PARTICIPATION_SOCIALE : ENTRETIEN_CADRE_VIE, ACCOMPAGNEMENT_ADMINISTRATIF,
+                              VIE_SOCIALE_LOISIRS, TRANSPORT
+    """
+
+    # Domaine : Soins & Santé
+    SOINS_INFIRMIERS = "SOINS_INFIRMIERS"  # Injections, pansements, surveillance...
+    SOINS_MEDICAUX = "SOINS_MEDICAUX"  # Consultations, distribution médicaments...
+    REEDUCATION = "REEDUCATION"  # Kiné, orthophonie, ergothérapie...
+
+    # Domaine : Autonomie
+    HYGIENE_ENTRETIEN_PERSONNEL = "HYGIENE_ENTRETIEN_PERSONNEL"  # Toilette, habillage, change...
+    ALIMENTATION = "ALIMENTATION"  # Aide repas, préparation, portage...
+    MOBILITE_TRANSFERTS = "MOBILITE_TRANSFERTS"  # Transferts, déplacements, prévention escarres...
+
+    # Domaine : Participation sociale
+    ENTRETIEN_CADRE_VIE = "ENTRETIEN_CADRE_VIE"  # Ménage, courses, linge...
+    ACCOMPAGNEMENT_ADMINISTRATIF = (
+        "ACCOMPAGNEMENT_ADMINISTRATIF"  # Démarches, coordination parcours...
+    )
+    VIE_SOCIALE_LOISIRS = "VIE_SOCIALE_LOISIRS"  # Stimulation cognitive, sorties, soutien psy...
+    TRANSPORT = "TRANSPORT"  # Accompagnement RDV, transport social, téléassistance...
+
+
+# Mapping domaine → catégories autorisées (validé côté API)
+DOMAIN_CATEGORY_MAP: dict[ServiceDomain, list[ServiceCategory]] = {
+    ServiceDomain.SOINS_SANTE: [
+        ServiceCategory.SOINS_INFIRMIERS,
+        ServiceCategory.SOINS_MEDICAUX,
+        ServiceCategory.REEDUCATION,
+    ],
+    ServiceDomain.AUTONOMIE: [
+        ServiceCategory.HYGIENE_ENTRETIEN_PERSONNEL,
+        ServiceCategory.ALIMENTATION,
+        ServiceCategory.MOBILITE_TRANSFERTS,
+    ],
+    ServiceDomain.PARTICIPATION_SOCIALE: [
+        ServiceCategory.ENTRETIEN_CADRE_VIE,
+        ServiceCategory.ACCOMPAGNEMENT_ADMINISTRATIF,
+        ServiceCategory.VIE_SOCIALE_LOISIRS,
+        ServiceCategory.TRANSPORT,
+    ],
+}
+
+# Mapping inverse : catégorie → domaine (dérivé automatiquement)
+CATEGORY_DOMAIN_MAP: dict[ServiceCategory, ServiceDomain] = {
+    cat: domain for domain, cats in DOMAIN_CATEGORY_MAP.items() for cat in cats
+}
 
 
 class ServiceType(StrEnum):
@@ -423,6 +511,35 @@ class AssignmentStatus(StrEnum):
     ASSIGNED = "ASSIGNED"  # Affecté
     CONFIRMED = "CONFIRMED"  # Confirmé par le professionnel
     REJECTED = "REJECTED"  # Refusé par le professionnel
+
+
+class CarePlanServiceStatus(StrEnum):
+    """Statut opérationnel d'un service dans un plan d'aide."""
+
+    ACTIVE = "ACTIVE"  # Service actif et en cours
+    PAUSED = "PAUSED"  # Service temporairement en pause
+    COMPLETED = "COMPLETED"  # Service terminé
+
+
+class RevisionReason(StrEnum):
+    """
+    Motifs de révision d'un plan d'aide (B28b).
+
+    Enum v1 issu de la note de cadrage B28 §5.1 (décision 23, 23/04/2026).
+    OTHER positionné comme filet de sécurité pour les cas non anticipés.
+    Enrichissement post-retours IDEC terrain → backlog B33.
+
+    Référence métier : HAS/ANESM 2008 (recommandations co-construction PPA),
+    article D.312-3 du CASF.
+    """
+
+    HOSPITAL_RETURN = "HOSPITAL_RETURN"  # Retour d'hospitalisation avec ajustements
+    HEALTH_DETERIORATION = "HEALTH_DETERIORATION"  # Dégradation de l'état de santé
+    HEALTH_STABILIZATION = "HEALTH_STABILIZATION"  # Stabilisation / amélioration
+    USER_REQUEST = "USER_REQUEST"  # Demande de l'usager / représentant légal
+    CAREGIVER_REQUEST = "CAREGIVER_REQUEST"  # Demande d'un proche aidant
+    ANNUAL_REVIEW = "ANNUAL_REVIEW"  # Révision annuelle (rythme HAS/ANESM)
+    OTHER = "OTHER"  # Autre motif (à préciser dans revision_comment)
 
 
 # =============================================================================
@@ -515,55 +632,168 @@ class BillingCycle(StrEnum):
 
 
 # =============================================================================
+# MODULE: VALIDATION - Portail valideur générique (Phase 4 bis B40-J1)
+# =============================================================================
+
+
+class ValidationWorkflowType(StrEnum):
+    """
+    Type de workflow de validation.
+
+    Détermine la nature de l'objet validé (B40-J1 §6 étape 4, décision PS-9).
+    V1 limitée aux deux workflows ci-dessous ; extensible (LIAISON_NOTEBOOK,
+    SYNTHESIS_PATIENT, etc.) sans changement de schéma.
+    """
+
+    AGGIR_FUNDING = "AGGIR_FUNDING"  # Évaluation AGGIR (instruction APA)
+    COORDINATION_DOSSIER = "COORDINATION_DOSSIER"  # Plan d'aide / dossier de coordination
+
+
+class ValidationStage(StrEnum):
+    """
+    Étape courante du workflow de validation.
+
+    Workflow Phase 4 bis AGGIR_FUNDING : INTERNAL_REVIEW → MEDICAL_REVIEW
+    → FUNDING_REVIEW. Simplifié pour COORDINATION_DOSSIER selon configuration.
+    """
+
+    INTERNAL_REVIEW = "INTERNAL_REVIEW"  # Relecture admin GCSMS
+    MEDICAL_REVIEW = "MEDICAL_REVIEW"  # Validation médicale externe
+    FUNDING_REVIEW = "FUNDING_REVIEW"  # Décision département (APA)
+
+
+class ValidationDecision(StrEnum):
+    """
+    Issue d'une demande de validation.
+
+    Référence : plan B40-J1 §6 étape 4.
+    """
+
+    VALIDATED = "VALIDATED"  # Décision favorable
+    INVALIDATED = "INVALIDATED"  # Décision défavorable (invalidation_reason obligatoire)
+    MORE_INFO_REQUESTED = "MORE_INFO_REQUESTED"  # Information complémentaire demandée
+    WITHDRAWN = "WITHDRAWN"  # Retrait par le soumetteur avant décision
+
+
+class InvalidationReason(StrEnum):
+    """
+    Catégorie structurée du motif d'invalidation.
+
+    Complémentaire du motif libre `decision_motif` — permet l'agrégation
+    statistique et le tri par typologie d'erreur côté UI valideur.
+    """
+
+    INCOMPLETE_INFO = "INCOMPLETE_INFO"  # Informations manquantes
+    CLINICAL_DISAGREEMENT = "CLINICAL_DISAGREEMENT"  # Désaccord clinique
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"  # Hors périmètre de validation
+    OTHER = "OTHER"  # Autre (motif libre obligatoire)
+
+
+class NotificationType(StrEnum):
+    """
+    Type structuré de notification utilisateur.
+
+    Permet l'agrégation et le filtrage côté UI (notification center).
+    Référence : plan B40-J1 §6 étape 3, D10 du cadrage Phase 4 bis.
+    """
+
+    VALIDATION_REQUEST_RECEIVED = "VALIDATION_REQUEST_RECEIVED"  # Valideur reçoit une demande
+    VALIDATION_DECISION_TAKEN = "VALIDATION_DECISION_TAKEN"  # Soumetteur reçoit la décision
+    VALIDATION_INFO_REQUESTED = "VALIDATION_INFO_REQUESTED"  # Soumetteur reçoit demande d'info
+    EVALUATION_FUNDING_REJECTED = "EVALUATION_FUNDING_REJECTED"  # Acteurs notifiés du refus APA
+
+
+class ExchangeActionType(StrEnum):
+    """Type d'action d'une entrée du fil d'échange (B40-J3).
+
+    Une entrée du fil est à la fois un message ET, le cas échéant, une décision :
+    c'est `action_type` qui distingue le simple commentaire de l'acte décisionnel.
+
+    - SUBMIT        : soumission initiale — ouvre le fil d'un nouveau dossier
+    - COMMENT       : message simple, pas de transition de workflow
+    - RESUBMIT      : le soumetteur renvoie après une demande de complément
+    - VALIDATE      : geste de validation (absorbé par transmit_* en workflow long)
+    - REQUEST_INFO  : demande de complément (réversible — la boucle continue)
+    - INVALIDATE    : refus (terminal, justification obligatoire)
+    - TRANSMIT      : transition d'étape (frontière de VR : interne→médical→financement)
+    """
+
+    SUBMIT = "SUBMIT"
+    COMMENT = "COMMENT"
+    RESUBMIT = "RESUBMIT"
+    VALIDATE = "VALIDATE"
+    REQUEST_INFO = "REQUEST_INFO"
+    INVALIDATE = "INVALIDATE"
+    TRANSMIT = "TRANSMIT"
+
+
+class ExchangeVisibility(StrEnum):
+    """Portée de visibilité d'une entrée du fil d'échange (B40-J3, décision session).
+
+    Filet : l'isolation tenant est portée par la RLS. La visibilité affine le
+    besoin-d'en-connaître INTRA-tenant (masquage au serializer côté service) ;
+    elle n'est PAS portée en RLS (cf. cadrage §5).
+
+    - INTERNAL_ONLY   : visible des seuls acteurs internes au GCSMS
+    - SHARED_EXTERNAL : visible aussi du valideur externe assigné (et famille si partagé)
+    """
+
+    INTERNAL_ONLY = "INTERNAL_ONLY"
+    SHARED_EXTERNAL = "SHARED_EXTERNAL"
+
+
+# =============================================================================
 # EXPORTS
 # =============================================================================
 
 __all__ = [
+    "CATEGORY_DOMAIN_MAP",
+    "DOMAIN_CATEGORY_MAP",
     "AccessType",
     "AggirResultLetter",
     "AggirSubVariableCode",
     "AggirVariableCode",
     "AssignmentStatus",
     "BillingCycle",
-    # CarePlan
+    "CarePlanServiceStatus",
     "CarePlanStatus",
     "ContractType",
-    # Coordination
     "CoordinationCategory",
     "DeviceType",
     "DocumentFormat",
     "DocumentType",
-    # Organization
     "EntityType",
     "EvaluationSchemaType",
     "EvaluationSessionStatus",
-    # Evaluation patient
     "EvaluationStatus",
+    "ExchangeActionType",
+    "ExchangeVisibility",
     "FrequencyType",
     "GirLevel",
     "IntegrationType",
-    # Interventions
     "InterventionStatus",
+    "InvalidationReason",
+    "NotificationType",
     "OrganizationModel",
-    # Patient
     "PatientStatus",
     "PermissionCategory",
-    # User
     "ProfessionCategory",
+    "RevisionReason",
     "RoleName",
-    # Catalog
     "ServiceCategory",
+    "ServiceDomain",
     "ServicePriority",
     "ServiceType",
     "ServiceUnit",
-    # Subscription
     "SubscriptionPlan",
     "SubscriptionStatus",
     "SyncStatus",
     "TenantStatus",
-    # Tenant (v4.1, mis à jour v4.4)
     "TenantType",
     "TerritoryType",
+    "ValidationDecision",
+    "ValidationStage",
+    "ValidationWorkflowType",
     "VitalSource",
     "VitalStatus",
     "VitalType",

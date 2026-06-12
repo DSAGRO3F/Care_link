@@ -18,7 +18,6 @@
   import DefaultLayout from '@/layouts/DefaultLayout.vue';
   import AuthLayout from '@/layouts/AuthLayout.vue';
   import PlatformLayout from '@/layouts/PlatformLayout.vue';
-  import AdminLayout from '@/layouts/AdminLayout.vue';
 
   const route = useRoute();
   const offlineStore = useOfflineStore();
@@ -31,9 +30,8 @@
       return AuthLayout;
     }
     if (route.meta.layout === 'platform') return PlatformLayout;
-    if (route.meta.layout === 'admin') return AdminLayout;
 
-    // Par défaut = layout complet avec sidebar
+    // Par défaut = shell unifié avec sidebar — espaces /soins ET /admin (B48 Palier 3)
     return DefaultLayout;
   });
 
